@@ -2,7 +2,7 @@
 #define APPLICATION_H_
 
 
-#include "window.h"
+#include <core/window.h>
 
 
 namespace pwg

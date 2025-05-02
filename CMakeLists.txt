@@ -1,53 +1,66 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.15)
 project(PWG)
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
-# Ustaw C++17
+# Set C++ 20
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Określ katalogi źródeł
-set(SOURCES
-    src/Application.cpp
-	src/window.cpp
-	src/main.cpp
+# Collect all source files
+file(GLOB_RECURSE ALL_SOURCES
+    "${PROJECT_SOURCE_DIR}/src/*.cpp"
+    "${PROJECT_SOURCE_DIR}/src/*.h"
 )
 
-set(HEADERS
-    src/window.h
-	src/Application.h
-)
+# Group source files in Visual Studio
+source_group(TREE ${PROJECT_SOURCE_DIR}/src PREFIX "src" FILES ${ALL_SOURCES})
 
-# GLAD
-add_library(glad
-    libs/glad/src/glad.c
-)
-
-target_include_directories(glad PUBLIC
-    libs/glad/include  # Ścieżka do nagłówków GLAD
-)
-
-# Dodaj plik wykonywalny
-add_executable(PWG ${SOURCES} ${HEADERS})
-
-# Dołącz katalogi nagłówków
-target_include_directories(PWG PRIVATE
-    include
-    libs/glad/include
-    libs/glm
-    libs/glfw/include
-)
-
-# GLFW + OpenGL
+# Find packages
 find_package(OpenGL REQUIRED)
 
-# Dodanie bibliotek GLAD i GLFW (zakładam, że masz źródła)
+# Create a static library target with the app source code
+add_library(${PROJECT_NAME}_Lib STATIC ${ALL_SOURCES})
+target_include_directories(${PROJECT_NAME}_Lib PUBLIC 
+"${PROJECT_SOURCE_DIR}/src"
+"${PROJECT_SOURCE_DIR}/libs/glad/include"
+"${PROJECT_SOURCE_DIR}/libs/glfw/include"	
+)
+
+# Add GLAD to project
+add_library(glad libs/glad/src/glad.c)
+
+target_include_directories(glad PUBLIC 
+"${PROJECT_SOURCE_DIR}/libs/glad/include" # Path to GLAD Header files
+)  
+
+# Add GLFW3 to project
 add_subdirectory(libs/glfw)
 
+# Add game executable
+add_executable(${PROJECT_NAME} "src/main.cpp")
 
-# Podłącz biblioteki
-target_link_libraries(PWG
-    glad
-    glfw
-    OpenGL::GL
+# Attach header files
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/libs
 )
+
+# Attach libraries
+target_link_libraries(${PROJECT_NAME}
+	PRIVATE 
+		${PROJECT_NAME}_Lib
+		glad
+		glfw
+		OpenGL::GL
+)
+
+# Configure output directories for game
+set_target_properties(${PROJECT_NAME} PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+# Set the startup project for Visual Studio
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+
+
 
