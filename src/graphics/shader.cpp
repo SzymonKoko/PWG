@@ -6,6 +6,8 @@ pwg::Shader::Shader(const char* vertexFilePath, const char* fragmentFilePath)
     std::string vertexCode = ReadFromShaderFile(vertexFilePath);
     std::string fragmentCode = ReadFromShaderFile(fragmentFilePath);
 
+    std::cout << vertexCode;
+    std::cout << fragmentCode;
     // Convert the shader source strings into character arrays
     const char* vertexSource = vertexCode.c_str();
     const char* fragmentSource = fragmentCode.c_str();
@@ -90,7 +92,7 @@ std::string pwg::Shader::ReadFromShaderFile(const char* shaderPath)
     }
     else
     {
-        std::cerr << "Could not read file " << shaderPath << ". File does not exist." << std::endl;
+        std::cout << "Could not read file " << shaderPath << ". File does not exist." << std::endl;
     }
 
     fileStream.close();

@@ -2,6 +2,7 @@
 #define INDEX_BUFFER_H_
 
 #include <glad.h>
+#include <vector>
 
 namespace pwg
 {
@@ -10,7 +11,7 @@ namespace pwg
 	public:
 
 		// Constructor that generates a Index Buffer Object and links it to indices
-		IndexBuffer(GLfloat* indices, GLsizeiptr size);
+		IndexBuffer(std::vector<GLuint>& indices);
 		~IndexBuffer() = default;
 
 		// Binds the EBO

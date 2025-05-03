@@ -1,10 +1,10 @@
 #include "indexBuffer.h"
 
-pwg::IndexBuffer::IndexBuffer(GLfloat* indices, GLsizeiptr size)
+pwg::IndexBuffer::IndexBuffer(std::vector<GLuint>& indices)
 {
 	glGenBuffers(1, &m_indexBufferObjectID);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBufferObjectID);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, indices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
 }
 
 void pwg::IndexBuffer::Bind()

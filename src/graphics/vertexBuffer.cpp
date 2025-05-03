@@ -1,10 +1,10 @@
 #include "vertexBuffer.h"
 
-pwg::VertexBuffer::VertexBuffer(GLfloat* vertices, GLsizeiptr size)
+pwg::VertexBuffer::VertexBuffer(std::vector<GLfloat>& vertices)
 {
 	glGenBuffers(1, &m_vertexBufferObjectID);
 	glBindBuffer(GL_ARRAY_BUFFER, m_vertexBufferObjectID);
-	glBufferData(GL_ARRAY_BUFFER, size, vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
 }
 
 void pwg::VertexBuffer::Bind()

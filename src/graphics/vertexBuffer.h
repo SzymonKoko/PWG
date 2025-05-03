@@ -2,6 +2,7 @@
 #define VERTEX_BUFFER_H_
 
 #include <glad.h>
+#include <vector>
 
 namespace pwg
 {
@@ -10,7 +11,7 @@ namespace pwg
 	public:
 
 		// Constructor that generates a Vertex Buffer Object and links it to vertices
-		VertexBuffer(GLfloat* vertices, GLsizeiptr size);
+		VertexBuffer(std::vector<GLfloat>& vertices);
 		~VertexBuffer() = default;
 
 		// Binds the VBO
