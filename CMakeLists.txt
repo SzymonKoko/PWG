@@ -19,12 +19,7 @@ source_group(TREE ${PROJECT_SOURCE_DIR}/src PREFIX "src" FILES ${ALL_SOURCES})
 find_package(OpenGL REQUIRED)
 
 # Create a static library target with the app source code
-add_library(${PROJECT_NAME}_Lib STATIC ${ALL_SOURCES})
-target_include_directories(${PROJECT_NAME}_Lib PUBLIC 
-"${PROJECT_SOURCE_DIR}/src"
-"${PROJECT_SOURCE_DIR}/libs/glad/include"
-"${PROJECT_SOURCE_DIR}/libs/glfw/include"	
-)
+
 
 # Add GLAD to project
 add_library(glad libs/glad/src/glad.c)
@@ -37,10 +32,11 @@ target_include_directories(glad PUBLIC
 add_subdirectory(libs/glfw)
 
 # Add game executable
-add_executable(${PROJECT_NAME} "src/main.cpp")
+add_executable(${PROJECT_NAME} ${ALL_SOURCES} "src/main.cpp")
 
 # Attach header files
 target_include_directories(${PROJECT_NAME} PRIVATE
+	${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/libs
 )
@@ -48,7 +44,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # Attach libraries
 target_link_libraries(${PROJECT_NAME}
 	PRIVATE 
-		${PROJECT_NAME}_Lib
 		glad
 		glfw
 		OpenGL::GL

@@ -71,6 +71,8 @@ pwg::Shader::Shader(const char* vertexFilePath, const char* fragmentFilePath)
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+
+    std::cout << "Shaders loaded\n";
 	
 }
 

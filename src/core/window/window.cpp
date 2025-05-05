@@ -1,4 +1,4 @@
-#include <core/window.h>
+#include "window.h"
 
 pwg::Window::Window()
 {

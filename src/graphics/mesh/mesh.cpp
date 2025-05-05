@@ -5,22 +5,28 @@ pwg::Mesh::Mesh(std::vector<GLfloat>& vertices, std::vector<GLuint>& indices)
 {
 
 	VAO.Bind();
+
+	//Creating Vertex buffer with vertices
 	VertexBuffer VBO(m_vertices);
 
+	//Creating index buffer with indices
 	IndexBuffer EBO(m_indices);
 	VAO.LinkVertexBufferObject(VBO, 0);
 
 	std::cout << "Mesh created: " << m_vertices.size() << ", " << m_indices.size();
 
+	//Unbinding buffers
 	VAO.Unbind();
 	EBO.Unbind();
 	VBO.Unbind();
+
+	//Deleting index and vertex buffers
+	EBO.Delete();
+	VBO.Delete();
 }
 
-void pwg::Mesh::Draw(Shader& shader)
+pwg::Mesh::~Mesh()
 {
-	shader.ActivateShader();
-	VAO.Bind();
-
-	glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
+	VAO.Delete();
 }
+
