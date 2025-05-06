@@ -29,7 +29,7 @@ void pwg::Window::InitWindow()
 {
     // GLFW Init
     if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW" << std::endl;
+        Logger::LogError(Logger::Module::Window, "Failed to initialize GLFW");
     }
 
     // OpenGL 3.3 Core
@@ -39,17 +39,21 @@ void pwg::Window::InitWindow()
 
 
     // Creating window
-    m_window = glfwCreateWindow(1280, 720, "PWG", nullptr, nullptr);
+    m_window = glfwCreateWindow(m_windowWidth, m_windowHeight, "PWG", nullptr, nullptr);
     if (!m_window) {
-        std::cerr << "Failed to create GLFW window" << std::endl;
+        Logger::LogError(Logger::Module::Window, "Failed to create GLFW window");
         glfwTerminate();
+    }
+    else 
+    {
+        Logger::LogInfo(Logger::Module::Window, "Window created");
     }
     glfwMakeContextCurrent(m_window);
     glfwSetFramebufferSizeCallback(m_window, framebuffer_size_callback);
 
     // GLAD Init
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        std::cerr << "Failed to initialize GLAD" << std::endl;
+        Logger::LogError(Logger::Module::Window, "Failed to initialize GLAD");
     }
 }
 

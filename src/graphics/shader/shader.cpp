@@ -6,8 +6,7 @@ pwg::Shader::Shader(const char* vertexFilePath, const char* fragmentFilePath)
     std::string vertexCode = ReadFromShaderFile(vertexFilePath);
     std::string fragmentCode = ReadFromShaderFile(fragmentFilePath);
 
-    std::cout << vertexCode;
-    std::cout << fragmentCode;
+    
     // Convert the shader source strings into character arrays
     const char* vertexSource = vertexCode.c_str();
     const char* fragmentSource = fragmentCode.c_str();
@@ -72,7 +71,7 @@ pwg::Shader::Shader(const char* vertexFilePath, const char* fragmentFilePath)
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    std::cout << "Shaders loaded\n";
+    Logger::LogInfo(Logger::Module::Shader, "Shaders loaded");
 	
 }
 
@@ -94,6 +93,7 @@ std::string pwg::Shader::ReadFromShaderFile(const char* shaderPath)
     }
     else
     {
+        Logger::LogError(Logger::Module::Shader, "Could not read file" + (std::string)shaderPath);
         std::cout << "Could not read file " << shaderPath << ". File does not exist." << std::endl;
     }
 
@@ -109,4 +109,9 @@ void pwg::Shader::ActivateShader()
 void pwg::Shader::DeleteShader()
 {
     glDeleteProgram(m_shaderID);
+}
+
+unsigned int pwg::Shader::GetShaderID()
+{
+    return m_shaderID;
 }

@@ -1,5 +1,5 @@
-#ifndef VERTEX_ARRAY_H_
-#define VERTEX_ARRAY_H_
+#ifndef SRC_GRAPHICS_BUFFER_VERTEX_ARRAY_H_
+#define SRC_GRAPHICS_BUFFER_VERTEX_ARRAY_H_
 
 #include <glad.h>
 #include "vertexBuffer.h"
@@ -15,7 +15,7 @@ namespace pwg
 		~VertexArray() = default;
 
 		// Links a VBO to the VAO using a certain layout
-		void LinkVertexBufferObject(VertexBuffer& VBO, GLuint layout);
+		void LinkVertexBufferObject(VertexBuffer& VBO, GLuint layout, GLuint numComponents, GLenum type, GLsizeiptr stride, void* offset);
 		// Binds the VAO
 		void Bind();
 		// Unbinds the VAO
@@ -27,4 +27,4 @@ namespace pwg
 	};
 	
 } // namespace pwg
-#endif // !VERTEX_ARRAY_H_
+#endif // !SRC_GRAPHICS_BUFFER_VERTEX_ARRAY_H_

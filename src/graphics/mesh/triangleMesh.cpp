@@ -3,7 +3,7 @@
 pwg::TriangleMesh::TriangleMesh()
 {
 	m_indexCount = m_indices.size();
-	std::cout << "IndexCOunt: " << m_indexCount;
+	m_vertexCount = m_vertices.size() / 3;
 
 	VAO.Bind();
 
@@ -12,9 +12,9 @@ pwg::TriangleMesh::TriangleMesh()
 
 	//Creating index buffer with indices
 	IndexBuffer EBO(m_indices);
-	VAO.LinkVertexBufferObject(VBO, 0);
+	VAO.LinkVertexBufferObject(VBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
 
-	std::cout << "Triangle Mesh created: " << m_vertices.size() << ", " << m_indices.size();
+	Logger::LogInfo(Logger::Module::TriangleMesh, "Triangle mesh created");
 
 	//Unbinding buffers
 	VAO.Unbind();
@@ -44,4 +44,9 @@ void pwg::TriangleMesh::Unbind()
 unsigned int pwg::TriangleMesh::GetIndexCount()
 {
 	return m_indexCount;
+}
+
+unsigned int pwg::TriangleMesh::GetVertexCount()
+{
+	return m_vertexCount;
 }

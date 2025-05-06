@@ -4,9 +4,14 @@
 #include <iostream>
 #include <glad.h>
 #include <vector>
+#include <glm/glm/glm.hpp>
+#include <glm/glm/gtc/matrix_transform.hpp>
+#include <glm/glm/gtc/type_ptr.hpp>
+#include <GLFW/glfw3.h>
 
-#include "graphics/vertexArray.h"
-#include "graphics/indexBuffer.h"
+#include "graphics/buffer/vertexArray.h"
+#include "graphics/buffer/indexBuffer.h"
+#include "core/logger/logger.h"
 
 namespace pwg
 {
@@ -18,6 +23,7 @@ namespace pwg
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
 		virtual unsigned int GetIndexCount() = 0;
+		virtual unsigned int GetVertexCount() = 0;
 	private:
 
 	};

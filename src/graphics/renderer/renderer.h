@@ -1,16 +1,15 @@
-#ifndef SRC_CORE_RENDERER_RENDERER_H_
-#define SRC_CORE_RENDERER_RENDERER_H_
+#ifndef SRC_GRAPHICS_RENDERER_RENDERER_H_
+#define SRC_GRAPHICS_RENDERER_RENDERER_H_
 
 #include <glad.h>
 #include "graphics/mesh/imesh.h"
-
 
 namespace pwg
 {
 	class Renderer
 	{
 	public:
-		Renderer() = default;
+		Renderer();
 		~Renderer() = default;
 
 		void Clear();
@@ -20,4 +19,4 @@ namespace pwg
 
 	};
 } //namespace pwg
-#endif // !SRC_CORE_RENDERER_RENDERER_H_
+#endif // !SRC_GRAPHICS_RENDERER_RENDERER_H_

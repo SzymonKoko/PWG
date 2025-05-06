@@ -3,6 +3,7 @@
 pwg::Application::Application()
 {
     InitApplication();
+    
 }
 
 pwg::Application::~Application()
@@ -14,6 +15,7 @@ void pwg::Application::InitApplication()
 {
     shaderProgram = new Shader("../assets/shaders/default.vert", "../assets/shaders/default.frag");
 
+    
 }
 
 void pwg::Application::Run()
@@ -26,7 +28,8 @@ void pwg::Application::Run()
         m_renderer.Clear();
 
         shaderProgram->ActivateShader();
-        m_renderer.Draw(m_triangleMesh);
+        m_pyramidMesh.InitMesh(shaderProgram->GetShaderID());
+        m_renderer.Draw(m_pyramidMesh);
 
         m_window.SwapBuffers();
         m_window.PollEvents();

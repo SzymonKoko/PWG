@@ -14,6 +14,7 @@ namespace pwg
 		void Bind() override;
 		void Unbind() override;
 		unsigned int GetIndexCount() override;
+		unsigned int GetVertexCount() override;
 
 
 	private:
@@ -36,6 +37,7 @@ namespace pwg
 			5, 4, 1 // Upper triangle
 		};
 		unsigned int m_indexCount{ 0 };
+		unsigned int m_vertexCount{ 0 };
 	};
 } //namespace pwg
 #endif // !SRC_GRAPHICS_MESH_TRIANGLE_MESH_H_

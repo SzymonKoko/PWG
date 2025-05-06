@@ -1,5 +1,5 @@
-#ifndef VERTEX_BUFFER_H_
-#define VERTEX_BUFFER_H_
+#ifndef SRC_GRAPHICS_BUFFER_VERTEX_BUFFER_H_
+#define SRC_GRAPHICS_BUFFER_VERTEX_BUFFER_H_
 
 #include <glad.h>
 #include <vector>
@@ -25,4 +25,4 @@ namespace pwg
 		GLuint m_vertexBufferObjectID{ 0 };
 	};
 } // namespace pwg
-#endif // !VERTEX_BUFFER_H_
+#endif // !SRC_GRAPHICS_BUFFER_VERTEX_BUFFER_H_
