@@ -6,6 +6,9 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(ASSET_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets)
+
 # Collect all source files
 file(GLOB_RECURSE ALL_SOURCES
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
@@ -30,6 +33,7 @@ target_include_directories(glad PUBLIC
 
 # Add GLFW3 to project
 add_subdirectory(libs/glfw)
+add_subdirectory(libs/glm)
 
 # Add game executable
 add_executable(${PROJECT_NAME} ${ALL_SOURCES} "src/main.cpp")
@@ -46,6 +50,7 @@ target_link_libraries(${PROJECT_NAME}
 	PRIVATE 
 		glad
 		glfw
+		glm
 		OpenGL::GL
 )
 
@@ -56,6 +61,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # Set the startup project for Visual Studio
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+
+# Copy assets and configs for the game
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+	${CMAKE_SOURCE_DIR}/assets ${ASSET_OUTPUT_DIR})
 
 
 

@@ -10,8 +10,12 @@ pwg::Window::~Window()
     glfwTerminate();
 }
 
-bool pwg::Window::WindowShouldClose() const
+bool pwg::Window::WindowShouldClose(pwg::KeyboardInput* input) const
 {
+    if (input->IsPressed(Action::Exit)) //256 - ESCAPE
+    {
+        glfwSetWindowShouldClose(m_window, true);
+    }
     return glfwWindowShouldClose(m_window);
 }
 
@@ -23,6 +27,19 @@ void pwg::Window::PollEvents()
 void pwg::Window::SwapBuffers()
 {
     glfwSwapBuffers(m_window);
+}
+
+void pwg::Window::UpdateDeltaTime()
+{
+    float currentFrame = glfwGetTime();
+    float lastFrame{ 0.0f };
+    deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+}
+
+float pwg::Window::GetDeltaTime()
+{
+    return deltaTime;
 }
 
 void pwg::Window::InitWindow()
@@ -55,6 +72,10 @@ void pwg::Window::InitWindow()
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         Logger::LogError(Logger::Module::Window, "Failed to initialize GLAD");
     }
+
+    glfwSetInputMode(m_window, GLFW_STICKY_KEYS, GLFW_TRUE);
+    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    
 }
 
 void pwg::Window::framebuffer_size_callback(GLFWwindow* window, int width, int height)

@@ -3,10 +3,13 @@
 
 
 #include "core/window/window.h"
+#include "core/input/keyboardInput.h"
+#include "core/input/mouseInput.h"
 #include "graphics/renderer/renderer.h"
 #include "graphics/mesh/triangleMesh.h"
 #include "graphics/mesh/pyramidMesh.h"
 #include "graphics/shader/shader.h"
+#include "graphics/camera/camera.h"
 
 namespace pwg
 {
@@ -24,6 +27,9 @@ namespace pwg
 		pwg::Shader* shaderProgram;
 		pwg::TriangleMesh m_triangleMesh;
 		pwg::PyramidMesh m_pyramidMesh;
+		pwg::Camera m_camera;
+		pwg::KeyboardInput* m_keyboardInput;
+		pwg::MouseInput* m_mouseInput;
 		void InitApplication();
 		
 	};

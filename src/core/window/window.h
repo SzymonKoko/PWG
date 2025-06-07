@@ -6,6 +6,8 @@
 #include <glad.h>
 #include <GLFW/glfw3.h>
 #include "core/logger/logger.h"
+#include "core/input/keyboardInput.h"
+#include "core/input/mouseInput.h"
 
 namespace pwg 
 {
@@ -16,14 +18,20 @@ namespace pwg
 		~Window();
 
 		
-		bool WindowShouldClose() const;
+		bool WindowShouldClose(KeyboardInput* input) const;
 		void PollEvents();
 		void SwapBuffers();
+
+		void UpdateDeltaTime();
+
+		GLFWwindow* GetWindow() { return m_window; }
+		float GetDeltaTime();
 		
 	private:
 		GLFWwindow* m_window;
 		uint16_t m_windowWidth{ 800 };
 		uint16_t m_windowHeight{ 800 };
+		float deltaTime{ 0.0f };
 
 		void InitWindow();
 
