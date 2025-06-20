@@ -3,6 +3,8 @@
 
 #include <glad.h>
 #include "graphics/mesh/imesh.h"
+#include "graphics/shader/shader.h"
+#include "graphics/mesh/pyramidMesh.h"
 
 namespace pwg
 {
@@ -10,12 +12,19 @@ namespace pwg
 	{
 	public:
 		Renderer();
-		~Renderer() = default;
+		~Renderer();
 
 		void Clear();
-		void Draw(IMesh& mesh);
-	private:
+		void Update();
+		void Draw();
 
+		
+		GLuint GetShaderProgramID();
+	private:
+		Shader* m_shaderProgram;
+		PyramidMesh m_pyramidMesh;
+
+		void InitShaders();
 
 	};
 } //namespace pwg

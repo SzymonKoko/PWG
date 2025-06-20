@@ -46,6 +46,10 @@ std::string pwg::Logger::ModuleToString(const Module module)
     case M::Shader:         return "Shader";
     case M::Logger:         return "Logger";
     case M::PyramidMesh:    return "PyramidMesh";
+    case M::KeyboardInput:  return "KeyboardInput";
+    case M::MouseInput:     return "MouseInput";
+    case M::InputManager:   return "InputManager";
+    case M::Camera:         return "Camera";
     default:                return "Unknown";
     }
 }

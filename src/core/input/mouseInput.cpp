@@ -3,7 +3,7 @@
 pwg::MouseInput::MouseInput(GLFWwindow* window)
 	:m_window(window)
 {
-
+    Logger::LogInfo(Logger::Module::MouseInput, "Mouse ready");
 }
 
 void pwg::MouseInput::Update()

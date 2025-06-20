@@ -17,12 +17,10 @@ namespace pwg
 		Window();
 		~Window();
 
-		
-		bool WindowShouldClose(KeyboardInput* input) const;
-		void PollEvents();
+		void Update();
 		void SwapBuffers();
-
-		void UpdateDeltaTime();
+		bool WindowShouldClose(KeyboardInput* input) const;
+		
 
 		GLFWwindow* GetWindow() { return m_window; }
 		float GetDeltaTime();
@@ -34,6 +32,8 @@ namespace pwg
 		float deltaTime{ 0.0f };
 
 		void InitWindow();
+		void PollEvents();
+		void UpdateDeltaTime();
 
 		static void framebuffer_size_callback(GLFWwindow* window, int width, int height); //Allows to resize the window
 	};

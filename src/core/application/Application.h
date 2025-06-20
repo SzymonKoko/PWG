@@ -5,6 +5,7 @@
 #include "core/window/window.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
+#include "core/logger/logger.h"
 #include "graphics/renderer/renderer.h"
 #include "graphics/mesh/triangleMesh.h"
 #include "graphics/mesh/pyramidMesh.h"
@@ -19,6 +20,8 @@ namespace pwg
 		Application();
 		~Application();
 
+		void Update();
+		void Render();
 		void Run();
 
 	private:

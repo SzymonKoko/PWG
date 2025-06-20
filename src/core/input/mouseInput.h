@@ -4,6 +4,7 @@
 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <core/logger/logger.h>
 
 namespace pwg
 {

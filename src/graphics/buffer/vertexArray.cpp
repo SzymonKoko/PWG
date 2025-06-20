@@ -8,9 +8,26 @@ pwg::VertexArray::VertexArray()
 void pwg::VertexArray::LinkVertexBufferObject(VertexBuffer& VBO, GLuint layout, GLuint numComponents, GLenum type, GLsizeiptr stride, void* offset)
 {
 	VBO.Bind();
-	glVertexAttribPointer(layout, numComponents, type, GL_FALSE, stride, offset);
-	glEnableVertexAttribArray(layout);
+	glBindVertexArray(m_vertexArrayObjectID);
+	if (layout == 0) {
+		VBO.Bind();
+		glEnableVertexAttribArray(layout);
+		glVertexAttribPointer(layout, numComponents, type, GL_FALSE, stride, offset);
+		VBO.Unbind();
+	}
+	else if (layout == 1) {
+		GLuint instanceVBO = VBO.GetInstancedVBO();
+		glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+		glEnableVertexAttribArray(layout);
+		glVertexAttribPointer(layout, numComponents, type, GL_FALSE, sizeof(glm::vec3), offset);
+		glVertexAttribDivisor(layout, 1);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+	
+	glBindVertexArray(0);
+
 	VBO.Unbind();
+
 }
 
 void pwg::VertexArray::Bind()

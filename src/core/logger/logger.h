@@ -27,7 +27,11 @@ namespace pwg
 			PyramidMesh,
 			Renderer,
 			Shader,
-			Logger
+			Logger,
+			InputManager,
+			KeyboardInput,
+			MouseInput,
+			Camera
 		};
 
 		enum class Severity

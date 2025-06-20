@@ -7,7 +7,11 @@ pwg::KeyboardInput::KeyboardInput(GLFWwindow* window)
 	m_keyBindings[static_cast<int>(Action::MoveBackward)] = GLFW_KEY_S;
 	m_keyBindings[static_cast<int>(Action::MoveLeft)] = GLFW_KEY_A;
 	m_keyBindings[static_cast<int>(Action::MoveRight)] = GLFW_KEY_D;
+	m_keyBindings[static_cast<int>(Action::MoveUp)] = GLFW_KEY_SPACE;
+	m_keyBindings[static_cast<int>(Action::MoveDown)] = GLFW_KEY_LEFT_SHIFT;
 	m_keyBindings[static_cast<int>(Action::Exit)] = GLFW_KEY_ESCAPE;
+
+	Logger::LogInfo(Logger::Module::KeyboardInput, "Keyboard ready");
 }
 
 void pwg::KeyboardInput::Update()
@@ -17,8 +21,6 @@ void pwg::KeyboardInput::Update()
 		m_previousState[i] = m_currentState[i];
 		int key = m_keyBindings[i];
 		m_currentState[i] = glfwGetKey(m_window, key) == GLFW_PRESS;
-
-		
 	}
 }
 

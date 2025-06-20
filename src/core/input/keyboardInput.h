@@ -3,10 +3,12 @@
 
 
 #include <GLFW/glfw3.h>
+#include <core/logger/logger.h>
 #include <unordered_map>
 #include <string>
 #include <iostream>
 #include <vector>
+
 
 namespace pwg
 {
@@ -17,6 +19,8 @@ namespace pwg
 		MoveBackward,
 		MoveLeft,
 		MoveRight,
+		MoveUp,
+		MoveDown,
 		Exit,
 		Count
 	};

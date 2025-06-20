@@ -2,6 +2,8 @@
 #define SRC_GRAPHICS_BUFFER_VERTEX_BUFFER_H_
 
 #include <glad.h>
+#include <glm/glm.hpp>
+#include <iostream>
 #include <vector>
 
 namespace pwg
@@ -21,8 +23,13 @@ namespace pwg
 		// Deletes the VBO
 		void Delete();
 
+		unsigned int GetInstancedPositionsSize();
+		GLuint GetInstancedVBO();
+
 	private:
 		GLuint m_vertexBufferObjectID{ 0 };
+		std::vector<glm::vec3> m_instancePositions;
+		unsigned int instancedVBO;
 	};
 } // namespace pwg
 #endif // !SRC_GRAPHICS_BUFFER_VERTEX_BUFFER_H_

@@ -19,9 +19,7 @@ namespace pwg
 		Camera();
 		~Camera() = default;
 
-		void UpdateCamera(const unsigned int& shaderID);
-		void MoveCamera(GLFWwindow* window, KeyboardInput* input, const float& dt, pwg::MouseInput* minput);
-		void UpdateRotation(pwg::MouseInput* minput);
+		void UpdateCamera(GLFWwindow* window, KeyboardInput* input, const float& dt, pwg::MouseInput* minput, const unsigned int& shaderID);
 	private:
 		glm::vec3 m_cameraPosition{ 0.0f, 0.0f, 3.0f };
 		glm::vec3 m_cameraTarget{ 0.0f, 0.0f, 0.0f };

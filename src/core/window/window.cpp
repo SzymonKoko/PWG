@@ -10,6 +10,12 @@ pwg::Window::~Window()
     glfwTerminate();
 }
 
+void pwg::Window::Update()
+{
+    PollEvents();
+    UpdateDeltaTime();
+}
+
 bool pwg::Window::WindowShouldClose(pwg::KeyboardInput* input) const
 {
     if (input->IsPressed(Action::Exit)) //256 - ESCAPE

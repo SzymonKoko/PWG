@@ -1,0 +1,8 @@
+TO DO
+- chunk mesh
+- noise generatoe classes
+- texture itd.
+
+Klasy do zrobienie:
+- chunk
+- map
