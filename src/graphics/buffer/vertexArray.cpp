@@ -9,13 +9,11 @@ void pwg::VertexArray::LinkVertexBufferObject(VertexBuffer& VBO, GLuint layout, 
 {
 	VBO.Bind();
 	glBindVertexArray(m_vertexArrayObjectID);
-	if (layout == 0) {
-		VBO.Bind();
+	if (layout < 3) {
 		glEnableVertexAttribArray(layout);
 		glVertexAttribPointer(layout, numComponents, type, GL_FALSE, stride, offset);
-		VBO.Unbind();
 	}
-	else if (layout == 1) {
+	else if (layout == 3) {
 		GLuint instanceVBO = VBO.GetInstancedVBO();
 		glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
 		glEnableVertexAttribArray(layout);

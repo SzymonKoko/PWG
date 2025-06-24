@@ -1,6 +1,6 @@
 #include "shader.h"
 
-pwg::Shader::Shader(const char* vertexFilePath, const char* fragmentFilePath)
+pwg::Shader::Shader(const std::string vertexFilePath, const std::string fragmentFilePath)
 {
     // Read vertexFile and fragmentFile and store the strings
     std::string vertexCode = ReadFromShaderFile(vertexFilePath);
@@ -79,7 +79,7 @@ pwg::Shader::~Shader()
 {
 }
 
-std::string pwg::Shader::ReadFromShaderFile(const char* shaderPath)
+std::string pwg::Shader::ReadFromShaderFile(const std::string shaderPath)
 {
     std::string content{ "" };
     std::ifstream fileStream(shaderPath, std::ios::in);
@@ -109,6 +109,21 @@ void pwg::Shader::ActivateShader()
 void pwg::Shader::DeleteShader()
 {
     glDeleteProgram(m_shaderID);
+}
+
+void pwg::Shader::SetUniformBool(const std::string& name, bool value) const
+{
+    glUniform1i(glGetUniformLocation(m_shaderID, name.c_str()), (int)value);
+}
+
+void pwg::Shader::SetUniformInt(const std::string& name, int value) const
+{
+    glUniform1i(glGetUniformLocation(m_shaderID, name.c_str()), value);
+}
+
+void pwg::Shader::SetUniformFloat(const std::string& name, float value) const
+{
+    glUniform1f(glGetUniformLocation(m_shaderID, name.c_str()), value);
 }
 
 unsigned int pwg::Shader::GetShaderID()

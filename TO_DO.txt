@@ -1,7 +1,7 @@
 TO DO
 - chunk mesh
 - noise generatoe classes
-- texture itd.
+- textureManager
 
 Klasy do zrobienie:
 - chunk

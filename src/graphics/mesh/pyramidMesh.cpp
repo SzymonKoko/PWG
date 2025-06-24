@@ -12,8 +12,10 @@ pwg::PyramidMesh::PyramidMesh()
 
 	//Creating index buffer with indices
 	IndexBuffer EBO(m_indices);
-	VAO.LinkVertexBufferObject(VBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
-	VAO.LinkVertexBufferObject(VBO, 1, 3, GL_FLOAT, 3 * sizeof(glm::vec3), (void*)0);
+	VAO.LinkVertexBufferObject(VBO, 0, 3, GL_FLOAT, 8 * sizeof(float), (void*)0);
+	VAO.LinkVertexBufferObject(VBO, 1, 3, GL_FLOAT, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	VAO.LinkVertexBufferObject(VBO, 2, 2, GL_FLOAT, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	VAO.LinkVertexBufferObject(VBO, 3, 3, GL_FLOAT, 3 * sizeof(glm::vec3), (void*)0);
 
 	m_instancedPositionsCount = VBO.GetInstancedPositionsSize();
 

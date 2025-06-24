@@ -28,8 +28,15 @@ find_package(OpenGL REQUIRED)
 add_library(glad libs/glad/src/glad.c)
 
 target_include_directories(glad PUBLIC 
-"${PROJECT_SOURCE_DIR}/libs/glad/include" # Path to GLAD Header files
+	"${PROJECT_SOURCE_DIR}/libs/glad/include" # Path to GLAD Header files
 )  
+
+# Add stb_image to project
+add_library(stb_image STATIC libs/stb/stb_image.cpp)
+
+target_include_directories(stb_image PUBLIC 
+    "${PROJECT_SOURCE_DIR}/libs/stb" # Path to stb_image Header file
+)
 
 # Add GLFW3 to project
 add_subdirectory(libs/glfw)
@@ -51,6 +58,7 @@ target_link_libraries(${PROJECT_NAME}
 		glad
 		glfw
 		glm
+		stb_image
 		OpenGL::GL
 )
 

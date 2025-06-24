@@ -31,7 +31,8 @@ namespace pwg
 			InputManager,
 			KeyboardInput,
 			MouseInput,
-			Camera
+			Camera,
+			Texture
 		};
 
 		enum class Severity

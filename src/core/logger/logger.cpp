@@ -50,6 +50,7 @@ std::string pwg::Logger::ModuleToString(const Module module)
     case M::MouseInput:     return "MouseInput";
     case M::InputManager:   return "InputManager";
     case M::Camera:         return "Camera";
+    case M::Texture:        return "Texture";
     default:                return "Unknown";
     }
 }
