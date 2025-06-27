@@ -44,7 +44,7 @@ void pwg::Renderer::InitShaders()
 
 void pwg::Renderer::InitTextures()
 {
-	m_texDirt.LoadFromFile("../assets/textures/dirt.png");
+	m_texDirt.LoadFromFile("../assets/textures/texture.png");
 }
 
 

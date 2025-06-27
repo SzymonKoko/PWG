@@ -2,7 +2,10 @@
 
 pwg::Camera::Camera()
 {
-	
+	glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f); // cel: np. œrodek mapy
+	m_cameraFront = glm::normalize(target - m_cameraPosition);
+	m_yaw = glm::degrees(atan2(m_cameraFront.z, m_cameraFront.x));
+	m_pitch = glm::degrees(asin(m_cameraFront.y));
 }
 
 void pwg::Camera::UpdateCamera(GLFWwindow* window, pwg::KeyboardInput* input, const float& dt, pwg::MouseInput* minput, const unsigned int& shaderID)
@@ -11,6 +14,7 @@ void pwg::Camera::UpdateCamera(GLFWwindow* window, pwg::KeyboardInput* input, co
 	glm::mat4 view = glm::mat4(1.0f);
 	view = glm::lookAt(m_cameraPosition, m_cameraPosition + m_cameraFront, m_cameraUp);
 
+	
 	glUseProgram(shaderID);
 
 	int viewLocation = glGetUniformLocation(shaderID, "view");

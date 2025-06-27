@@ -10,12 +10,12 @@ pwg::VertexBuffer::VertexBuffer(std::vector<GLfloat>& vertices)
 	float offset = 1.0f;
 	float heigth = 1;
 
-	const int CHUNK_SIZE = 16;
-	for (float x = 0; x < CHUNK_SIZE; x++) {
-		for (float y = 0; y < heigth; y++) {
-			for (float z = 0; z < CHUNK_SIZE; z++) {
-				m_instancePositions.emplace_back(glm::vec3(x, y, z));
-			}
+	const int CHUNK_SIZE = 256;
+	const int HALF_CHUNK_SIZE = CHUNK_SIZE / 2;
+	for (float x = -HALF_CHUNK_SIZE; x < HALF_CHUNK_SIZE; x++) {
+		for (float z = -HALF_CHUNK_SIZE; z < HALF_CHUNK_SIZE; z++) {
+			float y = m_noise.GenerateHeigthMap(x, z) * 50.0f;
+			m_instancePositions.emplace_back(glm::vec3(x, y, z));
 		}
 	}
 

@@ -6,6 +6,8 @@
 #include <iostream>
 #include <vector>
 
+#include "core/noise/noise.h"
+
 namespace pwg
 {
 	class VertexBuffer
@@ -27,6 +29,7 @@ namespace pwg
 		GLuint GetInstancedVBO();
 
 	private:
+		Noise m_noise;
 		GLuint m_vertexBufferObjectID{ 0 };
 		std::vector<glm::vec3> m_instancePositions;
 		unsigned int instancedVBO;

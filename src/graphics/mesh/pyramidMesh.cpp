@@ -68,9 +68,9 @@ void pwg::PyramidMesh::Update(const unsigned int& shaderID)
 	glm::mat4 projection = glm::mat4(1.0f);
 
 	model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-	//model = glm::rotate(model, (float)glfwGetTime()* 4 * glm::radians(45.0f), glm::vec3(1.0f, 1.0f, 0.0f));
+	model = glm::rotate(model, (float)glfwGetTime()* 1 * glm::radians(15.0f), glm::vec3(0.0f, 0.1f, 0.0f));
 
-	projection = glm::perspective(glm::radians(45.0f), (float)(800 / 800), 0.1f, 100.0f);
+	projection = glm::perspective(glm::radians(45.0f), (float)(800 / 800), 0.1f, 300.0f);
 
 	glUseProgram(shaderID);
 
