@@ -1,3 +1,4 @@
+#include <glad.h>
 #include "Application.h"
 
 pwg::Application::Application()
@@ -16,6 +17,11 @@ void pwg::Application::InitApplication()
     
     m_keyboardInput = new KeyboardInput(m_window.GetWindow());
     m_mouseInput = new MouseInput(m_window.GetWindow());
+
+    m_gui = new Gui(m_window);
+    m_gui->InitGui();
+    m_windowEditor = new WindowEditor(m_window);
+    m_windowEditor->InitEditor();
 }
 
 void pwg::Application::Update()
@@ -25,11 +31,14 @@ void pwg::Application::Update()
     m_keyboardInput->Update();
     m_mouseInput->Update();
     m_camera.UpdateCamera(m_window.GetWindow(), m_keyboardInput, m_window.GetDeltaTime(), m_mouseInput, m_renderer.GetShaderProgramID());
+    m_gui->Update();
 }
 
 void pwg::Application::Render()
 {
     m_renderer.Draw();
+    m_windowEditor->Render();
+    m_gui->Render();
     m_window.SwapBuffers();
 }
 

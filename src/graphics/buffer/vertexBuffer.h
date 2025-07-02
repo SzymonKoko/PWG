@@ -2,6 +2,7 @@
 #define SRC_GRAPHICS_BUFFER_VERTEX_BUFFER_H_
 
 #include <glad.h>
+
 #include <glm/glm.hpp>
 #include <iostream>
 #include <vector>

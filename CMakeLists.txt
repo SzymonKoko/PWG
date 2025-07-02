@@ -6,6 +6,17 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+#Fetching ImGui from github
+include(FetchContent)
+
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG docking
+)
+
+FetchContent_MakeAvailable(imgui)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(ASSET_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets)
 
@@ -13,6 +24,17 @@ set(ASSET_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets)
 file(GLOB_RECURSE ALL_SOURCES
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
     "${PROJECT_SOURCE_DIR}/src/*.h"
+)
+
+# Set all imgui sources
+set(IMGUI_SOURCES
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
 # Group source files in Visual Studio
@@ -43,13 +65,15 @@ add_subdirectory(libs/glfw)
 add_subdirectory(libs/glm)
 
 # Add game executable
-add_executable(${PROJECT_NAME} ${ALL_SOURCES} "src/main.cpp")
+add_executable(${PROJECT_NAME} ${ALL_SOURCES} ${IMGUI_SOURCES} "src/main.cpp")
 
 # Attach header files
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/libs
+	${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
 )
 
 # Attach libraries
@@ -65,6 +89,11 @@ target_link_libraries(${PROJECT_NAME}
 # Configure output directories for game
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+# Includes natvis to VS Project
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_VISUALIZER_FILES
+    "${imgui_SOURCE_DIR}/misc/natvis/imgui.natvis"
 )
 
 # Set the startup project for Visual Studio

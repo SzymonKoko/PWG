@@ -2,6 +2,7 @@
 #define SRC_GRAPHICS_BUFFER_INDEX_BUFFER_H_
 
 #include <glad.h>
+
 #include <vector>
 
 namespace pwg

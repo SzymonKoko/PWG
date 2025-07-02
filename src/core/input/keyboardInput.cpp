@@ -10,6 +10,7 @@ pwg::KeyboardInput::KeyboardInput(GLFWwindow* window)
 	m_keyBindings[static_cast<int>(Action::MoveUp)] = GLFW_KEY_SPACE;
 	m_keyBindings[static_cast<int>(Action::MoveDown)] = GLFW_KEY_LEFT_SHIFT;
 	m_keyBindings[static_cast<int>(Action::Exit)] = GLFW_KEY_ESCAPE;
+	m_keyBindings[static_cast<int>(Action::ToggleDebug)] = GLFW_KEY_F1;
 
 	Logger::LogInfo(Logger::Module::KeyboardInput, "Keyboard ready");
 }

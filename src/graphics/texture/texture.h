@@ -1,8 +1,8 @@
 #ifndef SRC_GRAPHICS_TEXTURE_TEXTURE_H_
 #define SRC_GRAPHICS_TEXTURE_TEXTURE_H_
 
-
 #include <glad.h>
+
 #include <iostream>
 #include <fstream>
 #include <string>

@@ -1,14 +1,18 @@
 #ifndef SRC_GRAPHICS_CAMERA_CAMERA_H_
 #define SRC_GRAPHICS_CAMERA_CAMERA_H_
 
+
+
+#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
-#include <glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <GLFW/glfw3.h>
 
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
+#include "core/gui/gui.h"
+
+
 
 
 namespace pwg

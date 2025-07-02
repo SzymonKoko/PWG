@@ -2,6 +2,7 @@
 #define SRC_GRAPHICS_SHADER_SHADER_H_
 
 #include <glad.h>
+
 #include <iostream>
 #include <fstream>
 #include <string>

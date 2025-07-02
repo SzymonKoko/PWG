@@ -22,6 +22,7 @@ namespace pwg
 		MoveUp,
 		MoveDown,
 		Exit,
+		ToggleDebug,
 		Count
 	};
 

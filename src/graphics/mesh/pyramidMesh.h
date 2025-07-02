@@ -1,6 +1,8 @@
 #ifndef SRC_GRAPHICS_MESH_PYRAMID_MESH_H_
 #define SRC_GRAPHICS_MESH_PYRAMID_MESH_H_
 
+
+#include <glad.h>
 #include "imesh.h"
 
 

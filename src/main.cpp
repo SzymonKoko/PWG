@@ -1,3 +1,4 @@
+#include <glad.h>
 #include "core/application/Application.h"
 
 

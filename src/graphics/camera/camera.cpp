@@ -1,4 +1,6 @@
+#include <glad.h>
 #include "camera.h"
+
 
 pwg::Camera::Camera()
 {
@@ -20,10 +22,11 @@ void pwg::Camera::UpdateCamera(GLFWwindow* window, pwg::KeyboardInput* input, co
 	int viewLocation = glGetUniformLocation(shaderID, "view");
 	glUniformMatrix4fv(viewLocation, 1, GL_FALSE, &view[0][0]);
 
+
 	//Moving camera with keyboard
-	const float cameraSpeed = 0.001f; 
+	const float cameraSpeed = 0.001f;
 	if (input->IsHeld(Action::MoveForward))
-		m_cameraPosition += cameraSpeed * dt *  m_cameraFront;
+		m_cameraPosition += cameraSpeed * dt * m_cameraFront;
 	if (input->IsHeld(Action::MoveBackward))
 		m_cameraPosition -= cameraSpeed * dt * m_cameraFront;
 	if (input->IsHeld(Action::MoveLeft))

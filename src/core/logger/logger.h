@@ -32,7 +32,11 @@ namespace pwg
 			KeyboardInput,
 			MouseInput,
 			Camera,
-			Texture
+			Texture,
+			WindowEditor,
+			TerrainEditor,
+			Noise,
+			GUI
 		};
 
 		enum class Severity
@@ -82,6 +86,14 @@ namespace pwg
 		 * @param module Identifier of the module.
 		 */
 		static std::string ModuleToString(const Module module);
+
+
+		/**
+		 * @brief Converts severity identifier to string
+		 * @param module Identifier of severity.
+		 */
+		static std::string SeverityToString(const Severity logLevel);
+
 	};
 } //namespace pwg
 #endif // !SRC_CORE_LOGGER_LOGGER_H

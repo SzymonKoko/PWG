@@ -11,7 +11,7 @@ pwg::Noise::Noise()
 	m_noise.SetFractalType(FastNoiseLite::FractalType_FBm);
 	m_noise.SetFractalOctaves(5);
 	m_noise.SetFractalLacunarity(2.0f);
-	m_noise.SetFractalGain(0.5f);
+	m_noise.SetFractalGain(0.3f);
 }
 
 pwg::Noise::~Noise()

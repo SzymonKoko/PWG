@@ -8,7 +8,7 @@ pwg::Logger::Logger()
 
 void pwg::Logger::Log(const Module module, const Severity logLevel, const std::string& message)
 {
-	std::cout << "[" << ModuleToString(module) << "] " << message << std::endl;
+	std::cout << "[" << SeverityToString(logLevel) << "] " << "[" << ModuleToString(module) << "] " << message << std::endl;
 }
 
 
@@ -51,6 +51,22 @@ std::string pwg::Logger::ModuleToString(const Module module)
     case M::InputManager:   return "InputManager";
     case M::Camera:         return "Camera";
     case M::Texture:        return "Texture";
+    case M::WindowEditor:   return "WindowEditor";
+    case M::TerrainEditor:  return "TerrainEditor";
+    case M::GUI:            return "GUI";
+    case M::Noise:          return "Noise";
+    default:                return "Unknown";
+    }
+}
+
+std::string pwg::Logger::SeverityToString(const Severity logLevel)
+{
+    using S = pwg::Logger::Severity;
+    switch (logLevel)
+    {
+    case S::INFO:           return "INFO";
+    case S::DEBUG:          return "DEBUG";
+    case S::ERROR:          return "ERROR";
     default:                return "Unknown";
     }
 }
