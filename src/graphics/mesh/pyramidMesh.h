@@ -2,7 +2,7 @@
 #define SRC_GRAPHICS_MESH_PYRAMID_MESH_H_
 
 
-#include <glad.h>
+#include <glad/glad.h>
 #include "imesh.h"
 
 

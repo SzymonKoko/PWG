@@ -1,17 +1,13 @@
 #ifndef SRC_CORE_APPLICATION_APPLICATION_H_
 #define SRC_CORE_APPLICATION_APPLICATION_H_
 
-
 #include "core/window/window.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
 #include "core/logger/logger.h"
-#include "graphics/renderer/renderer.h"
-#include "graphics/mesh/triangleMesh.h"
-#include "graphics/shader/shader.h"
-#include "graphics/camera/camera.h"
 #include "core/gui/gui.h"
 #include "core/editor/window_editor/window_editor.h"
+#include "graphics/scene/scene.h"
 
 namespace pwg
 {
@@ -26,16 +22,13 @@ namespace pwg
 		void Run();
 
 	private:
+		//TODO more smart pointers
 		pwg::Window m_window;
-		pwg::Renderer m_renderer;
-		pwg::Shader* shaderProgram;
-		pwg::PyramidMesh m_pyramidMesh;
-		pwg::Camera m_camera;
-		pwg::KeyboardInput* m_keyboardInput;
-		pwg::MouseInput* m_mouseInput;
-		pwg::Gui* m_gui;
-		pwg::WindowEditor* m_windowEditor;
-		void InitApplication();
+		pwg::KeyboardInput* m_keyboardInput; //TODO InputManager class
+		pwg::MouseInput* m_mouseInput; //TODO InputManager class
+		std::unique_ptr<Gui> m_gui;
+		pwg::WindowEditor* m_windowEditor; // TODO Move to GUI
+		std::shared_ptr<Scene> m_scene;
 		
 	};
 } //namespace pwg

@@ -1,7 +1,7 @@
 #ifndef SRC_GRAPHICS_SHADER_SHADER_H_
 #define SRC_GRAPHICS_SHADER_SHADER_H_
 
-#include <glad.h>
+#include <glad/glad.h>
 
 #include <iostream>
 #include <fstream>

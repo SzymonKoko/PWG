@@ -1,19 +1,14 @@
-﻿#include "gui.h"
+﻿#include <glad/glad.h>              
+#include "core/window/window.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+#include "gui.h"
 
-pwg::Gui::Gui(Window& window)
-	:m_window(window)
+pwg::Gui::Gui(Window& window, std::shared_ptr<Scene> scene)
+	:m_window(window), m_scene(scene)
 {
-}
 
-pwg::Gui::~Gui()
-{
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
-}
-
-void pwg::Gui::InitGui()
-{
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -29,13 +24,24 @@ void pwg::Gui::InitGui()
 	ImGui_ImplOpenGL3_Init(glsl_version);
 }
 
+pwg::Gui::~Gui()
+{
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+}
+
 void pwg::Gui::Update()
 {
 	// Start the Dear ImGui frame
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
-	//ImGui::ShowDemoWindow();
+	EnableDockSpace();
+	
+	m_scene->Draw();
+
+	ImGui::ShowDemoWindow();
 }
 
 void pwg::Gui::Render()
@@ -51,4 +57,32 @@ void pwg::Gui::Render()
 		ImGui::RenderPlatformWindowsDefault();
 		glfwMakeContextCurrent(backup_current_context);
 	}
+}
+
+void pwg::Gui::EnableDockSpace()
+{
+	static bool opt_fullscreen = true;
+	static bool opt_padding = false;
+	static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+
+	// Fullscreen window
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+	if (opt_fullscreen)
+	{
+		ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImGui::SetNextWindowPos(viewport->WorkPos);
+		ImGui::SetNextWindowSize(viewport->WorkSize);
+		ImGui::SetNextWindowViewport(viewport->ID);
+		window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+		window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+	}
+
+	// DockSpace window
+	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
+
+	// Set up the dockspace
+	ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+	ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+
+	ImGui::End();
 }

@@ -1,7 +1,6 @@
 #ifndef SRC_GRAPHICS_RENDERER_RENDERER_H_
 #define SRC_GRAPHICS_RENDERER_RENDERER_H_
 
-#include <glad.h>
 #include "graphics/mesh/imesh.h"
 #include "graphics/shader/shader.h"
 #include "graphics/mesh/pyramidMesh.h"
@@ -20,7 +19,7 @@ namespace pwg
 		void Draw();
 
 		
-		GLuint GetShaderProgramID();
+		unsigned int GetShaderProgramID();
 	private:
 		Shader* m_shaderProgram;
 		PyramidMesh m_pyramidMesh;

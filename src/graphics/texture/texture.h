@@ -1,8 +1,6 @@
 #ifndef SRC_GRAPHICS_TEXTURE_TEXTURE_H_
 #define SRC_GRAPHICS_TEXTURE_TEXTURE_H_
 
-#include <glad.h>
-
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -41,13 +39,16 @@ namespace pwg
 		* @param nrChannels Number of color channels 
 		*/
 		void LoadFromFile(const std::string& imagePath);
+		void LoadFramebufferTexture(int width, int height);
+
+		unsigned int GetTextureID() { return m_textureID; }
 
 	private:
-		unsigned char* m_image;
+		unsigned char* m_image{ nullptr };
 		int m_width{ 0 };
 		int m_height{ 0 };
 		int m_nrChannels{ 0 };
-		GLuint m_textureID{ 0 };
+		unsigned int m_textureID{ 0 };
 
 	};
 }

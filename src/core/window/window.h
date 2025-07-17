@@ -21,6 +21,8 @@ namespace pwg
 
 		GLFWwindow* GetWindow() { return m_window; }
 		float GetDeltaTime();
+		float GetWindowWidth();
+		float GetWindowHeight();
 
 		void SetWindowSizeAndPosition(GLFWwindow* window, int newWidth, int newHeight);
 

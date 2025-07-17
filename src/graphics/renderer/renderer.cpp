@@ -1,3 +1,4 @@
+#include <glad/glad.h>
 #include "renderer.h"
 
 pwg::Renderer::Renderer()
@@ -40,6 +41,8 @@ void pwg::Renderer::Draw()
 void pwg::Renderer::InitShaders()
 {
 	m_shaderProgram = new Shader("../assets/shaders/default.vert", "../assets/shaders/default.frag");
+	m_shaderProgram->ActivateShader();
+	m_shaderProgram->SetUniformInt("Texture", 0);
 }
 
 void pwg::Renderer::InitTextures()

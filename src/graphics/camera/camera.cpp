@@ -1,4 +1,5 @@
-#include <glad.h>
+#include <glad/glad.h>
+#include <imgui.h>
 #include "camera.h"
 
 
@@ -24,7 +25,7 @@ void pwg::Camera::UpdateCamera(GLFWwindow* window, pwg::KeyboardInput* input, co
 
 
 	//Moving camera with keyboard
-	const float cameraSpeed = 0.001f;
+	const float cameraSpeed = 0.1f;
 	if (input->IsHeld(Action::MoveForward))
 		m_cameraPosition += cameraSpeed * dt * m_cameraFront;
 	if (input->IsHeld(Action::MoveBackward))

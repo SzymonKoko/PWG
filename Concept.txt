@@ -10,3 +10,7 @@ EditorTree:
 - Ieditor - abstract class of varius types of editors
 - EditorManager - setting editors activity, updating and rendering them. 
 Also using ImGui initializing functions Newframe() EndFrame() etc.
+
+Mesh loader:
+- ability to load own meshes of a objects
+- applying objects to the map

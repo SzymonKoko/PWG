@@ -1,3 +1,5 @@
+#include <glad/glad.h>
+#include "imgui.h"
 #include "window_editor.h"
 
 pwg::WindowEditor::WindowEditor(Window& window)

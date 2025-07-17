@@ -1,7 +1,7 @@
 #ifndef SRC_GRAPHICS_BUFFER_VERTEX_BUFFER_H_
 #define SRC_GRAPHICS_BUFFER_VERTEX_BUFFER_H_
 
-#include <glad.h>
+#include <glad/glad.h>
 
 #include <glm/glm.hpp>
 #include <iostream>

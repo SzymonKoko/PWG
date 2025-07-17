@@ -1,4 +1,4 @@
-#include <glad.h>
+#include <glad/glad.h>
 #include "window.h"
 
 pwg::Window::Window()
@@ -88,6 +88,16 @@ void pwg::Window::SetWindowSizeAndPosition(GLFWwindow* window, int newWidth, int
 float pwg::Window::GetDeltaTime()
 {
     return deltaTime;
+}
+
+float pwg::Window::GetWindowWidth()
+{
+    return m_windowWidth;
+}
+
+float pwg::Window::GetWindowHeight()
+{
+    return m_windowHeight;
 }
 
 void pwg::Window::InitWindow()
