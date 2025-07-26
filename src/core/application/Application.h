@@ -7,7 +7,7 @@
 #include "core/logger/logger.h"
 #include "core/gui/gui.h"
 #include "core/editor/window_editor/window_editor.h"
-#include "graphics/scene/scene.h"
+#include "scene/sceneManager.h"
 
 namespace pwg
 {
@@ -28,7 +28,7 @@ namespace pwg
 		pwg::MouseInput* m_mouseInput; //TODO InputManager class
 		std::unique_ptr<Gui> m_gui;
 		pwg::WindowEditor* m_windowEditor; // TODO Move to GUI
-		std::shared_ptr<Scene> m_scene;
+		std::shared_ptr<SceneManager> m_scene;
 		
 	};
 } //namespace pwg

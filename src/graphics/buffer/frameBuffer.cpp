@@ -10,6 +10,45 @@ pwg::FrameBuffer::FrameBuffer(int width, int height, bool useRBO)
 
 }
 
+pwg::FrameBuffer::FrameBuffer(const pwg::FrameBuffer& otherFBO)
+	: m_width(otherFBO.m_width),
+	  m_height(otherFBO.m_height),
+	  m_useRBO(otherFBO.m_useRBO),
+	  m_resizeable(otherFBO.m_resizeable)
+{
+	m_fboTexture = std::make_shared<Texture>();
+	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
+
+	InitializeFrameBuffer();
+}
+
+pwg::FrameBuffer& pwg::FrameBuffer::operator=(const FrameBuffer& otherFBO)
+{
+	if (this == &otherFBO)
+	{
+		return *this;
+	}
+
+	CleanUp();
+
+	m_width = otherFBO.m_width;
+	m_height = otherFBO.m_height;
+	m_useRBO = otherFBO.m_useRBO;
+	m_resizeable = otherFBO.m_resizeable;
+
+	m_fboTexture = std::make_shared<Texture>();
+	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
+
+	InitializeFrameBuffer();
+
+	return *this;
+}
+
+pwg::FrameBuffer::~FrameBuffer()
+{
+	CleanUp();
+}
+
 void pwg::FrameBuffer::InitializeFrameBuffer()
 {
 	glGenFramebuffers(1, &m_frameBufferObjectID);

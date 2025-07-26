@@ -5,7 +5,7 @@
 #include "imgui_impl_opengl3.h"
 #include "gui.h"
 
-pwg::Gui::Gui(Window& window, std::shared_ptr<Scene> scene)
+pwg::Gui::Gui(Window& window, std::shared_ptr<SceneManager> scene)
 	:m_window(window), m_scene(scene)
 {
 
@@ -31,7 +31,7 @@ pwg::Gui::~Gui()
 	ImGui::DestroyContext();
 }
 
-void pwg::Gui::Update()
+void pwg::Gui::Update(const float& dt)
 {
 	// Start the Dear ImGui frame
 	ImGui_ImplOpenGL3_NewFrame();
@@ -39,6 +39,7 @@ void pwg::Gui::Update()
 	ImGui::NewFrame();
 	EnableDockSpace();
 	
+	m_scene->Update(dt);
 	m_scene->Draw();
 
 	ImGui::ShowDemoWindow();

@@ -2,7 +2,18 @@ TO DO
 - chunk mesh
 - noise generatoe classes
 - textureManager
+- PlayScene
+- Editors
+- Console ImGui
+- Noise, Map, Terrain Views
+- SceneDisplay
+
 
 Klasy do zrobienie:
 - chunk
 - map
+
+TODO NOW
+- rebuild scene
+- EditorCamera
+- PlayCamera

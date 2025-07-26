@@ -9,7 +9,7 @@ pwg::Application::Application()
     m_keyboardInput = new KeyboardInput(m_window.GetWindow());
     m_mouseInput = new MouseInput(m_window.GetWindow());
 
-    m_scene = std::make_shared<Scene>(m_window.GetWindow(), m_mouseInput, m_keyboardInput);
+    m_scene = std::make_shared<SceneManager>(m_window.GetWindow(), m_mouseInput, m_keyboardInput);
     m_gui = std::make_unique<Gui>(m_window, m_scene);
     m_windowEditor = new WindowEditor(m_window);
     m_windowEditor->InitEditor();
@@ -27,7 +27,7 @@ void pwg::Application::Update()
     m_window.Update();
     m_keyboardInput->Update();
     m_mouseInput->Update();
-    m_gui->Update();
+    m_gui->Update(m_window.GetDeltaTime());
     m_scene->Update(m_window.GetDeltaTime());
 }
 

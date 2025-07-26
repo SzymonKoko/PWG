@@ -12,7 +12,9 @@ namespace pwg
 	public:
 
 		FrameBuffer(int width, int height, bool useRBO);
-		~FrameBuffer() = default;
+		FrameBuffer(const pwg::FrameBuffer& otherFBO);
+		FrameBuffer& operator=(const FrameBuffer& otherFBO);
+		~FrameBuffer();
 
 		void Bind();
 		void Unbind();
