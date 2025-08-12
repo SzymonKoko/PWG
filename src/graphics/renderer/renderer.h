@@ -5,6 +5,7 @@
 #include "graphics/shader/shader.h"
 #include "graphics/mesh/pyramidMesh.h"
 #include "graphics/texture/texture.h"
+#include "graphics/camera/icamera.h"
 
 namespace pwg
 {
@@ -18,12 +19,15 @@ namespace pwg
 		void Update();
 		void Draw();
 
+		void SetCamera(ICamera* camera);
+
 		
 		unsigned int GetShaderProgramID();
 	private:
 		Shader* m_shaderProgram;
 		PyramidMesh m_pyramidMesh;
 		Texture m_texDirt;
+		ICamera* m_camera = nullptr;
 
 
 		void InitShaders();

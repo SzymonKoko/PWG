@@ -19,15 +19,18 @@ namespace pwg
 		void SwapBuffers();
 		bool WindowShouldClose(KeyboardInput* input) const;
 
+		void RegisterMouseInput(pwg::MouseInput* mouseInput);
+
 		GLFWwindow* GetWindow() { return m_window; }
 		float GetDeltaTime();
 		float GetWindowWidth();
 		float GetWindowHeight();
 
 		void SetWindowSizeAndPosition(GLFWwindow* window, int newWidth, int newHeight);
-
+		static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 	private:
 		GLFWwindow* m_window;
+
 		uint16_t m_windowWidth{ 1200 };
 		uint16_t m_windowHeight{ 1200 };
 		uint16_t m_screenWidth{ 0 };
@@ -40,6 +43,8 @@ namespace pwg
 		void UpdateDeltaTime();
 
 		static void framebuffer_size_callback(GLFWwindow* window, int width, int height); //Allows to resize the window
+		
+		static pwg::MouseInput* s_mouseInput;
 	};
 } //namespace pwg
 

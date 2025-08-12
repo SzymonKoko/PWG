@@ -23,6 +23,10 @@ namespace pwg
 		float GetDeltaX() const { return m_deltaX; }
 		float GetDeltaY() const { return m_deltaY; }
 
+		void SetScrollOffset(double xoffset, double yoffset);
+		double GetScrollOffsetY();
+		void ResetScrollOffset();
+
 	private:
 		GLFWwindow* m_window = nullptr;
 		glm::vec3 m_direction{ 0.0f, 0.0f, 0.0f };
@@ -32,6 +36,10 @@ namespace pwg
 
 		float m_deltaX{ 0.0f };
 		float m_deltaY{ 0.0f };
+
+		double m_scrollOffsetX{ 0.0f };
+		double m_scrollOffsetY{ 0.0f };
+
 	};
 }
 

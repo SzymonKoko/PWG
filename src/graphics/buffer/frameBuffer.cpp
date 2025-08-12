@@ -13,8 +13,7 @@ pwg::FrameBuffer::FrameBuffer(int width, int height, bool useRBO)
 pwg::FrameBuffer::FrameBuffer(const pwg::FrameBuffer& otherFBO)
 	: m_width(otherFBO.m_width),
 	  m_height(otherFBO.m_height),
-	  m_useRBO(otherFBO.m_useRBO),
-	  m_resizeable(otherFBO.m_resizeable)
+	  m_useRBO(otherFBO.m_useRBO)
 {
 	m_fboTexture = std::make_shared<Texture>();
 	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
@@ -34,7 +33,6 @@ pwg::FrameBuffer& pwg::FrameBuffer::operator=(const FrameBuffer& otherFBO)
 	m_width = otherFBO.m_width;
 	m_height = otherFBO.m_height;
 	m_useRBO = otherFBO.m_useRBO;
-	m_resizeable = otherFBO.m_resizeable;
 
 	m_fboTexture = std::make_shared<Texture>();
 	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
@@ -99,24 +97,18 @@ void pwg::FrameBuffer::Delete()
 
 void pwg::FrameBuffer::Resize(int width, int height)
 {
-	m_width = width;
-	m_height = height;
-	m_resizeable = true;
-}
-
-void pwg::FrameBuffer::CheckResize()
-{
-	if (!m_resizeable)
-	{
+	if (width <= 0 || height <= 0) {
 		return;
 	}
 
-	CleanUp();
+	m_width = width;
+	m_height = height;
+
+	CleanUp(); 
 
 	m_fboTexture = std::make_shared<Texture>();
 	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
 
-	InitializeFrameBuffer();
-	m_resizeable = false;
-
+	InitializeFrameBuffer();  
 }
+

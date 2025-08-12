@@ -6,11 +6,17 @@ pwg::Scene::Scene(GLFWwindow* window, MouseInput* minput, KeyboardInput* kinput)
     :m_keyboardInput(kinput), m_mouseInput(minput), m_window(window)
 {
     m_frameBuffer = std::make_unique<FrameBuffer>(800, 800, true);
+    m_editorCamera = std::make_unique<EditorCamera>(m_window, m_mouseInput, m_keyboardInput);
 }
 
 void pwg::Scene::Update(const float& dt)
 {
-    m_camera.UpdateCamera(m_window, m_keyboardInput, dt, m_mouseInput, m_renderer.GetShaderProgramID());
+    m_editorCamera->Update();
+
+    float aspectRatio = static_cast<float>(m_frameBuffer->GetWidth()) / static_cast<float>(m_frameBuffer->GetHeight());
+    m_editorCamera->UpdateProjectionMatrix(aspectRatio);
+
+    m_renderer.SetCamera(m_editorCamera.get());
 }
 
 void pwg::Scene::Draw()
@@ -27,7 +33,7 @@ void pwg::Scene::Draw()
     if (m_frameBuffer->GetWidth() != width || m_frameBuffer->GetHeight() != height) 
     {
         m_frameBuffer->Resize(width, height);
-        m_frameBuffer->CheckResize();
+        
     }
 
     m_frameBuffer->Bind();

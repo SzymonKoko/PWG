@@ -3,11 +3,12 @@
 
 #include "graphics/buffer/frameBuffer.h"
 #include "graphics/renderer/renderer.h"
-#include "graphics/camera/camera.h"
 #include "core/window/window.h"
+#include "graphics/camera/camera.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
 #include "scene/iscene.h"
+#include "editor/editorCamera/editorCamera.h"
 
 #include <memory>
 
@@ -58,14 +59,14 @@ namespace pwg
 		* @return A unique_ptr to a deep-copied EditorScene
 		*/
 		std::unique_ptr<IScene> Clone() override;
-	private:
-		Camera m_camera;
 		Renderer m_renderer;
 		std::unique_ptr<FrameBuffer> m_frameBuffer;
+		std::unique_ptr<EditorCamera> m_editorCamera;
 
 		GLFWwindow* m_window;
 		MouseInput* m_mouseInput;
 		KeyboardInput* m_keyboardInput;
+
 	};
 }
 

@@ -32,3 +32,22 @@ bool pwg::MouseInput::IsButtonDown(int button) const
 {
     return glfwGetMouseButton(m_window, button) == GLFW_PRESS;
 }
+
+void pwg::MouseInput::SetScrollOffset(double xoffset, double yoffset)
+{
+    m_scrollOffsetX = xoffset;
+    m_scrollOffsetY = yoffset;
+}
+
+double pwg::MouseInput::GetScrollOffsetY()
+{
+    double scroll = m_scrollOffsetY;
+    ResetScrollOffset();
+    return scroll;
+}
+
+void pwg::MouseInput::ResetScrollOffset()
+{
+    m_scrollOffsetX = 0.0f;
+    m_scrollOffsetY = 0.0f;
+}

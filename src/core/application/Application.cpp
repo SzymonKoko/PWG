@@ -8,6 +8,7 @@ pwg::Application::Application()
 
     m_keyboardInput = new KeyboardInput(m_window.GetWindow());
     m_mouseInput = new MouseInput(m_window.GetWindow());
+    m_window.RegisterMouseInput(m_mouseInput);
 
     m_scene = std::make_shared<SceneManager>(m_window.GetWindow(), m_mouseInput, m_keyboardInput);
     m_gui = std::make_unique<Gui>(m_window, m_scene);

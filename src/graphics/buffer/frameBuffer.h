@@ -21,7 +21,6 @@ namespace pwg
 		void Delete();
 
 		void Resize(int width, int height);
-		void CheckResize();
 
 		unsigned int GetID() { return m_frameBufferObjectID; }
 		unsigned int GetTextureID() { return m_fboTexture->GetTextureID(); }
@@ -34,7 +33,6 @@ namespace pwg
 		std::shared_ptr<Texture> m_fboTexture{ nullptr };
 		int m_width{ 800 };
 		int m_height{ 800 };
-		bool m_resizeable{ false };
 		bool m_useRBO{ false };
 
 	private:

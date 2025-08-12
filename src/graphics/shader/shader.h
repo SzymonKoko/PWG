@@ -8,6 +8,8 @@
 #include <string>
 
 #include "core/logger/logger.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 namespace pwg
 {
@@ -68,6 +70,13 @@ namespace pwg
 		 * @param value Float value for the uniform
 		 */
 		void SetUniformFloat(const std::string& name, float value) const;
+
+		/**
+		 * @brief Sets shader uniform to mat4 value
+		 * @param name Name of the uniform
+		 * @param value Mat4 value for the uniform
+		 */
+		void SetUniformMat4(const std::string& name, glm::mat4 value) const;
 
 
 		/**

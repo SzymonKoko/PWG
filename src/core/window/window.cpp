@@ -1,6 +1,8 @@
 #include <glad/glad.h>
 #include "window.h"
 
+pwg::MouseInput* pwg::Window::s_mouseInput = nullptr;
+
 pwg::Window::Window()
 {
     InitWindow();
@@ -24,6 +26,13 @@ bool pwg::Window::WindowShouldClose(pwg::KeyboardInput* input) const
         glfwSetWindowShouldClose(m_window, true);
     }
     return glfwWindowShouldClose(m_window);
+}
+
+void pwg::Window::RegisterMouseInput(pwg::MouseInput* mouseInput)
+{
+    s_mouseInput = mouseInput;
+
+    glfwSetScrollCallback(m_window, scroll_callback);
 }
 
 void pwg::Window::PollEvents()
@@ -102,6 +111,8 @@ float pwg::Window::GetWindowHeight()
 
 void pwg::Window::InitWindow()
 {
+    
+
     // GLFW Init
     if (!glfwInit()) {
         Logger::LogError(Logger::Module::Window, "Failed to initialize GLFW");
@@ -141,6 +152,7 @@ void pwg::Window::InitWindow()
 
     glfwMakeContextCurrent(m_window);
     glfwSetFramebufferSizeCallback(m_window, framebuffer_size_callback);
+    
 
     // GLAD Init
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -154,4 +166,10 @@ void pwg::Window::InitWindow()
 void pwg::Window::framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+void pwg::Window::scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    if (s_mouseInput)
+        s_mouseInput->SetScrollOffset(xoffset, yoffset);
 }

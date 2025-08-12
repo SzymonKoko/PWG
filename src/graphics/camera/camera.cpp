@@ -17,11 +17,14 @@ void pwg::Camera::UpdateCamera(GLFWwindow* window, pwg::KeyboardInput* input, co
 	glm::mat4 view = glm::mat4(1.0f);
 	view = glm::lookAt(m_cameraPosition, m_cameraPosition + m_cameraFront, m_cameraUp);
 
-	
+	//Renderer
+
 	glUseProgram(shaderID);
 
 	int viewLocation = glGetUniformLocation(shaderID, "view");
 	glUniformMatrix4fv(viewLocation, 1, GL_FALSE, &view[0][0]);
+
+	//Renderer
 
 
 	//Moving camera with keyboard

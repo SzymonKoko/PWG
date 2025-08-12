@@ -22,6 +22,13 @@ void pwg::Renderer::Clear()
 void pwg::Renderer::Update()
 {
 	m_shaderProgram->ActivateShader();
+	
+	if (m_camera)
+	{
+		m_shaderProgram->SetUniformMat4("view", m_camera->GetViewMatrix());
+		m_shaderProgram->SetUniformMat4("projection", m_camera->GetProjectionMatrix());
+	}
+
 	m_pyramidMesh.Update(GetShaderProgramID());
 }
 
@@ -36,6 +43,11 @@ void pwg::Renderer::Draw()
 	m_pyramidMesh.Unbind();
 	m_texDirt.Unbind();
 
+}
+
+void pwg::Renderer::SetCamera(ICamera* camera)
+{
+	m_camera = camera;
 }
 
 void pwg::Renderer::InitShaders()

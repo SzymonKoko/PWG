@@ -7,6 +7,7 @@
 #include "core/window/window.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
+#include "editor/editorCamera/editorCamera.h"
 
 #include <memory>
 
@@ -39,9 +40,9 @@ namespace pwg
 		*/
 		void Draw();
 	private:
-		Camera m_camera;
 		Renderer m_renderer;
 		std::unique_ptr<FrameBuffer> m_frameBuffer;
+		std::unique_ptr<EditorCamera> m_editorCamera;
 
 		GLFWwindow* m_window;
 		MouseInput* m_mouseInput;
