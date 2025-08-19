@@ -161,6 +161,8 @@ void pwg::Window::InitWindow()
 
     glfwSetInputMode(m_window, GLFW_STICKY_KEYS, GLFW_TRUE);
     glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+    
 }
 
 void pwg::Window::framebuffer_size_callback(GLFWwindow* window, int width, int height)

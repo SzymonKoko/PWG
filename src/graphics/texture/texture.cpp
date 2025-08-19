@@ -9,9 +9,15 @@ pwg::Texture::Texture()
 
 pwg::Texture::~Texture()
 {
-	stbi_image_free(m_image);
+	if (m_image)
+	{
+		stbi_image_free(m_image);
+	}
+
 	if (m_textureID != 0)
+	{
 		glDeleteTextures(1, &m_textureID);
+	}
 }
 
 void pwg::Texture::Bind()

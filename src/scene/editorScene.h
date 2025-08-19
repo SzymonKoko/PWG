@@ -9,6 +9,7 @@
 #include "core/input/mouseInput.h"
 #include "scene/iscene.h"
 #include "editor/editorCamera/editorCamera.h"
+#include "procedural/noiseTexture.h"
 
 #include <memory>
 
@@ -66,6 +67,8 @@ namespace pwg
 		GLFWwindow* m_window;
 		MouseInput* m_mouseInput;
 		KeyboardInput* m_keyboardInput;
+
+		std::unique_ptr<NoiseTexture> m_noiseTexture;
 
 	};
 }
