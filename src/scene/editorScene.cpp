@@ -2,7 +2,7 @@
 #include "imgui.h"
 #include "editorScene.h"
 
-pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput* minput, KeyboardInput* kinput)
+pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput)
 	: m_window(window), 
       m_keyboardInput(kinput), 
       m_mouseInput(minput)

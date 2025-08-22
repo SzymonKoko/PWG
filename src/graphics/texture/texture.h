@@ -43,6 +43,8 @@ namespace pwg
 
 		unsigned int GetTextureID() { return m_textureID; }
 
+
+
 	private:
 		unsigned char* m_image{ nullptr };
 		int m_width{ 0 };

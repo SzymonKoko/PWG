@@ -76,7 +76,6 @@ void pwg::FrameBuffer::CleanUp()
 		glDeleteRenderbuffers(1, &m_renderBufferObjectID);
 	}
 	GLuint textureID = m_fboTexture->GetTextureID();
-	std::cout << m_fboTexture->GetTextureID() << std::endl;
 	glDeleteTextures(1, &textureID);
 }
 

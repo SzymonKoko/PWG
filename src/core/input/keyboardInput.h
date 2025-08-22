@@ -43,6 +43,8 @@ namespace pwg
 		void RebindKey(Action action, int newKey);
 		int GetKeyForAction(Action action) const;
 
+		void SetWindow(GLFWwindow* window);
+
 
 	private:
 		GLFWwindow* m_window = nullptr;

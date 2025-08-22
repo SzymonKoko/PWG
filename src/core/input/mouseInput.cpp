@@ -51,3 +51,8 @@ void pwg::MouseInput::ResetScrollOffset()
     m_scrollOffsetX = 0.0f;
     m_scrollOffsetY = 0.0f;
 }
+
+void pwg::MouseInput::SetWindow(GLFWwindow* window)
+{
+    m_window = window;
+}

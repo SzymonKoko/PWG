@@ -27,6 +27,8 @@ namespace pwg
 		double GetScrollOffsetY();
 		void ResetScrollOffset();
 
+		void SetWindow(GLFWwindow* window);
+
 	private:
 		GLFWwindow* m_window = nullptr;
 		glm::vec3 m_direction{ 0.0f, 0.0f, 0.0f };

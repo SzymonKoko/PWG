@@ -13,6 +13,7 @@ pwg::Gui::Gui(Window& window, std::shared_ptr<SceneManager> scene)
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
+	io.IniFilename = "../assets/configs/imgui.ini";
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls 
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;

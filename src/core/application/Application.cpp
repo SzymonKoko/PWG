@@ -4,45 +4,44 @@
 
 pwg::Application::Application()
 {
+    m_keyboardInput = std::make_unique<KeyboardInput>(nullptr);
+    m_mouseInput = std::make_unique<MouseInput>(nullptr);
+    m_window = std::make_unique<Window>(*m_mouseInput, *m_keyboardInput);
+
+    m_keyboardInput->SetWindow(m_window->GetWindow());
+    m_mouseInput->SetWindow(m_window->GetWindow());
+
+    m_scene = std::make_shared<SceneManager>(m_window->GetWindow(), *m_mouseInput, *m_keyboardInput);
+    m_gui = std::make_unique<Gui>(*m_window, m_scene);
+
     Logger::LogInfo(Logger::Module::Application, "Application initialized");
-
-    m_keyboardInput = new KeyboardInput(m_window.GetWindow());
-    m_mouseInput = new MouseInput(m_window.GetWindow());
-    m_window.RegisterMouseInput(m_mouseInput);
-
-    m_scene = std::make_shared<SceneManager>(m_window.GetWindow(), m_mouseInput, m_keyboardInput);
-    m_gui = std::make_unique<Gui>(m_window, m_scene);
-    m_windowEditor = new WindowEditor(m_window);
-    m_windowEditor->InitEditor();
 }
 
 pwg::Application::~Application()
 {
-    delete m_windowEditor;
-    delete m_keyboardInput;
-    delete m_mouseInput;
+    glfwTerminate();
+    Logger::LogInfo(Logger::Module::Application, "Application destroyed");
 }
 
 void pwg::Application::Update()
 {
-    m_window.Update();
+    m_window->Update(m_window->GetDeltaTime());
     m_keyboardInput->Update();
     m_mouseInput->Update();
-    m_gui->Update(m_window.GetDeltaTime());
-    m_scene->Update(m_window.GetDeltaTime());
+    m_gui->Update(m_window->GetDeltaTime());
+    m_scene->Update(m_window->GetDeltaTime());
 }
 
 void pwg::Application::Render()
 {
-    m_windowEditor->Render();
     m_gui->Render();
-    m_window.SwapBuffers();
+    m_window->SwapBuffers();
 }
 
 void pwg::Application::Run()
 {
     //Main loop
-    while (!m_window.WindowShouldClose(m_keyboardInput)) {
+    while (!m_window->WindowShouldClose()) {
         Update();
         Render();
     }

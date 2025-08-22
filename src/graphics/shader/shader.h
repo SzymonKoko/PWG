@@ -1,8 +1,6 @@
 #ifndef SRC_GRAPHICS_SHADER_SHADER_H_
 #define SRC_GRAPHICS_SHADER_SHADER_H_
 
-#include <glad/glad.h>
-
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -84,7 +82,7 @@ namespace pwg
 		 */
 		unsigned int GetShaderID();
 	private:
-		GLuint m_shaderID{ 0 };
+		unsigned int m_shaderID{ 0 };
 	};
 }
 #endif // !SRC_GRAPHICS_SHADER_SHADER_H_

@@ -33,6 +33,7 @@ namespace pwg
 		*/
 		void Render();
 	private:
+
 		pwg::Window& m_window;
 		std::shared_ptr<SceneManager> m_scene;
 

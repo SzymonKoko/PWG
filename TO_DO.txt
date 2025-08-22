@@ -6,7 +6,9 @@ TO DO
 - Editors
 - Console ImGui
 - Noise, Map, Terrain Views
-- SceneDisplay
+- Window fullscreen
+- Noise zoom
+- Resource manager (shaderManager, textureManager, meshManager)
 
 
 Klasy do zrobienie:
@@ -14,6 +16,5 @@ Klasy do zrobienie:
 - map
 
 TODO NOW
-- rebuild scene
-- EditorCamera
 - PlayCamera
+

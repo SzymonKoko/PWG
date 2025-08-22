@@ -9,10 +9,6 @@ pwg::Texture::Texture()
 
 pwg::Texture::~Texture()
 {
-	if (m_image)
-	{
-		stbi_image_free(m_image);
-	}
 
 	if (m_textureID != 0)
 	{
@@ -60,6 +56,12 @@ void pwg::Texture::LoadFromFile(const std::string& imagePath)
 	else
 	{
 		Logger::LogError(Logger::Module::Texture, "Failed to load texture");
+	}
+
+	if (m_image)
+	{
+		stbi_image_free(m_image);
+		m_image = nullptr;
 	}
 }
 

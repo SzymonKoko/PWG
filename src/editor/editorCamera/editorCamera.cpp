@@ -1,9 +1,9 @@
 #include "editorCamera.h"
 #include "imgui.h"
 
-pwg::EditorCamera::EditorCamera(GLFWwindow* window, MouseInput* mimput, KeyboardInput* kinput)
+pwg::EditorCamera::EditorCamera(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput)
     : m_window(window),
-      m_mouseInput(mimput),
+      m_mouseInput(minput),
       m_keyboardInput(kinput),
       m_yaw(-45.0f),
       m_pitch(45.0f),
@@ -67,16 +67,16 @@ void pwg::EditorCamera::HandleMouseInput()
 
    
 
-    if (m_mouseInput->IsButtonDown(GLFW_MOUSE_BUTTON_RIGHT))
+    if (m_mouseInput.IsButtonDown(GLFW_MOUSE_BUTTON_RIGHT))
     {
         HandleOrbit();
     }
-    else if (m_mouseInput->IsButtonDown(GLFW_MOUSE_BUTTON_MIDDLE))
+    else if (m_mouseInput.IsButtonDown(GLFW_MOUSE_BUTTON_MIDDLE))
     {
         HandlePan();
     }
 
-    double scroll = m_mouseInput->GetScrollOffsetY();
+    double scroll = m_mouseInput.GetScrollOffsetY();
     
     if (scroll != 0.0f)
     {
@@ -93,8 +93,8 @@ void pwg::EditorCamera::HandleOrbit()
     const float sensitivity = 0.1f;
 
     //Moving camera with mouse
-    float xoffset = m_mouseInput->GetDeltaX() * sensitivity;
-    float yoffset = m_mouseInput->GetDeltaY() * sensitivity;
+    float xoffset = m_mouseInput.GetDeltaX() * sensitivity;
+    float yoffset = m_mouseInput.GetDeltaY() * sensitivity;
 
     //Updating yaw and pitch angles
     m_yaw += xoffset;
@@ -123,8 +123,8 @@ void pwg::EditorCamera::HandlePan()
 {
     float panSpeed = 0.0005f * m_distanceToTarget;
 
-    float dx = m_mouseInput->GetDeltaX();
-    float dy = m_mouseInput->GetDeltaY();
+    float dx = m_mouseInput.GetDeltaX();
+    float dy = m_mouseInput.GetDeltaY();
 
     glm::vec3 right = glm::normalize(glm::cross(m_position - m_target, m_up));
     glm::vec3 upMove = glm::normalize(m_up);
@@ -143,5 +143,5 @@ void pwg::EditorCamera::HandleZoom(double scroll)
     m_distanceToTarget = glm::clamp(m_distanceToTarget, m_minZoom, m_maxZoom);
 
     UpdateViewMatrix();
-    m_mouseInput->ResetScrollOffset();
+    m_mouseInput.ResetScrollOffset();
 }

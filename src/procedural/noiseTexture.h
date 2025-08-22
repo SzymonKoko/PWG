@@ -8,7 +8,9 @@
 
 namespace pwg
 {
-
+	/**
+	* @brief Struct that holds parameters of the noise
+	*/
 	struct NoiseParameters
 	{
 		int seed = 1000;
@@ -23,25 +25,99 @@ namespace pwg
 	class NoiseTexture
 	{
 	public:
+
+		/**
+		* @brief Noise texture constructor. Constructs noise with default parameters
+		*/
 		NoiseTexture();
+
+		/**
+		* @brief Noise texture constructor. Constructs noise with new parameters
+		* @param noiseParams Reference to a new parameters of the noise
+		*/
 		NoiseTexture(const NoiseParameters& noiseParams);
+
+		/**
+		* @brief Noise texture copy constructor. Constructs a copy of the noise texture instance
+		* @params Reference to a other noise texture instance
+		*/
 		NoiseTexture(const NoiseTexture& other);
+
+		/**
+		* @brief Noise texture destructor. Deletes generated textures.
+		*/
 		~NoiseTexture();
 
+		/**
+		* @brief Updates noise parameters with new ones
+		* @params noiseParams Reference to a struct of new noise parameters
+		*/
 		void UpdateNoiseData(const NoiseParameters& noiseParams);
+
+		/**
+		* @brief Noise parameters getter
+		* @return Returns reference to struct of noise parameters
+		*/
 		NoiseParameters& GetNoiseParameters() { return m_noiseParams; }
+
+		/**
+		* @brief Noise width getter
+		* @return Returns width of a noise texture in pixels
+		*/
 		int GetNoiseWidth() { return m_noiseParams.width; }
+
+		/**
+		* @brief Noise height getter
+		* @return Returns height of a noise texture in pixels
+		*/
 		int GetNoiseHeight() { return m_noiseParams.height; }
+
+		/**
+		* @brief Noise texture ID getter
+		* @return Returns id of the noise texture
+		*/
 		unsigned int GetTextureID() { return m_textureID; }
 
+		/**
+		* @brief Noise amplitude setter
+		* @param amplitude New amplitude of a noise
+		*/
 		void SetAmplitude(float amplitude);
+
+		/**
+		* @brief Noise frequency setter
+		* @param frequency New frequency of a noise
+		*/
 		void SetFrequency(float frequency);
+
+		/**
+		* @brief Noise scale setter
+		* @param scale New scale of a noise
+		*/
 		void SetScale(float scale);
+
+		/**
+		* @brief Noise offset setter
+		* @param offset New offset of a noise
+		*/
 		void SetOffset(glm::vec2 offset);
+
+		/**
+		* @brief Noise seed setter
+		* @param seed New seed of a noise
+		*/
 		void SetSeed(int seed);
 
 	private:
+
+		/**
+		* @brief Generates noise based on a noise parameters. Creates texture of the noise
+		*/
 		void GenerateNoiseData();
+
+		/**
+		* @brief Uploads noise texture to GPU
+		*/
 		void UploadToGPU();
 	private:
 		unsigned int m_textureID{ 0 };

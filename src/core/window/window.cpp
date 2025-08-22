@@ -1,38 +1,84 @@
 #include <glad/glad.h>
 #include "window.h"
 
-pwg::MouseInput* pwg::Window::s_mouseInput = nullptr;
-
-pwg::Window::Window()
+pwg::Window::Window(MouseInput& mouseInput, KeyboardInput& keyboardInput)
+    : m_mouseInput(mouseInput),
+      m_keyboardInput(keyboardInput),
+      m_window(nullptr)
 {
-    InitWindow();
+    // GLFW Init
+    if (!glfwInit()) {
+        Logger::LogError(Logger::Module::Window, "Failed to initialize GLFW");
+        return;
+    }
+
+    // OpenGL 3.3 Core
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    if (!mode) {
+        Logger::LogError(Logger::Module::Window, "Failed to get video mode!");
+        glfwTerminate();
+        return;
+    }
+    m_windowWidth = mode->width;
+    m_windowHeight = mode->height;
+
+    // Tworzenie okna
+    m_window = glfwCreateWindow(m_windowWidth, m_windowHeight, "PWG", nullptr, nullptr);
+    if (!m_window) {
+        Logger::LogError(Logger::Module::Window, "Failed to create GLFW window");
+        glfwTerminate();
+        return;
+    }
+    else
+    {
+        Logger::LogInfo(Logger::Module::Window, "Window created");
+    }
+
+    glfwMakeContextCurrent(m_window);
+    glfwSetFramebufferSizeCallback(m_window, framebuffer_size_callback);
+
+    glfwSetScrollCallback(m_window, scroll_callback);
+
+    // GLAD Init
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        Logger::LogError(Logger::Module::Window, "Failed to initialize GLAD");
+    }
+
+    glfwSetInputMode(m_window, GLFW_STICKY_KEYS, GLFW_TRUE);
+    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+    glfwSetWindowUserPointer(m_window, this);
 }
 
 pwg::Window::~Window()
 {
-    glfwTerminate();
+    glfwDestroyWindow(m_window);
+    Logger::LogInfo(Logger::Module::Window, "Window destroyed");
 }
 
-void pwg::Window::Update()
+void pwg::Window::Update(float dt)
 {
     PollEvents();
     UpdateDeltaTime();
 }
 
-bool pwg::Window::WindowShouldClose(pwg::KeyboardInput* input) const
+bool pwg::Window::WindowShouldClose() const
 {
-    if (input->IsPressed(Action::Exit))
+    if (m_keyboardInput.IsPressed(Action::Exit))
     {
         glfwSetWindowShouldClose(m_window, true);
     }
     return glfwWindowShouldClose(m_window);
 }
 
-void pwg::Window::RegisterMouseInput(pwg::MouseInput* mouseInput)
+void pwg::Window::SetWindowSize(float width, float height)
 {
-    s_mouseInput = mouseInput;
-
-    glfwSetScrollCallback(m_window, scroll_callback);
+    m_windowWidth = width;
+    m_windowHeight = height;
 }
 
 void pwg::Window::PollEvents()
@@ -48,121 +94,8 @@ void pwg::Window::SwapBuffers()
 void pwg::Window::UpdateDeltaTime()
 {
     float currentFrame = glfwGetTime();
-    deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
-}
-
-void pwg::Window::SetWindowSizeAndPosition(GLFWwindow* window, int newWidth, int newHeight)
-{
-
-    const int titleBarHeight = 35;
-
-    if (newWidth > m_screenWidth)
-    {
-        newWidth = m_screenWidth;
-    }
-    if (newHeight > m_screenHeight)
-    {
-        newHeight = m_screenHeight;
-    }
-
-    glfwSetWindowSize(window, newWidth, newHeight);
-
-    int xpos, ypos;
-    glfwGetWindowPos(window, &xpos, &ypos);
-
-    if (xpos + newWidth > m_screenWidth)
-    {
-        xpos = m_screenWidth - newWidth;
-    }
-
-    if (ypos + newHeight > m_screenHeight)
-    {
-        ypos = m_screenHeight - newHeight;
-    }
-
-    if (xpos < 0)
-    {
-        xpos = 0;
-    }
-    if (ypos < titleBarHeight)
-    {
-        ypos = titleBarHeight; 
-    }
-
-    glfwSetWindowPos(window, xpos, ypos);
-}
-
-
-float pwg::Window::GetDeltaTime()
-{
-    return deltaTime;
-}
-
-float pwg::Window::GetWindowWidth()
-{
-    return m_windowWidth;
-}
-
-float pwg::Window::GetWindowHeight()
-{
-    return m_windowHeight;
-}
-
-void pwg::Window::InitWindow()
-{
-    
-
-    // GLFW Init
-    if (!glfwInit()) {
-        Logger::LogError(Logger::Module::Window, "Failed to initialize GLFW");
-        return;
-    }
-
-    // OpenGL 3.3 Core
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    // Pobranie rozdzielczoœci ekranu
-    const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    if (!mode) {
-        Logger::LogError(Logger::Module::Window, "Failed to get video mode!");
-        glfwTerminate();
-        return;
-    }
-    m_screenWidth = mode->width;
-    m_screenHeight = mode->height;
-
-    // Ograniczenie rozmiaru okna do rozdzielczoœci ekranu
-    if (m_windowWidth > m_screenWidth) m_windowWidth = m_screenWidth;
-    if (m_windowHeight > m_screenHeight) m_windowHeight = m_screenHeight;
-
-    // Tworzenie okna
-    m_window = glfwCreateWindow(m_screenWidth, m_screenHeight, "PWG", nullptr, nullptr);
-    if (!m_window) {
-        Logger::LogError(Logger::Module::Window, "Failed to create GLFW window");
-        glfwTerminate();
-        return;
-    }
-    else
-    {
-        Logger::LogInfo(Logger::Module::Window, "Window created");
-    }
-
-    glfwMakeContextCurrent(m_window);
-    glfwSetFramebufferSizeCallback(m_window, framebuffer_size_callback);
-    
-
-    // GLAD Init
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        Logger::LogError(Logger::Module::Window, "Failed to initialize GLAD");
-    }
-
-    glfwSetInputMode(m_window, GLFW_STICKY_KEYS, GLFW_TRUE);
-    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
-    
+    m_deltaTime = currentFrame - m_lastFrame;
+    m_lastFrame = currentFrame;
 }
 
 void pwg::Window::framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -172,6 +105,9 @@ void pwg::Window::framebuffer_size_callback(GLFWwindow* window, int width, int h
 
 void pwg::Window::scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    if (s_mouseInput)
-        s_mouseInput->SetScrollOffset(xoffset, yoffset);
+    auto s_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    if (s_window)
+    {
+        s_window->m_mouseInput.SetScrollOffset(xoffset, yoffset);
+    }
 }

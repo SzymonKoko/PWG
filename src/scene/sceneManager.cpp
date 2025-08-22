@@ -1,6 +1,6 @@
 #include "sceneManager.h"
 
-pwg::SceneManager::SceneManager(GLFWwindow* window, MouseInput* minput, KeyboardInput* kinput)
+pwg::SceneManager::SceneManager(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput)
 	: m_window(window),
 	  m_mouseInput(minput),
 	  m_keyboardInput(kinput)

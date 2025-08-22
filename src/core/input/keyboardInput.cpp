@@ -52,3 +52,8 @@ int pwg::KeyboardInput::GetKeyForAction(Action action) const
 	return m_keyBindings[static_cast<int>(action)];
 }
 
+void pwg::KeyboardInput::SetWindow(GLFWwindow* window)
+{
+	m_window = window;
+}
+

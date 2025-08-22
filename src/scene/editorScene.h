@@ -4,7 +4,6 @@
 #include "graphics/buffer/frameBuffer.h"
 #include "graphics/renderer/renderer.h"
 #include "core/window/window.h"
-#include "graphics/camera/camera.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
 #include "scene/iscene.h"
@@ -25,7 +24,7 @@ namespace pwg
 		* @param minput Mouse input that is used for camera
 		* @param kinput Keyboard input that is used for camera
 		*/
-		EditorScene(GLFWwindow* window, MouseInput* minput, KeyboardInput* kinput);
+		EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput);
 
 		/**
 		* @brief EditorScene copy constructor. Creates a deep copy of a given EditorScene object
@@ -60,13 +59,15 @@ namespace pwg
 		* @return A unique_ptr to a deep-copied EditorScene
 		*/
 		std::unique_ptr<IScene> Clone() override;
+
+	private:
 		Renderer m_renderer;
 		std::unique_ptr<FrameBuffer> m_frameBuffer;
 		std::unique_ptr<EditorCamera> m_editorCamera;
 
 		GLFWwindow* m_window;
-		MouseInput* m_mouseInput;
-		KeyboardInput* m_keyboardInput;
+		MouseInput& m_mouseInput;
+		KeyboardInput& m_keyboardInput;
 
 		std::unique_ptr<NoiseTexture> m_noiseTexture;
 

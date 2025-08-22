@@ -1,3 +1,4 @@
+#include <glad/glad.h>
 #include "shader.h"
 
 pwg::Shader::Shader(const std::string vertexFilePath, const std::string fragmentFilePath)
