@@ -79,6 +79,12 @@ namespace pwg
 		unsigned int GetTextureID() { return m_textureID; }
 
 		/**
+		* @brief Noise data getter
+		* @return Returns vector of noise data float values
+		*/
+		std::vector<float> GetNoiseData() { return m_noiseData; }
+
+		/**
 		* @brief Noise amplitude setter
 		* @param amplitude New amplitude of a noise
 		*/
@@ -124,6 +130,7 @@ namespace pwg
 		FastNoiseLite m_noise;
 		NoiseParameters m_noiseParams;
 		std::vector<unsigned char> m_pixels;
+		std::vector<float> m_noiseData;
 
 	};
 }

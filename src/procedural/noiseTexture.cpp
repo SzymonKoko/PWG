@@ -29,7 +29,8 @@ pwg::NoiseTexture::NoiseTexture(const NoiseParameters& noiseParams)
 pwg::NoiseTexture::NoiseTexture(const NoiseTexture& other)
 	: m_noiseParams(other.m_noiseParams),
 	  m_noise(other.m_noise),
-	  m_pixels(other.m_pixels)
+	  m_pixels(other.m_pixels),
+	  m_noiseData(other.m_noiseData)
 {
 	glGenTextures(1, &m_textureID);
 	UploadToGPU(); 
@@ -80,6 +81,7 @@ void pwg::NoiseTexture::SetSeed(int seed)
 void pwg::NoiseTexture::GenerateNoiseData()
 {
 	m_pixels.resize(m_noiseParams.width * m_noiseParams.height * 4);
+	m_noiseData.resize(m_noiseParams.width * m_noiseParams.height);
 
 	for (int y = 0; y < m_noiseParams.height; y++)
 	{
@@ -102,6 +104,9 @@ void pwg::NoiseTexture::GenerateNoiseData()
 			m_pixels[pixelIndex + 1] = pixelValue;	//G
 			m_pixels[pixelIndex + 2] = pixelValue;	//B
 			m_pixels[pixelIndex + 3] = 255;			//A
+
+			size_t noiseDataIndex = y * m_noiseParams.width + x;
+			m_noiseData[noiseDataIndex] = noiseValue;
 		}
 	}
 }

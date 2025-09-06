@@ -43,9 +43,6 @@ source_group(TREE ${PROJECT_SOURCE_DIR}/src PREFIX "src" FILES ${ALL_SOURCES})
 # Find packages
 find_package(OpenGL REQUIRED)
 
-# Create a static library target with the app source code
-
-
 # Add GLAD to project
 add_library(glad libs/glad/src/glad.c)
 
@@ -58,6 +55,12 @@ add_library(stb_image STATIC libs/stb/stb_image.cpp)
 
 target_include_directories(stb_image PUBLIC 
     "${PROJECT_SOURCE_DIR}/libs/stb" # Path to stb_image Header file
+)
+
+#Add entt to project
+add_library(entt INTERFACE)
+target_include_directories(entt INTERFACE 
+    "${PROJECT_SOURCE_DIR}/libs/entt" # Path to entt Header file
 )
 
 # Add GLFW3 to project
@@ -83,6 +86,7 @@ target_link_libraries(${PROJECT_NAME}
 		glfw
 		glm
 		stb_image
+		entt
 		OpenGL::GL
 )
 
