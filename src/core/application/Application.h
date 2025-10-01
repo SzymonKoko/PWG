@@ -7,6 +7,7 @@
 #include "core/logger/logger.h"
 #include "core/gui/gui.h"
 #include "scene/sceneManager.h"
+#include <entt/entt.hpp>
 
 namespace pwg
 {

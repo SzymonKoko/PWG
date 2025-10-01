@@ -23,16 +23,16 @@ void pwg::SceneManager::Stop()
 
 void pwg::SceneManager::Update(const float& dt)
 {
-	if (m_currentScene)
+	if (m_editorScene)
 	{
-		m_currentScene->Update(dt);
+		m_editorScene->Update(dt);
 	}
 }
 
 void pwg::SceneManager::Draw()
 {
-	if (m_currentScene)
+	if (m_editorScene)
 	{
-		m_currentScene->Draw();
+		m_editorScene->Draw();
 	}
 }

@@ -6,9 +6,11 @@
 #include "core/window/window.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
-#include "scene/iscene.h"
 #include "editor/editorCamera/editorCamera.h"
 #include "procedural/noiseTexture.h"
+#include <entt/entt.hpp>
+#include "core/ecs/entity.h"
+#include "scene/iscene.h"
 
 #include <memory>
 
@@ -44,6 +46,8 @@ namespace pwg
 		*/
 		~EditorScene() = default;
 
+		Entity CreateEntity(const std::string& name);
+
 		/**
 		* @brief Updates scene on every frame
 		*/
@@ -70,7 +74,9 @@ namespace pwg
 		KeyboardInput& m_keyboardInput;
 
 		std::unique_ptr<NoiseTexture> m_noiseTexture;
+		entt::registry m_editorSceneRegistry;
 
+		float m_aspectRatio = 16.0f / 9.0f;
 	};
 }
 

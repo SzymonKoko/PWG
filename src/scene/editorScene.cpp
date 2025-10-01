@@ -1,6 +1,9 @@
 #include <glad/glad.h>
 #include "imgui.h"
 #include "editorScene.h"
+#include "scene/systems/editorCameraControllerSystem.h"
+#include "scene/components/tagComponent.h"
+
 
 pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput)
 	: m_window(window), 
@@ -8,7 +11,11 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
       m_mouseInput(minput)
 {
 	m_frameBuffer = std::make_unique<FrameBuffer>(800, 800, true);
-    m_editorCamera = std::make_unique<EditorCamera>(m_window, m_mouseInput, m_keyboardInput);
+
+    auto editorCam = CreateEntity("EditorCamera");
+    editorCam.AddComponent<pwg::components::TransformComponent>();
+    editorCam.AddComponent<pwg::components::CameraComponent>();
+    editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
     m_noiseTexture = std::make_unique<NoiseTexture>();
 }
@@ -22,11 +29,6 @@ pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)
     if (otherEditorScene.m_frameBuffer)
     {
         m_frameBuffer = std::make_unique<FrameBuffer>(*otherEditorScene.m_frameBuffer);
-    }
-
-    if (otherEditorScene.m_editorCamera)
-    {
-        m_editorCamera = std::make_unique<EditorCamera>(*otherEditorScene.m_editorCamera);
     }
 
     if (otherEditorScene.m_noiseTexture)
@@ -57,15 +59,6 @@ pwg::EditorScene& pwg::EditorScene::operator=(const EditorScene& otherEditorScen
         m_frameBuffer.reset();
     }
 
-    if (otherEditorScene.m_editorCamera)
-    {
-        m_editorCamera = std::make_unique<EditorCamera>(*otherEditorScene.m_editorCamera);
-    }
-    else
-    {
-        m_editorCamera.reset();
-    }
-
     if (otherEditorScene.m_noiseTexture)
     {
         m_noiseTexture = std::make_unique<NoiseTexture>(*otherEditorScene.m_noiseTexture);
@@ -78,11 +71,16 @@ pwg::EditorScene& pwg::EditorScene::operator=(const EditorScene& otherEditorScen
     return *this;
 }
 
+pwg::Entity pwg::EditorScene::CreateEntity(const std::string& name)
+{
+    Entity entity(m_editorSceneRegistry.create(), &m_editorSceneRegistry);
+    entity.AddComponent<pwg::components::TagComponent>(name);
+    return entity;
+}
+
 void pwg::EditorScene::Update(const float& dt)
 {
-    
-    m_renderer.SetCamera(m_editorCamera.get());
-    m_editorCamera->Update();
+    pwg::systems::EditorCameraControllerSystem::Update(m_editorSceneRegistry, m_mouseInput, m_aspectRatio);
 
     if (m_noiseTexture)
     {
@@ -115,13 +113,24 @@ void pwg::EditorScene::Draw()
 
             if (height > 0)
             {
-                float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
-                m_editorCamera->UpdateProjectionMatrix(aspectRatio);
+                m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+            }
+
+            pwg::components::CameraComponent* activeCamera = nullptr;
+            auto camView = m_editorSceneRegistry.view<pwg::components::CameraComponent>();
+            for (auto [entity, camera] : camView.each())
+            {
+                activeCamera = &camera;
+                break;
+            }
+
+            if (!activeCamera) {
+                std::cerr << "Brak aktywnej kamery w ECS!\n";
             }
 
             m_frameBuffer->Bind();
             m_renderer.Clear();
-            m_renderer.Update();
+            m_renderer.Update(activeCamera);
             m_renderer.Draw();
             m_frameBuffer->Unbind();
 

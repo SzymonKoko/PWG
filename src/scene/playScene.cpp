@@ -18,5 +18,5 @@ void pwg::PlayScene::Draw()
 
 std::unique_ptr<pwg::IScene> pwg::PlayScene::Clone()
 {
-	return std::make_unique<PlayScene>(*this);
+	return std::make_unique<PlayScene>();
 }
