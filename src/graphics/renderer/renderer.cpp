@@ -19,7 +19,7 @@ void pwg::Renderer::Clear()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void pwg::Renderer::Update(pwg::components::CameraComponent* camera)
+void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
 {
 	m_shaderProgram->ActivateShader();
 	
@@ -29,19 +29,16 @@ void pwg::Renderer::Update(pwg::components::CameraComponent* camera)
 		m_shaderProgram->SetUniformMat4("projection", camera->projectionMatrix);
 	}
 
-	m_pyramidMesh.Update(GetShaderProgramID());
+	mesh.Update(GetShaderProgramID());
 }
 
-void pwg::Renderer::Draw() 
+void pwg::Renderer::Draw(Mesh& mesh) 
 {
-	m_texDirt.Bind();
-	m_pyramidMesh.Bind();
+	//m_texDirt.Bind();
 
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glDrawElementsInstanced(GL_TRIANGLES, m_pyramidMesh.GetIndexCount(), GL_UNSIGNED_INT, 0, m_pyramidMesh.GetInstancedPositionsSize());
-	
-	m_pyramidMesh.Unbind();
-	m_texDirt.Unbind();
+	mesh.Draw();
+
+	//m_texDirt.Unbind();
 
 }
 

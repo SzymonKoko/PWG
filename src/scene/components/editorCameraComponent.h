@@ -10,7 +10,7 @@ namespace pwg::components
 		float yaw{ -45.0f };
 		float pitch{ 45.0f };
 		float distanceToTarget{ 200.0f };
-		glm::vec3 target{ -16.0f, 0.0f, 16.0f };
+		glm::vec3 target{ 0.0f, 0.0f, 0.0f };
 
 		float minZoom{ 5.0f };
 		float maxZoom{ 500.0f };

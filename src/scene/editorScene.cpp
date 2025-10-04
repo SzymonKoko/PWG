@@ -3,6 +3,7 @@
 #include "editorScene.h"
 #include "scene/systems/editorCameraControllerSystem.h"
 #include "scene/components/tagComponent.h"
+#include "scene/systems/planeMeshSystem.h"
 
 
 pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput)
@@ -17,7 +18,12 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     editorCam.AddComponent<pwg::components::CameraComponent>();
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
+    auto planeMesh = CreateEntity("PlaneMesh");
+    planeMesh.AddComponent<components::MeshComponent>();
+    planeMesh.AddComponent<components::PlaneMeshComponent>(100, 100);
+
     m_noiseTexture = std::make_unique<NoiseTexture>();
+    m_meshManager = std::make_unique<MeshManager>();
 }
 
 pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)
@@ -81,11 +87,14 @@ pwg::Entity pwg::EditorScene::CreateEntity(const std::string& name)
 void pwg::EditorScene::Update(const float& dt)
 {
     pwg::systems::EditorCameraControllerSystem::Update(m_editorSceneRegistry, m_mouseInput, m_aspectRatio);
+    pwg::systems::PlaneMeshSystem::Update(m_editorSceneRegistry, *m_meshManager);
 
     if (m_noiseTexture)
     {
         m_noiseTexture->UpdateNoiseData(m_noiseTexture->GetNoiseParameters());
     }
+
+    
 }
 
 void pwg::EditorScene::Draw()
@@ -128,10 +137,24 @@ void pwg::EditorScene::Draw()
                 std::cerr << "Brak aktywnej kamery w ECS!\n";
             }
 
+            pwg::components::MeshComponent* meshComponent = nullptr;
+            auto meshView = m_editorSceneRegistry.view<components::MeshComponent>();
+            for (auto [entity, mesh] : meshView.each())
+            {
+                meshComponent = &mesh;
+            }
+
+            if (!meshComponent)
+            {
+                std::cerr << "Brak mesha\n";
+            }
+
+            pwg::Mesh* mesh = &m_meshManager->GetMesh(meshComponent->meshID);
+
             m_frameBuffer->Bind();
             m_renderer.Clear();
-            m_renderer.Update(activeCamera);
-            m_renderer.Draw();
+            m_renderer.Update(activeCamera, *mesh);
+            m_renderer.Draw(*mesh);
             m_frameBuffer->Unbind();
 
             ImGui::Image(

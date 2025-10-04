@@ -1,16 +1,16 @@
 #ifndef SRC_SCENE_EDITOR_SCENE_H_
 #define SRC_SCENE_EDITOR_SCENE_H_
 
-#include "graphics/buffer/frameBuffer.h"
+#include "graphics/framebuffer/frameBuffer.h"
 #include "graphics/renderer/renderer.h"
 #include "core/window/window.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
-#include "editor/editorCamera/editorCamera.h"
 #include "procedural/noiseTexture.h"
 #include <entt/entt.hpp>
 #include "core/ecs/entity.h"
 #include "scene/iscene.h"
+#include "graphics/mesh/meshManager.h"
 
 #include <memory>
 
@@ -67,13 +67,14 @@ namespace pwg
 	private:
 		Renderer m_renderer;
 		std::unique_ptr<FrameBuffer> m_frameBuffer;
-		std::unique_ptr<EditorCamera> m_editorCamera;
+		//std::unique_ptr<EditorCamera> m_editorCamera;
 
 		GLFWwindow* m_window;
 		MouseInput& m_mouseInput;
 		KeyboardInput& m_keyboardInput;
 
 		std::unique_ptr<NoiseTexture> m_noiseTexture;
+		std::unique_ptr<MeshManager> m_meshManager;
 		entt::registry m_editorSceneRegistry;
 
 		float m_aspectRatio = 16.0f / 9.0f;
