@@ -36,9 +36,22 @@ namespace pwg
 	void Mesh::Draw()
 	{
 		glBindVertexArray(m_vaoID);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
+	}
+
+	std::vector<Vertex>& Mesh::GetVertices()
+	{
+		return m_vertices;
+	}
+
+	void Mesh::SetVertices(std::vector<Vertex> vertices)
+	{
+		m_vertices = vertices;
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboID);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, m_vertices.size() * sizeof(Vertex), m_vertices.data());
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
 	void Mesh::SetupMesh()

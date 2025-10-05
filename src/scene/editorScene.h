@@ -11,6 +11,7 @@
 #include "core/ecs/entity.h"
 #include "scene/iscene.h"
 #include "graphics/mesh/meshManager.h"
+#include "procedural/noiseDeformer.h"
 
 #include <memory>
 

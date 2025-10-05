@@ -17,8 +17,8 @@ namespace pwg
 		float amplitude = 1.0f;
 		float frequency = 0.02f;
 		float scale = 200.0f;
-		int width = 256;
-		int height = 256;
+		int width = 255;
+		int height = 255;
 		glm::vec2 offset = { 0.0f, 0.0f };
 	};
 

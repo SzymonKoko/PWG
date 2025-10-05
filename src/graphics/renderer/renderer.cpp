@@ -34,11 +34,11 @@ void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
 
 void pwg::Renderer::Draw(Mesh& mesh) 
 {
-	//m_texDirt.Bind();
+	m_texDirt.Bind();
 
 	mesh.Draw();
 
-	//m_texDirt.Unbind();
+	m_texDirt.Unbind();
 
 }
 
@@ -51,7 +51,7 @@ void pwg::Renderer::InitShaders()
 
 void pwg::Renderer::InitTextures()
 {
-	m_texDirt.LoadFromFile("../assets/textures/texture.png");
+	m_texDirt.LoadFromFile("../assets/textures/dirt.png");
 }
 
 

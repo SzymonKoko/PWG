@@ -20,7 +20,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     auto planeMesh = CreateEntity("PlaneMesh");
     planeMesh.AddComponent<components::MeshComponent>();
-    planeMesh.AddComponent<components::PlaneMeshComponent>(100, 100);
+    planeMesh.AddComponent<components::PlaneMeshComponent>(255, 255);
 
     m_noiseTexture = std::make_unique<NoiseTexture>();
     m_meshManager = std::make_unique<MeshManager>();
@@ -137,11 +137,14 @@ void pwg::EditorScene::Draw()
                 std::cerr << "Brak aktywnej kamery w ECS!\n";
             }
 
-            pwg::components::MeshComponent* meshComponent = nullptr;
-            auto meshView = m_editorSceneRegistry.view<components::MeshComponent>();
-            for (auto [entity, mesh] : meshView.each())
+            pwg::components::MeshComponent* meshComponent;
+            pwg::components::PlaneMeshComponent* planeMeshComponent;
+            auto meshView = m_editorSceneRegistry.view<components::MeshComponent, components::PlaneMeshComponent>();
+            for (auto [entity, mesh, plane] : meshView.each())
             {
                 meshComponent = &mesh;
+                planeMeshComponent = &plane;
+                break;
             }
 
             if (!meshComponent)
@@ -149,7 +152,14 @@ void pwg::EditorScene::Draw()
                 std::cerr << "Brak mesha\n";
             }
 
+            if (!m_meshManager)
+            {
+                
+            }
             pwg::Mesh* mesh = &m_meshManager->GetMesh(meshComponent->meshID);
+
+            NoiseDeformer noiseDeformer;
+            noiseDeformer.ApplyNoise(*planeMeshComponent, *mesh, m_noiseTexture->GetNoiseData());
 
             m_frameBuffer->Bind();
             m_renderer.Clear();

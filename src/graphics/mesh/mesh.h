@@ -22,6 +22,9 @@ namespace pwg
 
 		void Update(unsigned int shaderID);
 		void Draw();
+
+		std::vector<Vertex>& GetVertices();
+		void SetVertices(std::vector<Vertex> vertices);
 	private:
 		std::vector<Vertex> m_vertices;
 		std::vector<unsigned int> m_indices;
