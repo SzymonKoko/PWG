@@ -3,7 +3,7 @@
 
 pwg::NoiseTexture::NoiseTexture()
 {
-	m_noise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_Perlin);
+	m_noise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_OpenSimplex2);
 
 	if (m_textureID != 0)
 		glDeleteTextures(1, &m_textureID);

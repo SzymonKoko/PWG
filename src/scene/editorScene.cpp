@@ -6,10 +6,12 @@
 #include "scene/systems/planeMeshSystem.h"
 
 
-pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput)
+pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput, std::shared_ptr<ResourceManager> resourceManager, Renderer& renderer)
 	: m_window(window), 
       m_keyboardInput(kinput), 
-      m_mouseInput(minput)
+      m_mouseInput(minput),
+      m_resourceManager(resourceManager),
+      m_renderer(renderer)
 {
 	m_frameBuffer = std::make_unique<FrameBuffer>(800, 800, true);
 
@@ -20,7 +22,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     auto planeMesh = CreateEntity("PlaneMesh");
     planeMesh.AddComponent<components::MeshComponent>();
-    planeMesh.AddComponent<components::PlaneMeshComponent>(255, 255);
+    planeMesh.AddComponent<components::PlaneMeshComponent>(100, 100);
 
     m_noiseTexture = std::make_unique<NoiseTexture>();
     m_meshManager = std::make_unique<MeshManager>();
@@ -30,7 +32,8 @@ pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)
     : m_window(otherEditorScene.m_window),
       m_keyboardInput(otherEditorScene.m_keyboardInput),
       m_mouseInput(otherEditorScene.m_mouseInput), 
-      m_renderer(otherEditorScene.m_renderer)
+      m_renderer(otherEditorScene.m_renderer),
+      m_resourceManager(otherEditorScene.m_resourceManager)
 {
     if (otherEditorScene.m_frameBuffer)
     {
@@ -101,86 +104,84 @@ void pwg::EditorScene::Draw()
 {
     ImGui::Begin("Main View");
 
+    ImVec2 windowSize = ImGui::GetContentRegionAvail();
+
+    ImGui::BeginChild("SceneRenderArea", windowSize, false,
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse);
+
+    int width = static_cast<int>(windowSize.x);
+    int height = static_cast<int>(windowSize.y);
+
+    if (m_frameBuffer->GetWidth() != width || m_frameBuffer->GetHeight() != height)
+    {
+        m_frameBuffer->Resize(width, height);
+    }
+
+    if (height > 0)
+    {
+        m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    }
+
+    pwg::components::CameraComponent* activeCamera = nullptr;
+    auto camView = m_editorSceneRegistry.view<pwg::components::CameraComponent>();
+    for (auto [entity, camera] : camView.each())
+    {
+        activeCamera = &camera;
+        break;
+    }
+
+    if (!activeCamera) {
+        std::cerr << "Brak aktywnej kamery w ECS!\n";
+    }
+
+    pwg::components::MeshComponent* meshComponent;
+    pwg::components::PlaneMeshComponent* planeMeshComponent;
+    auto meshView = m_editorSceneRegistry.view<components::MeshComponent, components::PlaneMeshComponent>();
+    for (auto [entity, mesh, plane] : meshView.each())
+    {
+        meshComponent = &mesh;
+        planeMeshComponent = &plane;
+        break;
+    }
+
+    if (!meshComponent)
+    {
+        std::cerr << "Brak mesha\n";
+    }
+
+    if (!m_meshManager)
+    {
+                
+    }
+    auto mesh = m_meshManager->GetMesh(meshComponent->meshID);
+
+    NoiseDeformer noiseDeformer;
+    noiseDeformer.ApplyNoise(*planeMeshComponent, *mesh, m_noiseTexture->GetNoiseData());
+
+    m_frameBuffer->Bind();
+    m_renderer.Clear();
+    m_renderer.Update(activeCamera, *mesh);
+    m_renderer.Draw(*mesh);
+    m_frameBuffer->Unbind();
+
+    ImGui::Image(
+        (ImTextureID)(intptr_t)m_frameBuffer->GetTextureID(),
+        windowSize,
+        ImVec2(0, 1), ImVec2(1, 0)
+    );
+
+    ImGui::EndChild();
+     
+    ImGui::End(); // Scene view
+
+    ImGui::Begin("Controls");
+
     if (ImGui::BeginTabBar("MainTabs"))
     {
-        if (ImGui::BeginTabItem("Scene"))
-        {
-            ImVec2 windowSize = ImGui::GetContentRegionAvail();
-
-            ImGui::BeginChild("SceneRenderArea", windowSize, false,
-                ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoScrollbar |
-                ImGuiWindowFlags_NoScrollWithMouse);
-
-            int width = static_cast<int>(windowSize.x);
-            int height = static_cast<int>(windowSize.y);
-
-            if (m_frameBuffer->GetWidth() != width || m_frameBuffer->GetHeight() != height)
-            {
-                m_frameBuffer->Resize(width, height);
-            }
-
-            if (height > 0)
-            {
-                m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
-            }
-
-            pwg::components::CameraComponent* activeCamera = nullptr;
-            auto camView = m_editorSceneRegistry.view<pwg::components::CameraComponent>();
-            for (auto [entity, camera] : camView.each())
-            {
-                activeCamera = &camera;
-                break;
-            }
-
-            if (!activeCamera) {
-                std::cerr << "Brak aktywnej kamery w ECS!\n";
-            }
-
-            pwg::components::MeshComponent* meshComponent;
-            pwg::components::PlaneMeshComponent* planeMeshComponent;
-            auto meshView = m_editorSceneRegistry.view<components::MeshComponent, components::PlaneMeshComponent>();
-            for (auto [entity, mesh, plane] : meshView.each())
-            {
-                meshComponent = &mesh;
-                planeMeshComponent = &plane;
-                break;
-            }
-
-            if (!meshComponent)
-            {
-                std::cerr << "Brak mesha\n";
-            }
-
-            if (!m_meshManager)
-            {
-                
-            }
-            pwg::Mesh* mesh = &m_meshManager->GetMesh(meshComponent->meshID);
-
-            NoiseDeformer noiseDeformer;
-            noiseDeformer.ApplyNoise(*planeMeshComponent, *mesh, m_noiseTexture->GetNoiseData());
-
-            m_frameBuffer->Bind();
-            m_renderer.Clear();
-            m_renderer.Update(activeCamera, *mesh);
-            m_renderer.Draw(*mesh);
-            m_frameBuffer->Unbind();
-
-            ImGui::Image(
-                (ImTextureID)(intptr_t)m_frameBuffer->GetTextureID(),
-                windowSize,
-                ImVec2(0, 1), ImVec2(1, 0)
-            );
-
-            ImGui::EndChild();
-            ImGui::EndTabItem();
-        }
-
         if (ImGui::BeginTabItem("Noise"))
         {
-
-            //Do usuniecia
 
             float amplitude = m_noiseTexture->GetNoiseParameters().amplitude;
             float frequency = m_noiseTexture->GetNoiseParameters().frequency;
@@ -199,11 +200,8 @@ void pwg::EditorScene::Draw()
             if (updated)
                 m_noiseTexture->UpdateNoiseData(m_noiseTexture->GetNoiseParameters());
 
-            //Do usuniecia
-
-
             ImVec2 windowSize = ImGui::GetContentRegionAvail();
-            
+
             if (m_noiseTexture && m_noiseTexture->GetTextureID() != 0)
             {
                 ImVec2 windowSize = ImGui::GetContentRegionAvail();
@@ -228,10 +226,10 @@ void pwg::EditorScene::Draw()
 
             ImGui::EndTabItem();
         }
-
-        ImGui::EndTabBar();
     }
 
+    ImGui::EndTabBar();
+    
     ImGui::End();
 }
 

@@ -1,16 +1,21 @@
 #include <glad/glad.h>
 #include "renderer.h"
 
-pwg::Renderer::Renderer()
+pwg::Renderer::Renderer(std::shared_ptr<ResourceManager> resourceManager)
+	:m_resourceManager(resourceManager)
 {
-	InitShaders();
-	InitTextures();
+	auto& shaderManager = m_resourceManager->GetShaderManager();
+	shaderManager.Load("default", "../assets/shaders/default.vert", "../assets/shaders/default.frag");
+
+	auto& textureManager = m_resourceManager->GetTextureManager();
+	textureManager.Load("dirt", "../assets/textures/dirt.png");
+	m_currentShader = m_resourceManager->GetShaderManager().GetShader("default");
 	glEnable(GL_DEPTH_TEST);
 }
 
 pwg::Renderer::~Renderer()
 {
-	m_shaderProgram->DeleteShader();
+
 }
 
 void pwg::Renderer::Clear()
@@ -21,41 +26,31 @@ void pwg::Renderer::Clear()
 
 void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
 {
-	m_shaderProgram->ActivateShader();
+	
+	//std::cout << "Shader ID: " << shader.GetShaderID() << std::endl;
+	m_currentShader->ActivateShader();
 	
 	if (camera)
 	{
-		m_shaderProgram->SetUniformMat4("view", camera->viewMatrix);
-		m_shaderProgram->SetUniformMat4("projection", camera->projectionMatrix);
+		m_currentShader->SetUniformMat4("view", camera->viewMatrix);
+		m_currentShader->SetUniformMat4("projection", camera->projectionMatrix);
 	}
 
-	mesh.Update(GetShaderProgramID());
+	mesh.Update(m_currentShader->GetShaderID());
 }
 
 void pwg::Renderer::Draw(Mesh& mesh) 
 {
-	m_texDirt.Bind();
+	//auto& shader = *m_resourceManager->GetShaderManager().GetShader("default");
+	m_currentShader->ActivateShader();
+	//std::cout << "Shader ID 22: " << shader.GetShaderID() << std::endl;
 
+	auto& texDirt = *m_resourceManager->GetTextureManager().GetTexture("dirt");
+	texDirt.Bind();
+
+	m_currentShader->SetUniformInt("Texture", 0);
 	mesh.Draw();
 
-	m_texDirt.Unbind();
+	texDirt.Unbind();
 
-}
-
-void pwg::Renderer::InitShaders()
-{
-	m_shaderProgram = new Shader("../assets/shaders/default.vert", "../assets/shaders/default.frag");
-	m_shaderProgram->ActivateShader();
-	m_shaderProgram->SetUniformInt("Texture", 0);
-}
-
-void pwg::Renderer::InitTextures()
-{
-	m_texDirt.LoadFromFile("../assets/textures/dirt.png");
-}
-
-
-GLuint pwg::Renderer::GetShaderProgramID()
-{
-	return m_shaderProgram->GetShaderID();
 }

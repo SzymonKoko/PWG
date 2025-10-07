@@ -23,7 +23,7 @@ namespace pwg
 	{
 		glm::vec3 start_pos(0.0f, 0.0f, 0.0f);
 		glm::mat4 model = glm::mat4(1.0f);
-		glm::mat4 projection = glm::mat4(1.0f);
+		
 
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 
@@ -36,7 +36,7 @@ namespace pwg
 	void Mesh::Draw()
 	{
 		glBindVertexArray(m_vaoID);
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
 	}

@@ -12,6 +12,7 @@
 #include "scene/iscene.h"
 #include "graphics/mesh/meshManager.h"
 #include "procedural/noiseDeformer.h"
+#include "resources/resourceManager.h"
 
 #include <memory>
 
@@ -27,7 +28,7 @@ namespace pwg
 		* @param minput Mouse input that is used for camera
 		* @param kinput Keyboard input that is used for camera
 		*/
-		EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput);
+		EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput, std::shared_ptr<ResourceManager> resourceManager, Renderer& renderer);
 
 		/**
 		* @brief EditorScene copy constructor. Creates a deep copy of a given EditorScene object
@@ -66,14 +67,14 @@ namespace pwg
 		std::unique_ptr<IScene> Clone() override;
 
 	private:
-		Renderer m_renderer;
-		std::unique_ptr<FrameBuffer> m_frameBuffer;
-		//std::unique_ptr<EditorCamera> m_editorCamera;
 
 		GLFWwindow* m_window;
 		MouseInput& m_mouseInput;
 		KeyboardInput& m_keyboardInput;
+		Renderer& m_renderer;
+		std::shared_ptr<ResourceManager> m_resourceManager;
 
+		std::unique_ptr<FrameBuffer> m_frameBuffer;
 		std::unique_ptr<NoiseTexture> m_noiseTexture;
 		std::unique_ptr<MeshManager> m_meshManager;
 		entt::registry m_editorSceneRegistry;

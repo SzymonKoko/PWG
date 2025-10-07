@@ -8,6 +8,8 @@
 #include "core/gui/gui.h"
 #include "scene/sceneManager.h"
 #include <entt/entt.hpp>
+#include "resources/resourceManager.h"
+#include "graphics/renderer/renderer.h"
 
 namespace pwg
 {
@@ -45,7 +47,10 @@ namespace pwg
 		std::unique_ptr<pwg::KeyboardInput> m_keyboardInput;
 		std::unique_ptr<pwg::MouseInput> m_mouseInput;
 		std::unique_ptr<pwg::Gui> m_gui;
+		std::shared_ptr<pwg::Renderer> m_renderer;
 		std::shared_ptr<pwg::SceneManager> m_scene;
+		std::shared_ptr<pwg::ResourceManager> m_resourceManager;
+		
 
 	};
 } //namespace pwg

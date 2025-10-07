@@ -7,26 +7,7 @@ pwg::Texture::Texture()
 	
 }
 
-pwg::Texture::~Texture()
-{
-
-	if (m_textureID != 0)
-	{
-		glDeleteTextures(1, &m_textureID);
-	}
-}
-
-void pwg::Texture::Bind()
-{
-	glBindTexture(GL_TEXTURE_2D, m_textureID);
-}
-
-void pwg::Texture::Unbind()
-{
-	glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-void pwg::Texture::LoadFromFile(const std::string& imagePath)
+pwg::Texture::Texture(const std::string& imagePath)
 {
 	glGenTextures(1, &m_textureID);
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
@@ -51,7 +32,7 @@ void pwg::Texture::LoadFromFile(const std::string& imagePath)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, m_image);
 			glGenerateMipmap(GL_TEXTURE_2D);
 		}
-		
+
 	}
 	else
 	{
@@ -65,7 +46,7 @@ void pwg::Texture::LoadFromFile(const std::string& imagePath)
 	}
 }
 
-void pwg::Texture::LoadFramebufferTexture(int width, int height)
+pwg::Texture::Texture(int width, int height)
 {
 	glGenTextures(1, &m_textureID);
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
@@ -77,5 +58,24 @@ void pwg::Texture::LoadFramebufferTexture(int width, int height)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
 }
+
+pwg::Texture::~Texture()
+{
+
+	if (m_textureID != 0)
+	{
+		//glDeleteTextures(1, &m_textureID);
+	}
+}
+
+void pwg::Texture::Bind()
+{
+	glBindTexture(GL_TEXTURE_2D, m_textureID);
+}
+
+void pwg::Texture::Unbind()
+{
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+

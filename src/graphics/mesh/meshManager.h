@@ -16,10 +16,10 @@ namespace pwg
 
 		std::string CreateMesh(int width, int height, std::string name);
 
-		Mesh& GetMesh(std::string meshID);
+		std::shared_ptr<Mesh> GetMesh(std::string meshID);
 	private:
 		std::string m_meshID;
-		std::unordered_map<std::string, std::unique_ptr<Mesh>> m_meshes;
+		std::unordered_map<std::string, std::shared_ptr<Mesh>> m_meshes;
 	};
 }
 #endif // !SRC_GRAPHICS_MESH_MESH_MANAGER_H

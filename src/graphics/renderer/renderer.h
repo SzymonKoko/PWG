@@ -5,28 +5,23 @@
 #include "graphics/texture/texture.h"
 #include "scene/components/cameraComponent.h"
 #include "graphics/mesh/mesh.h"
+#include "resources/resourceManager.h"
 
 namespace pwg
 {
 	class Renderer
 	{
 	public:
-		Renderer();
+		Renderer(std::shared_ptr<ResourceManager> resourceManager);
 		~Renderer();
 
 		void Clear();
 		void Update(pwg::components::CameraComponent* camera, Mesh& mesh);
 		void Draw(Mesh& mesh);
 
-		
-		unsigned int GetShaderProgramID();
 	private:
-		Shader* m_shaderProgram;
-		Texture m_texDirt;
-
-		void InitShaders();
-		void InitTextures();
-
+		std::shared_ptr<ResourceManager> m_resourceManager;
+		std::shared_ptr<Shader> m_currentShader{ nullptr };
 	};
 } //namespace pwg
 #endif // !SRC_GRAPHICS_RENDERER_RENDERER_H_

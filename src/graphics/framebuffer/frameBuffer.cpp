@@ -4,8 +4,7 @@
 pwg::FrameBuffer::FrameBuffer(int width, int height, bool useRBO)
 	: m_width(width), m_height(height), m_useRBO(useRBO)
 {
-	m_fboTexture = std::make_shared<Texture>();
-	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
+	m_fboTexture = std::make_shared<Texture>(m_width, m_height);
 	InitializeFrameBuffer();
 
 }
@@ -15,8 +14,7 @@ pwg::FrameBuffer::FrameBuffer(const pwg::FrameBuffer& otherFBO)
 	  m_height(otherFBO.m_height),
 	  m_useRBO(otherFBO.m_useRBO)
 {
-	m_fboTexture = std::make_shared<Texture>();
-	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
+	m_fboTexture = std::make_shared<Texture>(m_width, m_height);
 
 	InitializeFrameBuffer();
 }
@@ -34,8 +32,7 @@ pwg::FrameBuffer& pwg::FrameBuffer::operator=(const FrameBuffer& otherFBO)
 	m_height = otherFBO.m_height;
 	m_useRBO = otherFBO.m_useRBO;
 
-	m_fboTexture = std::make_shared<Texture>();
-	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
+	m_fboTexture = std::make_shared<Texture>(m_width, m_height);
 
 	InitializeFrameBuffer();
 
@@ -105,8 +102,7 @@ void pwg::FrameBuffer::Resize(int width, int height)
 
 	CleanUp(); 
 
-	m_fboTexture = std::make_shared<Texture>();
-	m_fboTexture->LoadFramebufferTexture(m_width, m_height);
+	m_fboTexture = std::make_shared<Texture>(m_width, m_height);
 
 	InitializeFrameBuffer();  
 }

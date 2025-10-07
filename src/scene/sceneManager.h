@@ -17,7 +17,7 @@ namespace pwg
 		* @param minput Pointer to the mouse input that is used for camera
 		* @param kinput Pointer to the keyboard input that is used for camera
 		*/
-		SceneManager(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput);
+		SceneManager(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput, std::shared_ptr<ResourceManager> resourceManager, Renderer& renderer);
 
 		/**
 		* @brief Default SceneManager destructor. Does nothing.
@@ -50,6 +50,8 @@ namespace pwg
 		GLFWwindow* m_window;
 		MouseInput& m_mouseInput;
 		KeyboardInput& m_keyboardInput;
+		Renderer& m_renderer;
+		std::shared_ptr<ResourceManager> m_resourceManager;
 	};
 }
 #endif // !SCENE_SCENE_MANAGER_H

@@ -3,7 +3,7 @@
 
 #include "scene/iscene.h"
 #include "scene/editorScene.h"
-#include "graphics/renderer/renderer.h"
+
 
 namespace pwg
 {
@@ -43,7 +43,7 @@ namespace pwg
 		*/
 		std::unique_ptr<IScene> Clone() override;
 	private:
-		Renderer m_renderer;
+		
 		//Play camera
 		//Logics etc...
 	};

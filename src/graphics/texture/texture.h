@@ -17,6 +17,8 @@ namespace pwg
 	{
 	public:
 		Texture();
+		Texture(const std::string& imagePath);
+		Texture(int width, int height);
 		~Texture();
 
 
@@ -30,16 +32,6 @@ namespace pwg
 		* @brief Unbinding current texture
 		*/
 		void Unbind();
-
-		/**
-		* @brief Loading image file to imageData variable
-		* @param imagePath Path to the image
-		* @param width Width of an image
-		* @param height Height of an image
-		* @param nrChannels Number of color channels 
-		*/
-		void LoadFromFile(const std::string& imagePath);
-		void LoadFramebufferTexture(int width, int height);
 
 		unsigned int GetTextureID() { return m_textureID; }
 

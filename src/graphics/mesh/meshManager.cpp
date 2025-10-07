@@ -1,4 +1,5 @@
 #include "meshManager.h"
+#include "core/logger/logger.h"
 #include <iostream>
 
 namespace pwg
@@ -50,20 +51,18 @@ namespace pwg
 			}
 		}
 
-		m_meshes.emplace(name, std::make_unique<Mesh>(vertices, indices));
+		m_meshes.emplace(name, std::make_shared<Mesh>(vertices, indices));
 
 		return name;
 	}
 
-	Mesh& MeshManager::GetMesh(std::string meshID)
+	std::shared_ptr<Mesh> MeshManager::GetMesh(std::string meshID)
 	{
-		for (auto& mesh : m_meshes)
+		if (!m_meshes.contains(meshID))
 		{
-			if (mesh.first == meshID)
-			{
-				return *mesh.second;
-			}
+			return nullptr;
 		}
+		return m_meshes[meshID];
 	}
 }
 
