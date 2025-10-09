@@ -17,17 +17,21 @@ namespace pwg
 	class Mesh 
 	{
 	public:
-		Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices);
+		Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices, int size);
 		~Mesh();
 
 		void Update(unsigned int shaderID);
 		void Draw();
 
+		void SetVertices(std::vector<Vertex>& vertices);
+		void UpdateMeshData(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, int& size);
+
 		std::vector<Vertex>& GetVertices();
-		void SetVertices(std::vector<Vertex> vertices);
+		int GetSize();
 	private:
 		std::vector<Vertex> m_vertices;
 		std::vector<unsigned int> m_indices;
+		int m_meshSize{ 0 };
 
 		unsigned int m_vaoID{ 0 };
 		unsigned int m_vboID{ 0 };

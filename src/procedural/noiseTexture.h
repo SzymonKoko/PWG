@@ -17,8 +17,11 @@ namespace pwg
 		float amplitude = 1.0f;
 		float frequency = 0.02f;
 		float scale = 200.0f;
-		int width = 100;
-		int height = 100;
+		int octaves = 4;
+		float persistance = 0.5f;
+		float lacunarity = 2.0f;
+		int width = 200;
+		int height = 200;
 		glm::vec2 offset = { 0.0f, 0.0f };
 	};
 
@@ -113,6 +116,12 @@ namespace pwg
 		* @param seed New seed of a noise
 		*/
 		void SetSeed(int seed);
+
+		void SetOctaves(int octaves);
+
+		void SetPersistance(float persistance);
+
+		void SetLacunarity(float lacunarity);
 
 	private:
 

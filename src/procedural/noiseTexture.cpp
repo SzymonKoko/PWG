@@ -78,6 +78,21 @@ void pwg::NoiseTexture::SetSeed(int seed)
 	m_noiseParams.seed = seed;
 }
 
+void pwg::NoiseTexture::SetOctaves(int octaves)
+{
+	m_noiseParams.octaves = octaves;
+}
+
+void pwg::NoiseTexture::SetPersistance(float persistance)
+{
+	m_noiseParams.persistance = persistance;
+}
+
+void pwg::NoiseTexture::SetLacunarity(float lacunarity)
+{
+	m_noiseParams.lacunarity = lacunarity;
+}
+
 void pwg::NoiseTexture::GenerateNoiseData()
 {
 	m_pixels.resize(m_noiseParams.width * m_noiseParams.height * 4);
@@ -87,26 +102,37 @@ void pwg::NoiseTexture::GenerateNoiseData()
 	{
 		for (int x = 0; x < m_noiseParams.width; x++)
 		{
-			float newX = (float)x / m_noiseParams.width;
-			float newY = (float)y / m_noiseParams.height;
+			float noiseHeight = 0.0f;
+			float amplitude = m_noiseParams.amplitude;
+			float frequency = m_noiseParams.frequency;
 
-			float scaledX = (newX * m_noiseParams.scale) + m_noiseParams.offset.x;
-			float scaledY = (newY * m_noiseParams.scale) + m_noiseParams.offset.y;
+			for (int i = 0; i < m_noiseParams.octaves; i++)
+			{
+				float newX = (float)x / m_noiseParams.width;
+				float newY = (float)y / m_noiseParams.height;
 
-			float noiseValue = m_noise.GetNoise(scaledX, scaledY);
-			noiseValue = (noiseValue + 1.0f) * 0.5f;
-			noiseValue *= m_noiseParams.amplitude;
+				float scaledX = (newX * m_noiseParams.scale * frequency) + m_noiseParams.offset.x;
+				float scaledY = (newY * m_noiseParams.scale * frequency) + m_noiseParams.offset.y;
 
-			unsigned char pixelValue = (unsigned char)std::clamp(noiseValue * 255.0f, 0.0f, 255.0f);
+				float noiseValue = m_noise.GetNoise(scaledX, scaledY);
+				noiseValue = (noiseValue + 1.0f) * 0.5f;
+
+				noiseHeight += noiseValue * amplitude;
+
+				amplitude *= m_noiseParams.persistance;
+				frequency *= m_noiseParams.lacunarity;
+			}
+
+			unsigned char pixelValue = (unsigned char)std::clamp(noiseHeight * 255.0f, 0.0f, 255.0f);
 
 			size_t pixelIndex = (y * m_noiseParams.width + x) * 4;
-			m_pixels[pixelIndex] = pixelValue;		//R
-			m_pixels[pixelIndex + 1] = pixelValue;	//G
-			m_pixels[pixelIndex + 2] = pixelValue;	//B
-			m_pixels[pixelIndex + 3] = 255;			//A
+			m_pixels[pixelIndex + 0] = pixelValue;
+			m_pixels[pixelIndex + 1] = pixelValue;
+			m_pixels[pixelIndex + 2] = pixelValue;
+			m_pixels[pixelIndex + 3] = 255;
 
 			size_t noiseDataIndex = y * m_noiseParams.width + x;
-			m_noiseData[noiseDataIndex] = noiseValue;
+			m_noiseData[noiseDataIndex] = noiseHeight;
 		}
 	}
 }

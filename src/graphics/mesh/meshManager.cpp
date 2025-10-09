@@ -12,10 +12,13 @@ namespace pwg
 	{
 	}
 
-	std::string MeshManager::CreateMesh(int width, int height, std::string name)
+	std::string MeshManager::CreateMesh(int size, std::string name)
 	{
 		std::vector<Vertex> vertices;
 		std::vector<unsigned int> indices;
+
+		int width = size;
+		int height = size;
 
 		float topLeftX = (width - 1) / -2.0f;
 		float topLeftZ = (height - 1) / 2.0f;
@@ -50,8 +53,14 @@ namespace pwg
 				indices.push_back(i2);
 			}
 		}
-
-		m_meshes.emplace(name, std::make_shared<Mesh>(vertices, indices));
+		if (m_meshes.contains(name))
+		{
+			m_meshes[name]->UpdateMeshData(vertices, indices, size);
+		}
+		else
+		{
+			m_meshes.emplace(name, std::make_shared<Mesh>(vertices, indices, size));
+		}
 
 		return name;
 	}

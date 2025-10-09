@@ -6,9 +6,10 @@
 
 namespace pwg
 {
-	Mesh::Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices)
+	Mesh::Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices, int size)
 		:m_vertices(vertices),
-		 m_indices(indices)
+		 m_indices(indices),
+		 m_meshSize(size)
 	{
 		SetupMesh();
 	}
@@ -46,12 +47,32 @@ namespace pwg
 		return m_vertices;
 	}
 
-	void Mesh::SetVertices(std::vector<Vertex> vertices)
+	void Mesh::SetVertices(std::vector<Vertex>& vertices)
 	{
 		m_vertices = vertices;
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboID);
 		glBufferSubData(GL_ARRAY_BUFFER, 0, m_vertices.size() * sizeof(Vertex), m_vertices.data());
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+
+	void Mesh::UpdateMeshData(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, int& size)
+	{
+		m_vertices = vertices;
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboID);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, m_vertices.size() * sizeof(Vertex), m_vertices.data());
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		m_indices = indices;
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_eboID);
+		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, m_indices.size() * sizeof(uint32_t), m_indices.data());
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		m_meshSize = size;
+	}
+
+	int Mesh::GetSize()
+	{
+		return m_meshSize;
 	}
 
 	void Mesh::SetupMesh()

@@ -14,7 +14,7 @@ namespace pwg
 		MeshManager();
 		~MeshManager();
 
-		std::string CreateMesh(int width, int height, std::string name);
+		std::string CreateMesh(int size, std::string name);
 
 		std::shared_ptr<Mesh> GetMesh(std::string meshID);
 	private:

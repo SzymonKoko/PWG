@@ -7,11 +7,10 @@ namespace pwg::components
 {
 	struct PlaneMeshComponent
 	{
-		int width;
-		int height;
+		int size;
 		bool changed = true;
 
-		PlaneMeshComponent(int width, int height) : width(width), height(height) {}
+		PlaneMeshComponent(int size) : size(size) {}
 	};
 }
 #endif // !SRC_SCENE_COMPONENTS_PLANE_MESH_COMPONENT_H

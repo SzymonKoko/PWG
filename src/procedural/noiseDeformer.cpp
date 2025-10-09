@@ -5,8 +5,8 @@ void pwg::NoiseDeformer::ApplyNoise(components::PlaneMeshComponent& planeMesh, p
 {
 	std::vector<Vertex> vertices = mesh.GetVertices();
 
-	int width = planeMesh.width;
-	int height = planeMesh.height;
+	int width = planeMesh.size;
+	int height = planeMesh.size;
 
 	for (int y = 0; y < height; y++)
 	{

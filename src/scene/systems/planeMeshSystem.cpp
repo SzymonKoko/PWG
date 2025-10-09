@@ -12,7 +12,7 @@ namespace pwg::systems
 
 			if (planeMesh.changed)
 			{
-				meshComp.meshID = meshManager.CreateMesh(planeMesh.width, planeMesh.height, "PlaneMesh");
+				meshComp.meshID = meshManager.CreateMesh(planeMesh.size, "PlaneMesh");
 			}
 			planeMesh.changed = false;
 			

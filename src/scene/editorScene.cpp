@@ -22,7 +22,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     auto planeMesh = CreateEntity("PlaneMesh");
     planeMesh.AddComponent<components::MeshComponent>();
-    planeMesh.AddComponent<components::PlaneMeshComponent>(100, 100);
+    planeMesh.AddComponent<components::PlaneMeshComponent>(200);
 
     m_noiseTexture = std::make_unique<NoiseTexture>();
     m_meshManager = std::make_unique<MeshManager>();
@@ -188,12 +188,18 @@ void pwg::EditorScene::Draw()
             float scale = m_noiseTexture->GetNoiseParameters().scale;
             glm::vec2 offset = m_noiseTexture->GetNoiseParameters().offset;
             int seed = m_noiseTexture->GetNoiseParameters().seed;
+            int octaves = m_noiseTexture->GetNoiseParameters().octaves;
+            float persistance = m_noiseTexture->GetNoiseParameters().persistance;
+            float lacunarity = m_noiseTexture->GetNoiseParameters().lacunarity;
 
             bool updated = false;
 
             if (ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 10.0f)) { m_noiseTexture->SetAmplitude(amplitude); updated = true; }
             if (ImGui::SliderFloat("Frequency", &frequency, 0.001f, 1.0f)) { m_noiseTexture->SetFrequency(frequency); updated = true; }
             if (ImGui::SliderFloat("Scale", &scale, 0.1f, 200.0f)) { m_noiseTexture->SetScale(scale); updated = true; }
+            if (ImGui::SliderInt("Octaves", &octaves, 1, 8)) { m_noiseTexture->SetOctaves(octaves); updated = true; }
+            if (ImGui::SliderFloat("Persistance", &persistance, 0.01f, 2.0f)) { m_noiseTexture->SetPersistance(persistance); updated = true; }
+            if (ImGui::SliderFloat("Lacunarity", &lacunarity, 0.01f, 10.0f)) { m_noiseTexture->SetLacunarity(lacunarity); updated = true; }
             if (ImGui::DragFloat2("Offset", &offset.x, 0.01f)) { m_noiseTexture->SetOffset(offset); updated = true; }
             if (ImGui::InputInt("Seed", &seed)) { m_noiseTexture->SetSeed(seed); updated = true; }
 
