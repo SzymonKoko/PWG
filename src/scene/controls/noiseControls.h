@@ -36,7 +36,7 @@ namespace pwg::controls
                     }
                     else if (selectedType == 1)
                     {
-                        noiseTexture.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
+                        noiseTexture.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
                     }
                     else if (selectedType == 2)
                     {
