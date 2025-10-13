@@ -16,12 +16,11 @@ namespace pwg
 		int seed = 1000;
 		float amplitude = 1.0f;
 		float frequency = 0.02f;
-		float scale = 200.0f;
+		float scale = 100.0f;
 		int octaves = 4;
 		float persistance = 0.5f;
 		float lacunarity = 2.0f;
-		int width = 200;
-		int height = 200;
+		int size = 100;
 		glm::vec2 offset = { 0.0f, 0.0f };
 	};
 
@@ -32,7 +31,7 @@ namespace pwg
 		/**
 		* @brief Noise texture constructor. Constructs noise with default parameters
 		*/
-		NoiseTexture();
+		NoiseTexture(int terrainSize);
 
 		/**
 		* @brief Noise texture constructor. Constructs noise with new parameters
@@ -67,13 +66,13 @@ namespace pwg
 		* @brief Noise width getter
 		* @return Returns width of a noise texture in pixels
 		*/
-		int GetNoiseWidth() { return m_noiseParams.width; }
+		int GetNoiseWidth() { return m_noiseParams.size; }
 
 		/**
 		* @brief Noise height getter
 		* @return Returns height of a noise texture in pixels
 		*/
-		int GetNoiseHeight() { return m_noiseParams.height; }
+		int GetNoiseHeight() { return m_noiseParams.size; }
 
 		/**
 		* @brief Noise texture ID getter
@@ -122,6 +121,8 @@ namespace pwg
 		void SetPersistance(float persistance);
 
 		void SetLacunarity(float lacunarity);
+
+		void SetNoiseType(FastNoiseLite::NoiseType noiseType);
 
 	private:
 

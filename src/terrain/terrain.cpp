@@ -10,7 +10,7 @@ pwg::Terrain::Terrain(entt::registry& registry, std::shared_ptr<ResourceManager>
 	planeMesh.AddComponent<components::MeshComponent>();
 	planeMesh.AddComponent<components::PlaneMeshComponent>(size);
 
-	m_noiseTexture = std::make_shared<NoiseTexture>(); //Add size to constructor
+	m_noiseTexture = std::make_shared<NoiseTexture>(size); //Add size to constructor
 }
 
 pwg::Terrain::~Terrain()

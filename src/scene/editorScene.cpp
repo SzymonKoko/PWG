@@ -20,7 +20,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     editorCam.AddComponent<pwg::components::CameraComponent>();
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
-    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 200);
+    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 300);
 }
 
 pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)

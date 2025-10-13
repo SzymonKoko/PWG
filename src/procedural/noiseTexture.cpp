@@ -1,9 +1,10 @@
 #include <glad/glad.h>
 #include "noiseTexture.h"
 
-pwg::NoiseTexture::NoiseTexture()
+pwg::NoiseTexture::NoiseTexture(int terrainSize)
 {
 	m_noise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_OpenSimplex2);
+	m_noiseParams.size = terrainSize;
 
 	if (m_textureID != 0)
 		glDeleteTextures(1, &m_textureID);
@@ -93,14 +94,19 @@ void pwg::NoiseTexture::SetLacunarity(float lacunarity)
 	m_noiseParams.lacunarity = lacunarity;
 }
 
+void pwg::NoiseTexture::SetNoiseType(FastNoiseLite::NoiseType noiseType)
+{
+	m_noise.SetNoiseType(noiseType);
+}
+
 void pwg::NoiseTexture::GenerateNoiseData()
 {
-	m_pixels.resize(m_noiseParams.width * m_noiseParams.height * 4);
-	m_noiseData.resize(m_noiseParams.width * m_noiseParams.height);
+	m_pixels.resize(m_noiseParams.size * m_noiseParams.size * 4);
+	m_noiseData.resize(m_noiseParams.size * m_noiseParams.size);
 
-	for (int y = 0; y < m_noiseParams.height; y++)
+	for (int y = 0; y < m_noiseParams.size; y++)
 	{
-		for (int x = 0; x < m_noiseParams.width; x++)
+		for (int x = 0; x < m_noiseParams.size; x++)
 		{
 			float noiseHeight = 0.0f;
 			float amplitude = m_noiseParams.amplitude;
@@ -108,8 +114,8 @@ void pwg::NoiseTexture::GenerateNoiseData()
 
 			for (int i = 0; i < m_noiseParams.octaves; i++)
 			{
-				float newX = (float)x / m_noiseParams.width;
-				float newY = (float)y / m_noiseParams.height;
+				float newX = (float)x / m_noiseParams.size;
+				float newY = (float)y / m_noiseParams.size;
 
 				float scaledX = (newX * m_noiseParams.scale * frequency) + m_noiseParams.offset.x;
 				float scaledY = (newY * m_noiseParams.scale * frequency) + m_noiseParams.offset.y;
@@ -125,13 +131,13 @@ void pwg::NoiseTexture::GenerateNoiseData()
 
 			unsigned char pixelValue = (unsigned char)std::clamp(noiseHeight * 255.0f, 0.0f, 255.0f);
 
-			size_t pixelIndex = (y * m_noiseParams.width + x) * 4;
+			size_t pixelIndex = (y * m_noiseParams.size + x) * 4;
 			m_pixels[pixelIndex + 0] = pixelValue;
 			m_pixels[pixelIndex + 1] = pixelValue;
 			m_pixels[pixelIndex + 2] = pixelValue;
 			m_pixels[pixelIndex + 3] = 255;
 
-			size_t noiseDataIndex = y * m_noiseParams.width + x;
+			size_t noiseDataIndex = y * m_noiseParams.size + x;
 			m_noiseData[noiseDataIndex] = noiseHeight;
 		}
 	}
@@ -141,7 +147,7 @@ void pwg::NoiseTexture::UploadToGPU()
 {
 
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_noiseParams.width, m_noiseParams.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, m_pixels.data());
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_noiseParams.size, m_noiseParams.size, 0, GL_RGBA, GL_UNSIGNED_BYTE, m_pixels.data());
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
