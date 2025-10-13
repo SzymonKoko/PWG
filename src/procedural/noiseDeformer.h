@@ -17,7 +17,7 @@ namespace pwg
 		NoiseDeformer() = default;
 		~NoiseDeformer() = default;
 
-		void ApplyNoise(components::PlaneMeshComponent& planeMesh, pwg::Mesh& mesh, const std::vector<float>& noiseData);
+		static void ApplyNoise(pwg::Mesh& mesh, const std::vector<float>& noiseData);
 	private:
 	};
 }

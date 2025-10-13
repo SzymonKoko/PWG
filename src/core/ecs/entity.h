@@ -2,6 +2,7 @@
 #define SRC_CORE_ECS_ENTITY_H
 
 #include <entt/entt.hpp>
+#include "scene/components/tagComponent.h"
 
 namespace pwg
 {
@@ -9,7 +10,12 @@ namespace pwg
 	{
 	public:
 		Entity() = default;
-		Entity(entt::entity entityHandle, entt::registry* registry) : m_entityHandle(entityHandle), m_registry(registry) {}
+		Entity(entt::registry* registry, std::string name) 
+			: m_registry(registry) 
+		{
+			m_entityHandle = m_registry->create();
+			AddComponent<components::TagComponent>(name);
+		}
 		~Entity() = default;
 
 		template<typename T, typename... Args>

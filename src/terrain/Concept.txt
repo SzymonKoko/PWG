@@ -1,0 +1,57 @@
+== Terrain concept ==
+
+Structure:
+
+terrain/
+	systems/
+		terrainSystem .h/.cpp
+	components/
+		terrainComponent .h/.cpp
+	terrain .h/.cpp
+	terrainLayer .h
+	
+terrain.h
+
+public:
+	Terrain(entt::registry& reg, int size);
+	- Create Entity
+	- Create MeshManager
+	- Create NoiseTexture
+	
+	void UpdateSystems(); 
+	- update planeMeshSystem
+	- update terrainSystem
+	
+	void AddLayer(TerrainLayer& layer);
+	void RemoveLayer(string name);
+	
+	void ApplyLayers();
+	
+	//Getters
+	TerrainLayer& GetLayer(string name);
+	unordered_map<TerrainLayer>& GetLayersMap();
+	Mesh& GetMesh();
+	
+private:
+	
+	int m_terrainSize;
+	unordered_map<TerrainLayer> m_terrainLayers;
+	
+	entt::registry reg;
+	MeshManager m_meshManager;
+	NoiseTexture m_noiseTexture;
+	
+	
+TerrainSystem - update chunków, lod itd... 
+
+TerrainLayer
+
+struct 
+{
+	bool enabled;
+	string name;
+	float minHeight;
+	float maxHeight;
+	uint textureID;
+	vec3 color;
+}

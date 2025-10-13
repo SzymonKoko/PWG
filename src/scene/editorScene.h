@@ -6,13 +6,11 @@
 #include "core/window/window.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
-#include "procedural/noiseTexture.h"
 #include <entt/entt.hpp>
 #include "core/ecs/entity.h"
 #include "scene/iscene.h"
-#include "graphics/mesh/meshManager.h"
-#include "procedural/noiseDeformer.h"
 #include "resources/resourceManager.h"
+#include "terrain/terrain.h"
 
 #include <memory>
 
@@ -48,8 +46,6 @@ namespace pwg
 		*/
 		~EditorScene() = default;
 
-		Entity CreateEntity(const std::string& name);
-
 		/**
 		* @brief Updates scene on every frame
 		*/
@@ -75,7 +71,7 @@ namespace pwg
 		std::shared_ptr<ResourceManager> m_resourceManager;
 
 		std::unique_ptr<FrameBuffer> m_frameBuffer;
-		std::unique_ptr<NoiseTexture> m_noiseTexture;
+		std::unique_ptr<Terrain> m_terrain;
 		std::unique_ptr<MeshManager> m_meshManager;
 		entt::registry m_editorSceneRegistry;
 

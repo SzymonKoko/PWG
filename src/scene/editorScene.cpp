@@ -15,17 +15,12 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 {
 	m_frameBuffer = std::make_unique<FrameBuffer>(800, 800, true);
 
-    auto editorCam = CreateEntity("EditorCamera");
+    Entity editorCam(&m_editorSceneRegistry, "EditorCamera");
     editorCam.AddComponent<pwg::components::TransformComponent>();
     editorCam.AddComponent<pwg::components::CameraComponent>();
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
-    auto planeMesh = CreateEntity("PlaneMesh");
-    planeMesh.AddComponent<components::MeshComponent>();
-    planeMesh.AddComponent<components::PlaneMeshComponent>(200);
-
-    m_noiseTexture = std::make_unique<NoiseTexture>();
-    m_meshManager = std::make_unique<MeshManager>();
+    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 200);
 }
 
 pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)
@@ -38,11 +33,6 @@ pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)
     if (otherEditorScene.m_frameBuffer)
     {
         m_frameBuffer = std::make_unique<FrameBuffer>(*otherEditorScene.m_frameBuffer);
-    }
-
-    if (otherEditorScene.m_noiseTexture)
-    {
-        m_noiseTexture = std::make_unique<NoiseTexture>(*otherEditorScene.m_noiseTexture);
     }
 
 }
@@ -68,36 +58,13 @@ pwg::EditorScene& pwg::EditorScene::operator=(const EditorScene& otherEditorScen
         m_frameBuffer.reset();
     }
 
-    if (otherEditorScene.m_noiseTexture)
-    {
-        m_noiseTexture = std::make_unique<NoiseTexture>(*otherEditorScene.m_noiseTexture);
-    }
-    else
-    {
-        m_noiseTexture.reset();
-    }
-
     return *this;
-}
-
-pwg::Entity pwg::EditorScene::CreateEntity(const std::string& name)
-{
-    Entity entity(m_editorSceneRegistry.create(), &m_editorSceneRegistry);
-    entity.AddComponent<pwg::components::TagComponent>(name);
-    return entity;
 }
 
 void pwg::EditorScene::Update(const float& dt)
 {
     pwg::systems::EditorCameraControllerSystem::Update(m_editorSceneRegistry, m_mouseInput, m_aspectRatio);
-    pwg::systems::PlaneMeshSystem::Update(m_editorSceneRegistry, *m_meshManager);
-
-    if (m_noiseTexture)
-    {
-        m_noiseTexture->UpdateNoiseData(m_noiseTexture->GetNoiseParameters());
-    }
-
-    
+    m_terrain->Update();
 }
 
 void pwg::EditorScene::Draw()
@@ -136,34 +103,10 @@ void pwg::EditorScene::Draw()
         std::cerr << "Brak aktywnej kamery w ECS!\n";
     }
 
-    pwg::components::MeshComponent* meshComponent;
-    pwg::components::PlaneMeshComponent* planeMeshComponent;
-    auto meshView = m_editorSceneRegistry.view<components::MeshComponent, components::PlaneMeshComponent>();
-    for (auto [entity, mesh, plane] : meshView.each())
-    {
-        meshComponent = &mesh;
-        planeMeshComponent = &plane;
-        break;
-    }
-
-    if (!meshComponent)
-    {
-        std::cerr << "Brak mesha\n";
-    }
-
-    if (!m_meshManager)
-    {
-                
-    }
-    auto mesh = m_meshManager->GetMesh(meshComponent->meshID);
-
-    NoiseDeformer noiseDeformer;
-    noiseDeformer.ApplyNoise(*planeMeshComponent, *mesh, m_noiseTexture->GetNoiseData());
-
     m_frameBuffer->Bind();
     m_renderer.Clear();
-    m_renderer.Update(activeCamera, *mesh);
-    m_renderer.Draw(*mesh);
+    m_renderer.Update(activeCamera, *m_terrain->GetMesh());
+    m_renderer.Draw(*m_terrain->GetMesh());
     m_frameBuffer->Unbind();
 
     ImGui::Image(
@@ -176,12 +119,15 @@ void pwg::EditorScene::Draw()
      
     ImGui::End(); // Scene view
 
+    //do przeniesienia
     ImGui::Begin("Controls");
 
     if (ImGui::BeginTabBar("MainTabs"))
     {
         if (ImGui::BeginTabItem("Noise"))
         {
+
+            auto m_noiseTexture = m_terrain->GetNoiseTexture();
 
             float amplitude = m_noiseTexture->GetNoiseParameters().amplitude;
             float frequency = m_noiseTexture->GetNoiseParameters().frequency;
@@ -200,7 +146,7 @@ void pwg::EditorScene::Draw()
             if (ImGui::SliderInt("Octaves", &octaves, 1, 8)) { m_noiseTexture->SetOctaves(octaves); updated = true; }
             if (ImGui::SliderFloat("Persistance", &persistance, 0.01f, 2.0f)) { m_noiseTexture->SetPersistance(persistance); updated = true; }
             if (ImGui::SliderFloat("Lacunarity", &lacunarity, 0.01f, 10.0f)) { m_noiseTexture->SetLacunarity(lacunarity); updated = true; }
-            if (ImGui::DragFloat2("Offset", &offset.x, 0.01f)) { m_noiseTexture->SetOffset(offset); updated = true; }
+            if (ImGui::DragFloat2("Offset", &offset.x, 0.1f, 100.0f)) { m_noiseTexture->SetOffset(offset); updated = true; }
             if (ImGui::InputInt("Seed", &seed)) { m_noiseTexture->SetSeed(seed); updated = true; }
 
             if (updated)
@@ -237,6 +183,8 @@ void pwg::EditorScene::Draw()
     ImGui::EndTabBar();
     
     ImGui::End();
+
+    //do przeniesienia
 }
 
 std::unique_ptr<pwg::IScene> pwg::EditorScene::Clone()
