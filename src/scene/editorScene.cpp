@@ -14,14 +14,14 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
       m_resourceManager(resourceManager),
       m_renderer(renderer)
 {
-	m_frameBuffer = std::make_unique<FrameBuffer>(800, 800, true);
+	m_frameBuffer = std::make_unique<FrameBuffer>(600, 600, true);
 
     Entity editorCam(&m_editorSceneRegistry, "EditorCamera");
     editorCam.AddComponent<pwg::components::TransformComponent>();
     editorCam.AddComponent<pwg::components::CameraComponent>();
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
-    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 300);
+    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 100);
 }
 
 pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)

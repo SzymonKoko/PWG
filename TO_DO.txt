@@ -2,9 +2,12 @@ TO DO
 - chunk mesh
 - PlayScene
 - Console ImGui
-- Change noiseTexture size parameter
-- Move noiseTexture controls to another class
+- Add more controls
+- Fix camera move system (orbit etc.)
+- Add automatic camera distance
+- Fix main scene window
 - Add layers system to terrain
+
 
 
 

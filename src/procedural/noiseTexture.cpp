@@ -99,6 +99,51 @@ void pwg::NoiseTexture::SetNoiseType(FastNoiseLite::NoiseType noiseType)
 	m_noise.SetNoiseType(noiseType);
 }
 
+void pwg::NoiseTexture::SetFractalType(FastNoiseLite::FractalType fractalType)
+{
+	m_noise.SetFractalType(fractalType);
+}
+
+void pwg::NoiseTexture::SetFractalOctaves(int octaves)
+{
+	m_noise.SetFractalOctaves(octaves);
+}
+
+void pwg::NoiseTexture::SetFractalLacunarity(float lacunarity)
+{
+	m_noise.SetFractalLacunarity(lacunarity);
+}
+
+void pwg::NoiseTexture::SetFractalGain(float gain)
+{
+	m_noise.SetFractalGain(gain);
+}
+
+void pwg::NoiseTexture::SetFractalWeightedStrength(float strength)
+{
+	m_noise.SetFractalWeightedStrength(strength);
+}
+
+void pwg::NoiseTexture::SetFractalPingPongStrength(float strength)
+{
+	m_noise.SetFractalPingPongStrength(strength);
+}
+
+void pwg::NoiseTexture::SetCellularDistanceFunction(FastNoiseLite::CellularDistanceFunction cellularDistFunction)
+{
+	m_noise.SetCellularDistanceFunction(cellularDistFunction);
+}
+
+void pwg::NoiseTexture::SetCellularReturnType(FastNoiseLite::CellularReturnType cellularReturnType)
+{
+	m_noise.SetCellularReturnType(cellularReturnType);
+}
+
+void pwg::NoiseTexture::SetCellularJitter(float jitter)
+{
+	m_noise.SetCellularJitter(jitter);
+}
+
 void pwg::NoiseTexture::GenerateNoiseData()
 {
 	m_pixels.resize(m_noiseParams.size * m_noiseParams.size * 4);

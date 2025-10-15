@@ -2,6 +2,7 @@
 #define SRC_SCENE_CONTROLS_NOISE_CONTROLS_H
 
 #include "procedural/noiseTexture.h"
+#include <thread>
 #include "imgui.h"
 
 namespace pwg::controls
@@ -14,6 +15,8 @@ namespace pwg::controls
 		{
             if (ImGui::BeginTabItem("Noise"))
             {
+                //General options
+                static int selectedNoiseType = 0;
                 float amplitude = noiseTexture.GetNoiseParameters().amplitude;
                 float frequency = noiseTexture.GetNoiseParameters().frequency;
                 float scale = noiseTexture.GetNoiseParameters().scale;
@@ -23,29 +26,34 @@ namespace pwg::controls
                 float persistance = noiseTexture.GetNoiseParameters().persistance;
                 float lacunarity = noiseTexture.GetNoiseParameters().lacunarity;
 
+                //Fractal options
+                static int fractalType = 0;
+                static int fractalOctaves = 3;
+                static float fractalLacunarity = 2.0f;
+                static float fractalGain = 0.5f;
+                static float fractalWeightedStrength = 0.5f;
+                static float fractalPingPongStrength = 2.0f;
+
+
+                static int selectedCellularDistanceFuncType = 0;
+                static int selectedCellularReturnType = 0;
+                static float cellularJitter = 1.0f;
                 bool updated = false;
 
-                const char* noiseTypes[] = { "Perlin", "Simplex", "Cellular", "Value" };
-                static int selectedType = 1;
+                //Types
+                static const char* noiseTypes[] = { "OpenSimplex2", "OpenSimplex2S", "Cellular", "Perlin", "Value Cubic", "Value" };
+                static const char* fractalTypes[] = { "None", "FBm", "Ridged", "Ping Pong" };
+                static const char* cellularDistanceFuncTypes[] = { "Euclidean", "Euclidean Sq", "Manhattan", "Hybrid" };
+                static const char* cellularReturnTypes[] = { "Cell Value", "Distance", "Distance 2", "Distance 2 Add", "Distance 2 Sub", "Distance 2 Mul", "Distance 2 Div" };
 
-                if (ImGui::Combo("Noise type", &selectedType, noiseTypes, IM_ARRAYSIZE(noiseTypes)))
+
+                //General controls
+                ImGui::TextUnformatted("General");
+
+                if (ImGui::Combo("Noise type", &selectedNoiseType, noiseTypes, IM_ARRAYSIZE(noiseTypes)))
                 {
-                    if (selectedType == 0)
-                    {
-                        noiseTexture.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-                    }
-                    else if (selectedType == 1)
-                    {
-                        noiseTexture.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-                    }
-                    else if (selectedType == 2)
-                    {
-                        noiseTexture.SetNoiseType(FastNoiseLite::NoiseType_Cellular);
-                    }
-                    else if (selectedType == 3)
-                    {
-                        noiseTexture.SetNoiseType(FastNoiseLite::NoiseType_Value);
-                    }
+                    noiseTexture.SetNoiseType((FastNoiseLite::NoiseType)selectedNoiseType);
+                    updated = true;
                 }
 
                 if (ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 10.0f)) { noiseTexture.SetAmplitude(amplitude); updated = true; }
@@ -57,6 +65,65 @@ namespace pwg::controls
                 if (ImGui::DragFloat2("Offset", &offset.x, 0.1f, 100.0f)) { noiseTexture.SetOffset(offset); updated = true; }
                 if (ImGui::InputInt("Seed", &seed)) { noiseTexture.SetSeed(seed); updated = true; }
 
+                if (ImGui::Combo("Fractal type", &fractalType, fractalTypes, IM_ARRAYSIZE(fractalTypes)))
+                {
+                    noiseTexture.SetFractalType((FastNoiseLite::FractalType)fractalType);
+                    updated = true;
+                }
+
+                //Fractal controls
+                ImGui::TextUnformatted("Fractal");
+
+                ImGui::BeginDisabled(fractalType == 0);
+                if (ImGui::DragInt("Fractal Octaves", &fractalOctaves, 0.1f, 1, 20))
+                {
+                    noiseTexture.SetFractalOctaves(fractalOctaves);
+                    updated = true;
+                }
+                if (ImGui::DragFloat("Fractal Lacunarity", &fractalLacunarity, 0.01f))
+                {
+                    noiseTexture.SetFractalLacunarity(fractalLacunarity);
+                    updated = true;
+                }
+                if (ImGui::DragFloat("Fractal Gain", &fractalGain, 0.01f))
+                {
+                    noiseTexture.SetFractalGain(fractalGain);
+                    updated = true;
+                }
+                if (ImGui::DragFloat("Weighted Strength", &fractalWeightedStrength, 0.01f))
+                {
+                    noiseTexture.SetFractalWeightedStrength(fractalWeightedStrength);
+                    updated = true;
+                }
+                ImGui::BeginDisabled(fractalType != (int)FastNoiseLite::FractalType_PingPong);
+                if (ImGui::DragFloat("Ping Pong Strength", &fractalPingPongStrength, 0.01f))
+                {
+                    noiseTexture.SetFractalPingPongStrength(fractalPingPongStrength);
+                    updated = true;
+                }
+                ImGui::EndDisabled();
+                ImGui::EndDisabled();
+
+                //Cellular controls
+
+                ImGui::TextUnformatted("Cellular");
+                ImGui::BeginDisabled(selectedNoiseType != (int)FastNoiseLite::NoiseType_Cellular);
+
+                if (ImGui::Combo("Distance Function", &selectedCellularDistanceFuncType, cellularDistanceFuncTypes, IM_ARRAYSIZE(cellularDistanceFuncTypes)))
+                {
+                    noiseTexture.SetCellularDistanceFunction((FastNoiseLite::CellularDistanceFunction)selectedCellularDistanceFuncType);
+                }
+                if (ImGui::Combo("Return Type", &selectedCellularReturnType, cellularReturnTypes, IM_ARRAYSIZE(cellularReturnTypes)))
+                {
+                    noiseTexture.SetCellularReturnType((FastNoiseLite::CellularReturnType)selectedCellularReturnType);
+                }
+                if (ImGui::DragFloat("Jitter", &cellularJitter, 0.01f))
+                {
+                    noiseTexture.SetCellularJitter(cellularJitter);
+                }
+
+                ImGui::EndDisabled();
+
                 if (updated)
                 {
                     noiseTexture.UpdateNoiseData(noiseTexture.GetNoiseParameters());
@@ -67,7 +134,7 @@ namespace pwg::controls
                 if (noiseTexture.GetTextureID() != 0)
                 {
                     ImVec2 windowSize = ImGui::GetContentRegionAvail();
-                    ImVec2 noiseSize((float)noiseTexture.GetNoiseWidth(), (float)noiseTexture.GetNoiseHeight());
+                    ImVec2 noiseSize((float)noiseTexture.GetNoiseWidth() * 4, (float)noiseTexture.GetNoiseHeight() * 4);
 
                     //Center noise image on the window
                     ImVec2 cursorPos = ImGui::GetCursorPos();

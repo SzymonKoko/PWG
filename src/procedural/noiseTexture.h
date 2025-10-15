@@ -124,6 +124,24 @@ namespace pwg
 
 		void SetNoiseType(FastNoiseLite::NoiseType noiseType);
 
+		void SetFractalType(FastNoiseLite::FractalType fractalType);
+
+		void SetFractalOctaves(int octaves);
+
+		void SetFractalLacunarity(float lacunarity);
+
+		void SetFractalGain(float gain);
+
+		void SetFractalWeightedStrength(float strength);
+
+		void SetFractalPingPongStrength(float strength);
+
+		void SetCellularDistanceFunction(FastNoiseLite::CellularDistanceFunction cellularDistFunction);
+
+		void SetCellularReturnType(FastNoiseLite::CellularReturnType cellularReturnType);
+
+		void SetCellularJitter(float jitter);
+
 	private:
 
 		/**
