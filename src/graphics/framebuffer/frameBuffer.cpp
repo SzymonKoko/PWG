@@ -46,6 +46,7 @@ pwg::FrameBuffer::~FrameBuffer()
 
 void pwg::FrameBuffer::InitializeFrameBuffer()
 {
+	glViewport(0, 0, m_width, m_height);
 	glGenFramebuffers(1, &m_frameBufferObjectID);
 	glBindFramebuffer(GL_FRAMEBUFFER, m_frameBufferObjectID);
 

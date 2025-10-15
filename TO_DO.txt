@@ -2,11 +2,10 @@ TO DO
 - chunk mesh
 - PlayScene
 - Console ImGui
-- Add more controls
 - Fix camera move system (orbit etc.)
 - Add automatic camera distance
-- Fix main scene window
-- Add layers system to terrain
+- Add layers to terrain
+- Add layers controls in gui
 
 
 
