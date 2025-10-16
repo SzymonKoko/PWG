@@ -54,3 +54,8 @@ std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()
 
     return mesh;
 }
+
+int pwg::Terrain::GetSize()
+{
+    return m_size;
+}

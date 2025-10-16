@@ -17,6 +17,7 @@ namespace pwg::systems
 		~EditorCameraControllerSystem() = default;
 
 		static void Update(entt::registry& registry, pwg::MouseInput& mouseInput, float aspectRatio);
+		static void SetCameraDefaultPosition(entt::registry& registry, int size);
 	private:
 
 		static void HandleMouseInput(pwg::MouseInput& mouseInput, pwg::components::CameraComponent& camera, pwg::components::TransformComponent& transform, pwg::components::EditorCameraComponent& editorData);

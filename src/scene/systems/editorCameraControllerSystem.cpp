@@ -10,6 +10,7 @@ void pwg::systems::EditorCameraControllerSystem::Update(entt::registry& registry
 
     for (auto [entity, transform, camera, editorData] : view.each())
     {
+        std::cout << transform.position.x << " " << transform.position.y << " " << transform.position.z << "Distance: " << editorData.distanceToTarget << std::endl;
         HandleMouseInput(mouseInput, camera, transform, editorData);
         HandleProjection(camera, aspectRatio);
     }
@@ -69,4 +70,18 @@ void pwg::systems::EditorCameraControllerSystem::HandleMouseInput(pwg::MouseInpu
 void pwg::systems::EditorCameraControllerSystem::HandleProjection(pwg::components::CameraComponent& camera, float aspectRatio)
 {
     camera.projectionMatrix = glm::perspective(glm::radians(camera.fov), aspectRatio, camera.nearPlane, camera.farPlane);
+}
+
+void pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(entt::registry& registry, int size)
+{
+    auto view = registry.view<pwg::components::TransformComponent, pwg::components::EditorCameraComponent>();
+
+    for (auto [entity, transform, editorData] : view.each())
+    {
+        transform.position.x = (float)size + 50.0f;
+        transform.position.y = (transform.position.x / 50.0f) * 70;
+        transform.position.z = -((float)size + 50.0f);
+
+        editorData.distanceToTarget = transform.position.x * 2;
+    }
 }

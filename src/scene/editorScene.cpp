@@ -22,6 +22,8 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
     m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 100);
+
+    pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(m_editorSceneRegistry, m_terrain->GetSize());
 }
 
 pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)

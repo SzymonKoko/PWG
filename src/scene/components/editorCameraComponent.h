@@ -13,7 +13,7 @@ namespace pwg::components
 		glm::vec3 target{ 0.0f, 0.0f, 0.0f };
 
 		float minZoom{ 5.0f };
-		float maxZoom{ 500.0f };
+		float maxZoom{ 700.0f };
 		float zoomSpeed{ 5.0f };
 	};
 }

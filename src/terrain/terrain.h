@@ -26,6 +26,7 @@ namespace pwg
 
 		std::shared_ptr<Mesh> GetMesh();
 		std::shared_ptr<NoiseTexture> GetNoiseTexture() { return m_noiseTexture; }
+		int GetSize();
 	private:
 		int m_size;
 
