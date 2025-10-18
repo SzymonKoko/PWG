@@ -46,11 +46,11 @@ void pwg::Renderer::Draw(Mesh& mesh)
 	//std::cout << "Shader ID 22: " << shader.GetShaderID() << std::endl;
 
 	auto& texDirt = *m_resourceManager->GetTextureManager().GetTexture("dirt");
-	texDirt.Bind();
+	//texDirt.Bind();
 
-	m_currentShader->SetUniformInt("Texture", 0);
+	//m_currentShader->SetUniformInt("Texture", 0);
 	mesh.Draw();
 
-	texDirt.Unbind();
+	//texDirt.Unbind();
 
 }

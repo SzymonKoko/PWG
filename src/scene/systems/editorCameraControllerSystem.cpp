@@ -10,7 +10,7 @@ void pwg::systems::EditorCameraControllerSystem::Update(entt::registry& registry
 
     for (auto [entity, transform, camera, editorData] : view.each())
     {
-        std::cout << transform.position.x << " " << transform.position.y << " " << transform.position.z << "Distance: " << editorData.distanceToTarget << std::endl;
+        //std::cout << transform.position.x << " " << transform.position.y << " " << transform.position.z << "Distance: " << editorData.distanceToTarget << std::endl;
         HandleMouseInput(mouseInput, camera, transform, editorData);
         HandleProjection(camera, aspectRatio);
     }

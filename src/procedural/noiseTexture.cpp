@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include "noiseTexture.h"
+#include <iostream>
 
 pwg::NoiseTexture::NoiseTexture(int terrainSize)
 {
@@ -176,6 +177,8 @@ void pwg::NoiseTexture::GenerateNoiseData()
 
 			unsigned char pixelValue = (unsigned char)std::clamp(noiseHeight * 255.0f, 0.0f, 255.0f);
 
+			
+
 			size_t pixelIndex = (y * m_noiseParams.size + x) * 4;
 			m_pixels[pixelIndex + 0] = pixelValue;
 			m_pixels[pixelIndex + 1] = pixelValue;
@@ -186,6 +189,8 @@ void pwg::NoiseTexture::GenerateNoiseData()
 			m_noiseData[noiseDataIndex] = noiseHeight;
 		}
 	}
+
+	
 }
 
 void pwg::NoiseTexture::UploadToGPU()

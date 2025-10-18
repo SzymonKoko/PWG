@@ -10,7 +10,7 @@ pwg::Terrain::Terrain(entt::registry& registry, std::shared_ptr<ResourceManager>
 	planeMesh.AddComponent<components::MeshComponent>();
 	planeMesh.AddComponent<components::PlaneMeshComponent>(size);
 
-	m_noiseTexture = std::make_shared<NoiseTexture>(size); //Add size to constructor
+	m_noiseTexture = std::make_shared<NoiseTexture>(size);
 }
 
 pwg::Terrain::~Terrain()
@@ -22,6 +22,25 @@ void pwg::Terrain::ApplyNoise()
     NoiseDeformer::ApplyNoise(*m_resourceManager->GetMeshManager().GetMesh("PlaneMesh"), m_noiseTexture->GetNoiseData());
 }
 
+void pwg::Terrain::ApplyLayers()
+{
+    std::vector<Vertex> vertices = m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->GetVertices();
+    for (auto& v : vertices)
+    {
+        for (auto layer : m_terrainLayers)
+        {
+            if (layer.second.enabled)
+            {
+                if (v.position.y >= layer.second.minHeight)
+                {
+                    v.color = layer.second.color;
+                }
+            }
+        }
+    }
+    m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->SetVertices(vertices);
+}
+
 void pwg::Terrain::Update()
 {
 	pwg::systems::PlaneMeshSystem::Update(m_registry, m_resourceManager->GetMeshManager());
@@ -31,6 +50,17 @@ void pwg::Terrain::Update()
 		m_noiseTexture->UpdateNoiseData(m_noiseTexture->GetNoiseParameters());
 	}
     ApplyNoise();
+    ApplyLayers();
+}
+
+void pwg::Terrain::AddLayer(const TerrainLayer& terrainLayer)
+{
+    m_terrainLayers.emplace(terrainLayer.name, terrainLayer);
+}
+
+void pwg::Terrain::RemoveLayer(std::string name)
+{
+    m_terrainLayers.erase(name);
 }
 
 std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()

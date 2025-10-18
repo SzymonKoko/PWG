@@ -160,6 +160,8 @@ namespace pwg
 		std::vector<unsigned char> m_pixels;
 		std::vector<float> m_noiseData;
 
+		
+
 	};
 }
 #endif // !SRC_PROCEDURAL_NOISE_TEXTURE_H

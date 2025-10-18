@@ -76,6 +76,13 @@ namespace pwg
 		 */
 		void SetUniformMat4(const std::string& name, glm::mat4 value) const;
 
+		/**
+		 * @brief Sets shader uniform to vec3 value
+		 * @param name Name of the uniform
+		 * @param value Vec3 value for the uniform
+		 */
+		void SetUniformVec3(const std::string& name, glm::vec3 value) const;
+
 
 		/**
 		 * @brief Returns shader program ID

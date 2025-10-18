@@ -1,0 +1,21 @@
+TO DO
+
+//Features
+- chunk mesh
+- PlayScene
+- Console ImGui
+- Add layers to terrain PRIOR
+- Add layers controls in gui
+- Add texture layers
+- FPS counter
+
+//Fixes
+- Fix noiseTexture display size in imgui window
+- Change logging system
+
+//Cleanups
+- Add comments and logs
+
+
+
+

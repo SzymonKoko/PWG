@@ -11,6 +11,7 @@
 #include "procedural/noiseDeformer.h"
 #include "procedural/noiseTexture.h"
 #include "resources/resourceManager.h"
+#include "terrainLayer.h"
 
 namespace pwg
 {
@@ -20,15 +21,20 @@ namespace pwg
 		Terrain(entt::registry& registry, std::shared_ptr<ResourceManager> resourceManager, int size);
 		~Terrain();
 
-		void ApplyNoise();
-
 		void Update();
+
+		void AddLayer(const TerrainLayer& terrainLayer);
+		void RemoveLayer(std::string name);
 
 		std::shared_ptr<Mesh> GetMesh();
 		std::shared_ptr<NoiseTexture> GetNoiseTexture() { return m_noiseTexture; }
 		int GetSize();
 	private:
+		void ApplyNoise();
+		void ApplyLayers();
+
 		int m_size;
+		std::unordered_map<std::string, TerrainLayer> m_terrainLayers;
 
 		entt::registry& m_registry;
 		std::shared_ptr<NoiseTexture> m_noiseTexture;

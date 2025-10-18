@@ -39,7 +39,7 @@ namespace pwg
 	void Mesh::Draw()
 	{
 		glBindVertexArray(m_vaoID);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
 	}
@@ -99,6 +99,9 @@ namespace pwg
 
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, uv));
+
+		glEnableVertexAttribArray(3);
+		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
 
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);

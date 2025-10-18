@@ -132,6 +132,11 @@ void pwg::Shader::SetUniformMat4(const std::string& name, glm::mat4 value) const
     glUniformMatrix4fv(glGetUniformLocation(m_shaderID, name.c_str()),1, GL_FALSE, glm::value_ptr(value));
 }
 
+void pwg::Shader::SetUniformVec3(const std::string& name, glm::vec3 value) const
+{
+    glUniform3fv(glGetUniformLocation(m_shaderID, name.c_str()), 1, glm::value_ptr(value));
+}
+
 unsigned int pwg::Shader::GetShaderID()
 {
     return m_shaderID;
