@@ -23,12 +23,15 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 100);
 
-    m_terrain->AddLayer(pwg::TerrainLayer(true, "Water", 0.0f, 20.0f, 10, glm::vec3(0.0f, 0.0f, 1.0f)));
-    m_terrain->AddLayer(pwg::TerrainLayer(false, "Grass", 20.0f, 30.0f, 10, glm::vec3(0.0f, 1.0f, 0.0f)));
-    m_terrain->AddLayer(pwg::TerrainLayer(true, "Stone", 30.0f, 40.0f, 10, glm::vec3(0.75f, 0.75f, 0.75f)));
-    m_terrain->AddLayer(pwg::TerrainLayer(true, "Snow", 40.0f, 100.0f, 10, glm::vec3(1.0f, 1.0f, 1.0f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Water", 0.0f, 19.0f, 10, glm::vec3(0.0f, 0.0f, 1.0f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Sand", 19.0f, 20.0f, 10, glm::vec3(1.0f, 1.0f, 0.0f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Grass", 20.0f, 25.0f, 10, glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Stone", 25.0f, 37.0f, 10, glm::vec3(0.75f, 0.75f, 0.75f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Snow", 37.0f, 45.0f, 10, glm::vec3(0.9f, 0.9f, 0.9f)));
 
     pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(m_editorSceneRegistry, m_terrain->GetSize());
+
+    PWG_INFO("Editor scene initialized");
 }
 
 pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)

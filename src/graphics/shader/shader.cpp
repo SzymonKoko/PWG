@@ -28,8 +28,7 @@ pwg::Shader::Shader(const std::string vertexFilePath, const std::string fragment
     if (!success)
     {
         glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" <<
-            infoLog << std::endl;
+        PWG_ERROR("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n {0}", infoLog);
     }
 
     //Create fragment shader
@@ -46,8 +45,7 @@ pwg::Shader::Shader(const std::string vertexFilePath, const std::string fragment
     if (!success)
     {
         glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" <<
-            infoLog << std::endl;
+        PWG_ERROR("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n {0}", infoLog);
     }
 
     //Create shader program
@@ -65,15 +63,11 @@ pwg::Shader::Shader(const std::string vertexFilePath, const std::string fragment
     if (!success)
     {
         glGetProgramInfoLog(m_shaderID, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" <<
-            infoLog << std::endl;
+        PWG_ERROR("ERROR::SHADER::PROGRAM::LINKING_FAILED\n {0}", infoLog);
     }
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
-
-    Logger::LogInfo(Logger::Module::Shader, "Shaders loaded");
-	
 }
 
 pwg::Shader::~Shader()
@@ -94,8 +88,7 @@ std::string pwg::Shader::ReadFromShaderFile(const std::string shaderPath)
     }
     else
     {
-        Logger::LogError(Logger::Module::Shader, "Could not read file" + (std::string)shaderPath);
-        std::cout << "Could not read file " << shaderPath << ". File does not exist." << std::endl;
+        PWG_ERROR("Could not read shader file ({0})", shaderPath);
     }
 
     fileStream.close();

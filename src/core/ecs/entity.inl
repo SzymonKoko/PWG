@@ -1,11 +1,14 @@
 #ifndef SRC_CORE_ECS_ENTITY_INL
 #define SRC_CORE_ECS_ENTITY_INL
 
+#include "core/logger/logger.h"
+
 namespace pwg
 {
 	template<typename T, typename... Args>
 	T& Entity::AddComponent(Args&&... args)
 	{
+		PWG_DEBUG("Added {0} to entity {1}.", T::Name, m_name);
 		return m_registry->emplace<T>(m_entityHandle, std::forward<Args>(args)...);
 	}
 
@@ -24,7 +27,8 @@ namespace pwg
 	template<typename T>
 	void Entity::RemoveComponent()
 	{
-		m_registry->remove<T>(m_entityHandle);	
+		m_registry->remove<T>(m_entityHandle);
+		PWG_DEBUG("Removed {0} from entity {1}.", T::Name, m_name);
 	}
 }
 

@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include "noiseTexture.h"
 #include <iostream>
+#include "core/logger/logger.h"
 
 pwg::NoiseTexture::NoiseTexture(int terrainSize)
 {
@@ -13,6 +14,7 @@ pwg::NoiseTexture::NoiseTexture(int terrainSize)
 	glGenTextures(1, &m_textureID);
 
 	UpdateNoiseData(m_noiseParams);
+	PWG_INFO("Noise texture has been created ({0}x{0}, id={1})",terrainSize, m_textureID);
 }
 
 pwg::NoiseTexture::NoiseTexture(const NoiseParameters& noiseParams)
@@ -189,8 +191,6 @@ void pwg::NoiseTexture::GenerateNoiseData()
 			m_noiseData[noiseDataIndex] = noiseHeight;
 		}
 	}
-
-	
 }
 
 void pwg::NoiseTexture::UploadToGPU()

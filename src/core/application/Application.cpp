@@ -4,6 +4,8 @@
 
 pwg::Application::Application()
 {
+    Logger::Init();
+
     m_keyboardInput = std::make_unique<KeyboardInput>(nullptr);
     m_mouseInput = std::make_unique<MouseInput>(nullptr);
     m_window = std::make_unique<Window>(*m_mouseInput, *m_keyboardInput);
@@ -17,14 +19,14 @@ pwg::Application::Application()
     m_scene = std::make_shared<SceneManager>(m_window->GetWindow(), *m_mouseInput, *m_keyboardInput, m_resourceManager, *m_renderer);
     m_gui = std::make_unique<Gui>(*m_window, m_scene);
 
-    Logger::LogInfo(Logger::Module::Application, "Application initialized");
+    PWG_INFO("Application initialized");
 }
 
 pwg::Application::~Application()
 {
     m_resourceManager->UnloadAll();
     glfwTerminate();
-    Logger::LogInfo(Logger::Module::Application, "Application destroyed");
+    PWG_INFO("Application destroyed");
 }
 
 void pwg::Application::Update()

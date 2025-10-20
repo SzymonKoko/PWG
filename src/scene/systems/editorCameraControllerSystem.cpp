@@ -83,5 +83,15 @@ void pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(entt::
         transform.position.z = -((float)size + 50.0f);
 
         editorData.distanceToTarget = transform.position.x * 2;
+
+        PWG_INFO("Camera set to default (Position: {0} {1} {2}, distance to target: {3}, target: {4} {5} {6})",
+            transform.position.x,
+            transform.position.y,
+            transform.position.z,
+            editorData.distanceToTarget,
+            editorData.target.x,
+            editorData.target.y,
+            editorData.target.z
+        );
     }
 }

@@ -7,6 +7,8 @@ namespace pwg::components
 {
 	struct EditorCameraComponent
 	{
+		static constexpr const char* Name = "Editor Camera Component";
+
 		float yaw{ -45.0f };
 		float pitch{ 45.0f };
 		float distanceToTarget{ 200.0f };

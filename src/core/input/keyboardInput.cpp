@@ -12,7 +12,7 @@ pwg::KeyboardInput::KeyboardInput(GLFWwindow* window)
 	m_keyBindings[static_cast<int>(Action::Exit)] = GLFW_KEY_ESCAPE;
 	m_keyBindings[static_cast<int>(Action::ToggleDebug)] = GLFW_KEY_F1;
 
-	Logger::LogInfo(Logger::Module::KeyboardInput, "Keyboard ready");
+	PWG_INFO("Keyboard ready");
 }
 
 void pwg::KeyboardInput::Update()

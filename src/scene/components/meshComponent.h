@@ -7,6 +7,8 @@ namespace pwg::components
 {
 	struct MeshComponent
 	{
+		static constexpr const char* Name = "Mesh Component";
+
 		std::string meshID = "";
 
 		MeshComponent() = default;

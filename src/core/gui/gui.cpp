@@ -4,6 +4,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "gui.h"
+#include "core/logger/logger.h"
 
 pwg::Gui::Gui(Window& window, std::shared_ptr<SceneManager> scene)
 	:m_window(window), m_scene(scene)
@@ -23,6 +24,8 @@ pwg::Gui::Gui(Window& window, std::shared_ptr<SceneManager> scene)
 	ImGui_ImplGlfw_InitForOpenGL(m_window.GetWindow(), true);          // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
 	const char* glsl_version = "#version 330";
 	ImGui_ImplOpenGL3_Init(glsl_version);
+
+	PWG_INFO("ImGui initialized");
 }
 
 pwg::Gui::~Gui()

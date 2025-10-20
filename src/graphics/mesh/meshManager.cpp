@@ -62,6 +62,7 @@ namespace pwg
 			m_meshes.emplace(name, std::make_shared<Mesh>(vertices, indices, size));
 		}
 
+		PWG_INFO("Created mesh \"{0}\" ({1}x{1})", name, size);
 		return name;
 	}
 

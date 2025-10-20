@@ -11,6 +11,7 @@ pwg::Terrain::Terrain(entt::registry& registry, std::shared_ptr<ResourceManager>
 	planeMesh.AddComponent<components::PlaneMeshComponent>(size);
 
 	m_noiseTexture = std::make_shared<NoiseTexture>(size);
+    PWG_INFO("Terrain created ({0}x{0})", size);
 }
 
 pwg::Terrain::~Terrain()
@@ -31,7 +32,7 @@ void pwg::Terrain::ApplyLayers()
         {
             if (layer.second.enabled)
             {
-                if (v.position.y >= layer.second.minHeight)
+                if (v.position.y >= layer.second.minHeight && v.position.y <= layer.second.maxHeight)
                 {
                     v.color = layer.second.color;
                 }
@@ -56,11 +57,22 @@ void pwg::Terrain::Update()
 void pwg::Terrain::AddLayer(const TerrainLayer& terrainLayer)
 {
     m_terrainLayers.emplace(terrainLayer.name, terrainLayer);
+    PWG_DEBUG("Terrain layer added ({0}, {1}, {2}-{3}, {4}, color: {5} {6} {7})", 
+        terrainLayer.name, 
+        terrainLayer.enabled, 
+        terrainLayer.minHeight, 
+        terrainLayer.maxHeight, 
+        terrainLayer.textureID,
+        terrainLayer.color.x,
+        terrainLayer.color.y,
+        terrainLayer.color.z
+    );
 }
 
 void pwg::Terrain::RemoveLayer(std::string name)
 {
     m_terrainLayers.erase(name);
+    PWG_DEBUG("Removed terrain layer {0}", name);
 }
 
 std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()
@@ -77,7 +89,7 @@ std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()
 
     if (!meshComponent)
     {
-        std::cerr << "Brak mesha\n";
+        PWG_ERROR("Brak mesha");
     }
 
     auto mesh = m_resourceManager->GetMeshManager().GetMesh(meshComponent->meshID);

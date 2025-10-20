@@ -9,24 +9,27 @@ void pwg::TextureManager::Load(const std::string& textureID, const std::string& 
 
     auto texture = std::make_shared<Texture>(texturePath);
     m_textures[textureID] = texture;
-
-    //Czy w przypadku framebuffer tex zostawiæ to w Texture czy daæ drugi konstruktor
+    
+    PWG_DEBUG("Texture has been loaded ({0}, id={1}, {2}x{3})", textureID, texture->GetTextureID(), texture->GetWidth(), texture->GetHeight());
 }
 
 void pwg::TextureManager::Unload(std::string& textureID)
 {
     m_textures.erase(textureID);
+    PWG_DEBUG("Texture has been unloaded ({0})", textureID);
 }
 
 void pwg::TextureManager::UnloadAll()
 {
     m_textures.clear();
+    PWG_DEBUG("All textures have been unloaded");
 }
 
 std::shared_ptr<pwg::Texture> pwg::TextureManager::GetTexture(const std::string& textureID)
 {
     if (!m_textures.contains(textureID))
     {
+        PWG_ERROR("Texture {0} does not exits!\n", textureID);
         return nullptr;
     }
     return m_textures[textureID];

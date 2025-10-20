@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "core/logger/logger.h"
 #include "mesh.h"
 
 namespace pwg
@@ -21,6 +22,7 @@ namespace pwg
 		glDeleteBuffers(1, &m_vboID);
 		glDeleteBuffers(1, &m_eboID);
 	}
+
 	void Mesh::Update(unsigned int shaderID)
 	{
 		glm::vec3 start_pos(0.0f, 0.0f, 0.0f);
@@ -106,7 +108,8 @@ namespace pwg
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
+		
+		PWG_INFO("Mesh uploaded to GPU");
 	}
 }
 

@@ -7,6 +7,8 @@ namespace pwg::components
 {
 	struct TagComponent
 	{
+		static constexpr const char* Name = "Tag Component";
+
 		std::string name;
 
 		TagComponent(const std::string& name = "") : name(name) {}

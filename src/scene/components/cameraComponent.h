@@ -7,6 +7,8 @@ namespace pwg::components
 {
 	struct CameraComponent
 	{
+		static constexpr const char* Name = "Camera Component";
+
 		float fov = 45.0f;
 		float nearPlane = 0.01;
 		float farPlane = 2000.0f;

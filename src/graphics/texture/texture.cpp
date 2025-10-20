@@ -33,10 +33,11 @@ pwg::Texture::Texture(const std::string& imagePath)
 			glGenerateMipmap(GL_TEXTURE_2D);
 		}
 
+		
 	}
 	else
 	{
-		Logger::LogError(Logger::Module::Texture, "Failed to load texture");
+		PWG_ERROR("Failed to load texture ({0})", imagePath.c_str());
 	}
 
 	if (m_image)
@@ -58,6 +59,8 @@ pwg::Texture::Texture(int width, int height)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+	PWG_DEBUG("Framebuffer texture created ({0}x{1})", width, height);
 }
 
 pwg::Texture::~Texture()
@@ -72,6 +75,7 @@ pwg::Texture::~Texture()
 void pwg::Texture::Bind()
 {
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
+	PWG_DEBUG("Texture binded (id={0})", m_textureID);
 }
 
 void pwg::Texture::Unbind()

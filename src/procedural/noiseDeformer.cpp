@@ -28,7 +28,7 @@ void pwg::NoiseDeformer::ApplyNoise(pwg::Mesh& mesh, const std::vector<float>& n
 		}
 	}
 
-	std::cout << "Min: " << m_minNoiseHeight << "	Max: " << m_maxNoiseHeight << std::endl;
+	//std::cout << "Min: " << m_minNoiseHeight << "	Max: " << m_maxNoiseHeight << std::endl;
 
 	mesh.SetVertices(vertices);
 }

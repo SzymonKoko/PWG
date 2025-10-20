@@ -17,6 +17,14 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(imgui)
 
+FetchContent_Declare(
+	spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG v1.14.1
+)
+
+FetchContent_MakeAvailable(spdlog)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(ASSET_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets)
 
@@ -62,7 +70,7 @@ target_include_directories(stb_image PUBLIC
 add_library(entt INTERFACE)
 target_include_directories(entt INTERFACE 
     "${PROJECT_SOURCE_DIR}/libs/entt" # Path to entt Header file
-)
+) 
 
 # Add GLFW3 to project
 add_subdirectory(libs/glfw)
@@ -89,6 +97,7 @@ target_link_libraries(${PROJECT_NAME}
 		stb_image
 		entt
 		OpenGL::GL
+		spdlog::spdlog
 )
 
 # Configure output directories for game

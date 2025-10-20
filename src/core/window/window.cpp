@@ -8,7 +8,7 @@ pwg::Window::Window(MouseInput& mouseInput, KeyboardInput& keyboardInput)
 {
     // GLFW Init
     if (!glfwInit()) {
-        Logger::LogError(Logger::Module::Window, "Failed to initialize GLFW");
+        PWG_ERROR("Failed to initialize GLFW");
         return;
     }
 
@@ -19,7 +19,7 @@ pwg::Window::Window(MouseInput& mouseInput, KeyboardInput& keyboardInput)
 
     const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     if (!mode) {
-        Logger::LogError(Logger::Module::Window, "Failed to get video mode!");
+        PWG_ERROR("Failed to get video mode!");
         glfwTerminate();
         return;
     }
@@ -29,13 +29,13 @@ pwg::Window::Window(MouseInput& mouseInput, KeyboardInput& keyboardInput)
     // Tworzenie okna
     m_window = glfwCreateWindow(m_windowWidth, m_windowHeight, "PWG", nullptr, nullptr);
     if (!m_window) {
-        Logger::LogError(Logger::Module::Window, "Failed to create GLFW window");
+        PWG_ERROR("Failed to create GLFW window");
         glfwTerminate();
         return;
     }
     else
     {
-        Logger::LogInfo(Logger::Module::Window, "Window created");
+        PWG_INFO("Window created");
     }
 
     glfwMakeContextCurrent(m_window);
@@ -45,7 +45,7 @@ pwg::Window::Window(MouseInput& mouseInput, KeyboardInput& keyboardInput)
 
     // GLAD Init
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        Logger::LogError(Logger::Module::Window, "Failed to initialize GLAD");
+        PWG_ERROR("Failed to initialize GLAD");
     }
 
     glfwSetInputMode(m_window, GLFW_STICKY_KEYS, GLFW_TRUE);
@@ -57,7 +57,7 @@ pwg::Window::Window(MouseInput& mouseInput, KeyboardInput& keyboardInput)
 pwg::Window::~Window()
 {
     glfwDestroyWindow(m_window);
-    Logger::LogInfo(Logger::Module::Window, "Window destroyed");
+    PWG_INFO("Window destroyed");
 }
 
 void pwg::Window::Update(float dt)

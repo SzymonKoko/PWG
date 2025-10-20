@@ -26,6 +26,10 @@ public:
 	void RemoveLayer(string name);
 	
 	void ApplyLayers();
+	{
+		Iterujemy po m_layers
+		Jeżeli terrainHeight jest pomiędzy min i max to color = ...
+	}
 	
 	//Getters
 	TerrainLayer& GetLayer(string name);

@@ -7,6 +7,8 @@ namespace pwg::components
 {
 	struct PlaneMeshComponent
 	{
+		static constexpr const char* Name = "Plane Mesh Component";
+
 		int size;
 		bool changed = true;
 

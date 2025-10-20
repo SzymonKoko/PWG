@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include "renderer.h"
+#include "core/logger/logger.h"
 
 pwg::Renderer::Renderer(std::shared_ptr<ResourceManager> resourceManager)
 	:m_resourceManager(resourceManager)
@@ -11,6 +12,8 @@ pwg::Renderer::Renderer(std::shared_ptr<ResourceManager> resourceManager)
 	textureManager.Load("dirt", "../assets/textures/dirt.png");
 	m_currentShader = m_resourceManager->GetShaderManager().GetShader("default");
 	glEnable(GL_DEPTH_TEST);
+
+	PWG_INFO("Renderer initialized");
 }
 
 pwg::Renderer::~Renderer()

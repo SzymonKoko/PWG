@@ -6,7 +6,7 @@ pwg::FrameBuffer::FrameBuffer(int width, int height, bool useRBO)
 {
 	m_fboTexture = std::make_shared<Texture>(m_width, m_height);
 	InitializeFrameBuffer();
-
+	PWG_INFO("Framebuffer created ({0}x{1})", width, height);
 }
 
 pwg::FrameBuffer::FrameBuffer(const pwg::FrameBuffer& otherFBO)
@@ -106,5 +106,6 @@ void pwg::FrameBuffer::Resize(int width, int height)
 	m_fboTexture = std::make_shared<Texture>(m_width, m_height);
 
 	InitializeFrameBuffer();  
+	PWG_DEBUG("Changed framebuffer size to {0}x{1}", m_width, m_height);
 }
 

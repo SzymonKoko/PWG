@@ -35,6 +35,9 @@ namespace pwg
 
 		unsigned int GetTextureID() { return m_textureID; }
 
+		int GetWidth() { return m_width; }
+		int GetHeight() { return m_height; }
+
 
 
 	private:

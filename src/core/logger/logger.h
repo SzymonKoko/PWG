@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <string>
+#include "spdlog/spdlog.h"
+#include <memory>
 
 namespace pwg
 {
@@ -12,88 +14,19 @@ namespace pwg
 	class Logger
 	{
 	public:
-		Logger();
-		~Logger() = default;
+		static void Init();
 
-		enum class Module
-		{
-			Application,
-			Window,
-			IndexBuffer,
-			VertexArray,
-			VertexBuffer,
-			IMesh,
-			TriangleMesh,
-			PyramidMesh,
-			Renderer,
-			Shader,
-			Logger,
-			InputManager,
-			KeyboardInput,
-			MouseInput,
-			Camera,
-			Texture,
-			WindowEditor,
-			TerrainEditor,
-			Noise,
-			GUI
-		};
-
-		enum class Severity
-		{
-			INFO,
-			DEBUG,
-			ERROR
-		};
-
-
-		/**
-		 * @brief Prints an info log message
-		 * @param module Identifier of the module from which the log message originates.
-		 * @param message Message to be printed.
-		 */
-		static void LogInfo(const Module module, const std::string& message);
-
-
-		/**
-		 * @brief Prints a debug log message
-		 * @param module Identifier of the module from which the log message originates.
-		 * @param message Message to be printed.
-		 */
-		static void LogDebug(const Module module, const std::string& message);
-
-
-		/**
-		 * @brief Prints an error log message
-		 * @param module Identifier of the module from which the log message originates.
-		 * @param message Message to be printed.
-		 */
-		static void LogError(const Module module, const std::string& message);
+		inline static std::shared_ptr<spdlog::logger>& GetLogger() { return m_logger; }
 	private:
-
-
-		/**
-		 * @brief Prints a given message 
-		 * @param module Identifier of the module from which the log message originates.
-		 * @param logLevel Severity of the log message.
-		 * @param message Message to be printed.
-		 */
-		static void Log(const Module module, const Severity logLevel, const std::string& message);
-
-
-		/**
-		 * @brief Converts module identifier to string
-		 * @param module Identifier of the module.
-		 */
-		static std::string ModuleToString(const Module module);
-
-
-		/**
-		 * @brief Converts severity identifier to string
-		 * @param module Identifier of severity.
-		 */
-		static std::string SeverityToString(const Severity logLevel);
+		static std::shared_ptr<spdlog::logger> m_logger;
 
 	};
 } //namespace pwg
+
+#define PWG_ERROR(...)	 ::pwg::Logger::GetLogger()->error(__VA_ARGS__)
+#define PWG_WARN(...)	 ::pwg::Logger::GetLogger()->warn(__VA_ARGS__)
+#define PWG_INFO(...)	 ::pwg::Logger::GetLogger()->info(__VA_ARGS__)
+#define PWG_TRACE(...)	 ::pwg::Logger::GetLogger()->trace(__VA_ARGS__)
+#define PWG_FATAL(...)	 ::pwg::Logger::GetLogger()->fatal(__VA_ARGS__)
+#define PWG_DEBUG(...)	 ::pwg::Logger::GetLogger()->debug(__VA_ARGS__)
 #endif // !SRC_CORE_LOGGER_LOGGER_H
