@@ -1,3 +1,10 @@
-Editor mode
-Play mode
-Serialization
+Prototype
+- Editor mode
+- Simple Play mode
+- Serialization
+
+Non prototype
+- Lights
+- Biomes
+- Objects
+- Shaders

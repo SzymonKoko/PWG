@@ -9,112 +9,123 @@
 
 namespace pwg
 {
+	/**
+	* @brief Class responsible for creating and managing the application window.
+	* Handles GLFW initialization, delta time calculation, and window events.
+	*/
 	class Window
 	{
 	public:
 
 		/**
-		* @brief Window constructor. Initializing GLFW, Glad and default configs
-		* @param minput Reference to a mouse input instance that is used for window
-		* @param kinput Reference to a keyboard input instance that is used for window
+		* @brief Constructs the Window instance.
+		* Initializes GLFW, sets up input callbacks, and creates a window with default configuration.
+		* @param mouseInput Reference to a MouseInput instance used for handling mouse events.
+		* @param keyboardInput Reference to a KeyboardInput instance used for handling keyboard input.
 		*/
 		Window(MouseInput& mouseInput, KeyboardInput& keyboardInput);
 
 		/**
-		* @brief Window destructor. Destroying GLFWwindow instance.
+		* @brief Destructor. Cleans up GLFW and destroys the window instance.
 		*/
 		~Window();
 
-
 		/**
-		* @brief Updates window on every frame.
-		* @param dt Time between frames
+		* @brief Updates window state every frame.
+		* Polls events and updates delta time.
+		* @param dt Time elapsed since last frame.
 		*/
 		void Update(float dt);
 
 		/**
-		* @brief Swaps buffer. GLFW standard function.
+		* @brief Swaps the front and back buffers.
+		* Standard GLFW function used for frame presentation.
 		*/
 		void SwapBuffers();
 
 		/**
-		* @brief Changes state of a window. Waits for user input
-		* @return Returns true if window should close, false otherwise
+		* @brief Checks if the window should close.
+		* @return True if user requested to close the window, false otherwise.
 		*/
 		bool WindowShouldClose() const;
 
 		/**
-		* @brief GLFWwindow getter.
-		* @return Returns GLFWwindow instance
+		* @brief Getter for the GLFW window pointer.
+		* @return Pointer to the GLFWwindow instance.
 		*/
 		GLFWwindow* GetWindow() { return m_window; }
 
 		/**
-		* @brief Delta time getter
-		* @return Returns time between frames
+		* @brief Getter for delta time value.
+		* @return Time elapsed between frames.
 		*/
 		float GetDeltaTime() { return m_deltaTime; }
 
 		/**
-		* @brief Window width getter
-		* @return Returns width of the window in pixels
+		* @brief Getter for window width in pixels.
+		* @return Width of the window.
 		*/
 		float GetWindowWidth() { return m_windowWidth; }
 
 		/**
-		* @brief Window height getter
-		* @return Returns height of the window in pixels
+		* @brief Getter for window height in pixels.
+		* @return Height of the window.
 		*/
 		float GetWindowHeight() { return m_windowHeight; }
 
 		/**
-		* @brief Window size setter
-		* @param width New width of the window in pixels
-		* @param height New height of the window in pixels
+		* @brief Sets a new window size.
+		* @param width New width in pixels.
+		* @param height New height in pixels.
 		*/
 		void SetWindowSize(float width, float height);
 
-		
 	private:
-		GLFWwindow* m_window;
-		MouseInput& m_mouseInput;
-		KeyboardInput& m_keyboardInput;
+		GLFWwindow* m_window;				/**< Pointer to the GLFW window instance. */
+		MouseInput& m_mouseInput;			/**< Reference to the mouse input handler. */
+		KeyboardInput& m_keyboardInput;		/**< Reference to the keyboard input handler. */
 
-		uint16_t m_windowWidth{ 1600 };
-		uint16_t m_windowHeight{ 900 };
-		uint16_t m_screenWidth{ 0 };
-		uint16_t m_screenHeight{ 0 };
-		float m_deltaTime{ 0.0f };
-		float m_lastFrame{ 0.0f };
+		uint16_t m_windowWidth{ 1600 };		/**< Current window width in pixels. */
+		uint16_t m_windowHeight{ 900 };		/**< Current window height in pixels. */
+		uint16_t m_screenWidth{ 0 };		/**< Current screen width in pixels. */
+		uint16_t m_screenHeight{ 0 };		/**< Current screen height in pixels. */
+		float m_deltaTime{ 0.0f };			/**< Time elapsed between the last and current frame. */
+		float m_lastFrame{ 0.0f };			/**< Timestamp of the last rendered frame. */
 
 		/**
-		* @brief Polls GLFW events. GLFW standard function.
+		* @brief Polls GLFW window events such as input and resize.
 		*/
 		void PollEvents();
 
 		/**
-		* @brief Updates delta time. Calculates time between frames
+		* @brief Updates the delta time value based on current and previous frame timestamps.
 		*/
 		void UpdateDeltaTime();
 
+		/**
+		* @brief Counts and logs FPS to the console or debug overlay.
+		* @param dt Delta time from the current frame.
+		*/
 		void CountFPS(const float& dt);
 
 		/**
-		* @brief GLFW scroll callback function. Callback triggered when scroll is moved
-		* @param window Pointer to GLFWwindow instance
-		* @param xoffset Scroll offset on X axis
-		* @param yoffset Scroll offset on y axis
+		* @brief GLFW scroll callback function.
+		* Triggered when the user scrolls using the mouse wheel.
+		* @param window Pointer to GLFWwindow instance.
+		* @param xoffset Scroll offset along the X axis.
+		* @param yoffset Scroll offset along the Y axis.
 		*/
 		static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 		/**
-		* @brief Framebuffer size change callback function. Callback triggered when framebuffer size changes.
-		* @param window Pointer to GLFWwindow instance
-		* @param width New width of a framebuffer
-		* @param height New height of a framebuffer
+		* @brief GLFW framebuffer resize callback.
+		* Triggered when the framebuffer size changes (e.g. window resize).
+		* @param window Pointer to GLFWwindow instance.
+		* @param width New framebuffer width.
+		* @param height New framebuffer height.
 		*/
 		static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 	};
-} //namespace pwg
+} // namespace pwg
 
 #endif // !SRC_CORE_WINDOW_WINDOW_H_

@@ -41,7 +41,7 @@ namespace pwg
 
 		/**
 		* @brief Noise texture copy constructor. Constructs a copy of the noise texture instance
-		* @params Reference to a other noise texture instance
+		* @param other Reference to another noise texture instance
 		*/
 		NoiseTexture(const NoiseTexture& other);
 
@@ -52,7 +52,7 @@ namespace pwg
 
 		/**
 		* @brief Updates noise parameters with new ones
-		* @params noiseParams Reference to a struct of new noise parameters
+		* @param noiseParams Reference to a struct of new noise parameters
 		*/
 		void UpdateNoiseData(const NoiseParameters& noiseParams);
 
@@ -116,30 +116,82 @@ namespace pwg
 		*/
 		void SetSeed(int seed);
 
+		/**
+		* @brief Noise octaves setter
+		* @param octaves New number of octaves used for fractal noise generation
+		*/
 		void SetOctaves(int octaves);
 
+		/**
+		* @brief Noise persistance setter
+		* @param persistance New persistance value controlling amplitude reduction per octave
+		*/
 		void SetPersistance(float persistance);
 
+		/**
+		* @brief Noise lacunarity setter
+		* @param lacunarity New lacunarity value controlling frequency increase per octave
+		*/
 		void SetLacunarity(float lacunarity);
 
+		/**
+		* @brief Noise type setter
+		* @param noiseType New FastNoiseLite noise type
+		*/
 		void SetNoiseType(FastNoiseLite::NoiseType noiseType);
 
+		/**
+		* @brief Fractal type setter
+		* @param fractalType New FastNoiseLite fractal type
+		*/
 		void SetFractalType(FastNoiseLite::FractalType fractalType);
 
+		/**
+		* @brief Fractal octaves setter
+		* @param octaves Number of octaves for fractal noise
+		*/
 		void SetFractalOctaves(int octaves);
 
+		/**
+		* @brief Fractal lacunarity setter
+		* @param lacunarity New lacunarity value for fractal noise
+		*/
 		void SetFractalLacunarity(float lacunarity);
 
+		/**
+		* @brief Fractal gain setter
+		* @param gain Gain multiplier for fractal noise
+		*/
 		void SetFractalGain(float gain);
 
+		/**
+		* @brief Fractal weighted strength setter
+		* @param strength Weighted strength value for fractal noise
+		*/
 		void SetFractalWeightedStrength(float strength);
 
+		/**
+		* @brief Fractal ping-pong strength setter
+		* @param strength Ping-pong strength value for fractal noise
+		*/
 		void SetFractalPingPongStrength(float strength);
 
+		/**
+		* @brief Cellular distance function setter
+		* @param cellularDistFunction New cellular distance function type
+		*/
 		void SetCellularDistanceFunction(FastNoiseLite::CellularDistanceFunction cellularDistFunction);
 
+		/**
+		* @brief Cellular return type setter
+		* @param cellularReturnType New cellular return type
+		*/
 		void SetCellularReturnType(FastNoiseLite::CellularReturnType cellularReturnType);
 
+		/**
+		* @brief Cellular jitter setter
+		* @param jitter Jitter value controlling randomness of cell positions
+		*/
 		void SetCellularJitter(float jitter);
 
 	private:
@@ -153,15 +205,13 @@ namespace pwg
 		* @brief Uploads noise texture to GPU
 		*/
 		void UploadToGPU();
+
 	private:
-		unsigned int m_textureID{ 0 };
-		FastNoiseLite m_noise;
-		NoiseParameters m_noiseParams;
-		std::vector<unsigned char> m_pixels;
-		std::vector<float> m_noiseData;
-
-		
-
+		unsigned int m_textureID{ 0 };					/**< OpenGL texture ID */
+		FastNoiseLite m_noise;							/**< FastNoiseLite noise generator instance */
+		NoiseParameters m_noiseParams;					/**< Parameters used for noise generation */
+		std::vector<unsigned char> m_pixels;			/**< Pixel data of generated noise texture (grayscale) */
+		std::vector<float> m_noiseData;					/**< Raw noise values before normalization */
 	};
 }
 #endif // !SRC_PROCEDURAL_NOISE_TEXTURE_H

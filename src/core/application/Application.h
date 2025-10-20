@@ -13,6 +13,9 @@
 
 namespace pwg
 {
+	/**
+	* @brief Main application class responsible for initializing and running core engine systems.
+	*/
 	class Application
 	{
 	public:
@@ -43,16 +46,15 @@ namespace pwg
 		void Run();
 
 	private:
-		std::unique_ptr<pwg::Window> m_window;
-		std::unique_ptr<pwg::KeyboardInput> m_keyboardInput;
-		std::unique_ptr<pwg::MouseInput> m_mouseInput;
-		std::unique_ptr<pwg::Gui> m_gui;
-		std::shared_ptr<pwg::Renderer> m_renderer;
-		std::shared_ptr<pwg::SceneManager> m_scene;
-		std::shared_ptr<pwg::ResourceManager> m_resourceManager;
-		
 
+		std::unique_ptr<pwg::Window> m_window;						/**< Pointer to the main application window */
+		std::unique_ptr<pwg::KeyboardInput> m_keyboardInput;		/**< Keyboard input handler */
+		std::unique_ptr<pwg::MouseInput> m_mouseInput;				/**< Mouse input handler */
+		std::unique_ptr<pwg::Gui> m_gui;							/**< Graphical user interface manager */
+		std::shared_ptr<pwg::Renderer> m_renderer;					/**< Rendering subsystem responsible for drawing scenes */
+		std::shared_ptr<pwg::SceneManager> m_scene;					/**< Scene manager that handles active scenes and entities */
+		std::shared_ptr<pwg::ResourceManager> m_resourceManager;	/**< Resource manager responsible for loading and caching assets */
 	};
-} //namespace pwg
+} // namespace pwg
 
 #endif // !SRC_CORE_APPLICATION_APPLICATION_H_

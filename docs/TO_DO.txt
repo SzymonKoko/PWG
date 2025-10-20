@@ -2,19 +2,21 @@ TO DO
 
 //Features
 - chunk mesh
-- PlayScene
+- PlayScene (Movement, 9 chunks system)
+- Mesh size setter
+- Serialization to json files(Layers, Mesh, etc PRIO 4
+- Json parser PRIO 3
 - Console ImGui
-- Add layers controls in gui
+- Add layers controls in gui PRIO 2
 - Add texture layers
-- FPS counter DONE
 
 //Fixes
-- Fix noiseTexture display size in imgui window
-- Remove noise class and move FastNoiseLite to /libs
 - Remake CMakeFile
+- Move aspcet ratio from editorScene.h
 
 //Cleanups
-- Add comments and logs IN PROG
+- Add comments and logs PRIO 1
+- Components constructors etc...
 
 
 
