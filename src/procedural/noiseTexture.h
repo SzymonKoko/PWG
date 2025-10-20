@@ -1,7 +1,7 @@
 #ifndef SRC_PROCEDURAL_NOISE_TEXTURE_H
 #define SRC_PROCEDURAL_NOISE_TEXTURE_H
 
-#include "core/noise/FastNoiseLite.h"
+#include "FastNoiseLite/FastNoiseLite.h"
 #include <glm/vec2.hpp>
 #include <vector>
 #include <algorithm>

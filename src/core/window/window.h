@@ -97,6 +97,8 @@ namespace pwg
 		*/
 		void UpdateDeltaTime();
 
+		void CountFPS(const float& dt);
+
 		/**
 		* @brief GLFW scroll callback function. Callback triggered when scroll is moved
 		* @param window Pointer to GLFWwindow instance

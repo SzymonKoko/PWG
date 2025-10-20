@@ -45,8 +45,6 @@ void pwg::Gui::Update(const float& dt)
 	
 	m_scene->Update(dt);
 	m_scene->Draw();
-
-	//ImGui::ShowDemoWindow();
 }
 
 void pwg::Gui::Render()

@@ -4,7 +4,6 @@
 #include "graphics/mesh/mesh.h"
 #include "scene/components/planeMeshComponent.h"
 #include "scene/components/meshComponent.h"
-#include "core/noise/noise.h"
 #include "core/ecs/entity.h"
 
 #include <vector>

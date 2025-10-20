@@ -72,6 +72,12 @@ target_include_directories(entt INTERFACE
     "${PROJECT_SOURCE_DIR}/libs/entt" # Path to entt Header file
 ) 
 
+#Add entt to project
+add_library(FastNoiseLite INTERFACE)
+target_include_directories(FastNoiseLite INTERFACE 
+    "${PROJECT_SOURCE_DIR}/libs/FastNoiseLite" # Path to entt Header file
+)
+
 # Add GLFW3 to project
 add_subdirectory(libs/glfw)
 add_subdirectory(libs/glm)
@@ -98,6 +104,7 @@ target_link_libraries(${PROJECT_NAME}
 		entt
 		OpenGL::GL
 		spdlog::spdlog
+		FastNoiseLite
 )
 
 # Configure output directories for game

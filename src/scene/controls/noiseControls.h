@@ -133,18 +133,26 @@ namespace pwg::controls
 
                 if (noiseTexture.GetTextureID() != 0)
                 {
+
                     ImVec2 windowSize = ImGui::GetContentRegionAvail();
-                    ImVec2 noiseSize((float)noiseTexture.GetNoiseWidth() * 4, (float)noiseTexture.GetNoiseHeight() * 4);
+                    ImVec2 noiseSize((float)noiseTexture.GetNoiseWidth(), (float)noiseTexture.GetNoiseHeight());
+                    float scaleX= windowSize.x / noiseSize.x;
+                    float scaleY = windowSize.y / noiseSize.y;
+
+                    ImVec2 textureSize(noiseSize.x * scaleX, noiseSize.y * scaleX);
+
+                    textureSize.x = std::clamp(textureSize.x, 10.0f, 400.0f);
+                    textureSize.y = std::clamp(textureSize.y, 10.0f, 400.0f);
 
                     //Center noise image on the window
                     ImVec2 cursorPos = ImGui::GetCursorPos();
-                    ImVec2 offset((windowSize.x - noiseSize.x) * 0.5f, (windowSize.y - noiseSize.y) * 0.5f);
+                    ImVec2 offset((windowSize.x - textureSize.x) * 0.5f, (windowSize.y - textureSize.y) * 0.5f);
 
                     ImGui::SetCursorPos(ImVec2(cursorPos.x + offset.x, cursorPos.y + offset.y));
 
                     ImGui::Image(
                         (ImTextureID)(intptr_t)noiseTexture.GetTextureID(),
-                        noiseSize,
+                        textureSize,
                         ImVec2(0, 1), ImVec2(1, 0)
                     );
                 }

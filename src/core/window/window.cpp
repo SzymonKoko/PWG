@@ -64,6 +64,7 @@ void pwg::Window::Update(float dt)
 {
     PollEvents();
     UpdateDeltaTime();
+    CountFPS(dt);
 }
 
 bool pwg::Window::WindowShouldClose() const
@@ -96,6 +97,15 @@ void pwg::Window::UpdateDeltaTime()
     float currentFrame = glfwGetTime();
     m_deltaTime = currentFrame - m_lastFrame;
     m_lastFrame = currentFrame;
+}
+
+void pwg::Window::CountFPS(const float& dt)
+{
+    auto fps = 1000 / dt;
+    std::stringstream ss;
+    ss << "PWG" << " " << "v0.5" << " [" << fps << " FPS]";
+
+    glfwSetWindowTitle(m_window, ss.str().c_str());
 }
 
 void pwg::Window::framebuffer_size_callback(GLFWwindow* window, int width, int height)

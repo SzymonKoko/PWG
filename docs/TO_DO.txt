@@ -4,19 +4,17 @@ TO DO
 - chunk mesh
 - PlayScene
 - Console ImGui
-- Add layers to terrain PRIOR
 - Add layers controls in gui
 - Add texture layers
-- FPS counter
+- FPS counter DONE
 
 //Fixes
 - Fix noiseTexture display size in imgui window
-- Change logging system
 - Remove noise class and move FastNoiseLite to /libs
 - Remake CMakeFile
 
 //Cleanups
-- Add comments and logs
+- Add comments and logs IN PROG
 
 
 
