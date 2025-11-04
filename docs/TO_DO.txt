@@ -4,18 +4,24 @@ TO DO
 - chunk mesh
 - PlayScene (Movement, 9 chunks system)
 - Mesh size setter
-- Serialization to json files(Layers, Mesh, etc PRIO 4
-- Json parser PRIO 3
+- Serialization to json files(Layers, Mesh, etc PRIO 
+- Json parser PRIO 
 - Console ImGui
-- Add layers controls in gui PRIO 2
+- Add layers controls in gui PRIO 
 - Add texture layers
 
 //Fixes
 - Remake CMakeFile
 - Move aspcet ratio from editorScene.h
+- Change gui style
+- Clamp height controls (terrain layers)
+- Change metric system to 0 .. 1 (terrain layer)
+- Mesh size controls
+- Noise height multiplier
+- Default noise params
+- Fix mesh size and height issue (too big mesh == no height)
 
 //Cleanups
-- Add comments and logs PRIO 1
 - Components constructors etc...
 
 

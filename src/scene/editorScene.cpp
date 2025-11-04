@@ -5,6 +5,7 @@
 #include "scene/components/tagComponent.h"
 #include "scene/systems/planeMeshSystem.h"
 #include "controls/noiseControls.h"
+#include "controls/terrainLayerControls.h"
 
 
 pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput, std::shared_ptr<ResourceManager> resourceManager, Renderer& renderer)
@@ -21,13 +22,13 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     editorCam.AddComponent<pwg::components::CameraComponent>();
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
-    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 100);
+    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 128);
 
-    m_terrain->AddLayer(pwg::TerrainLayer(true, "Water", 0.0f, 19.0f, 10, glm::vec3(0.0f, 0.0f, 1.0f)));
-    m_terrain->AddLayer(pwg::TerrainLayer(true, "Sand", 19.0f, 20.0f, 10, glm::vec3(1.0f, 1.0f, 0.0f)));
-    m_terrain->AddLayer(pwg::TerrainLayer(true, "Grass", 20.0f, 25.0f, 10, glm::vec3(0.0f, 1.0f, 0.0f)));
-    m_terrain->AddLayer(pwg::TerrainLayer(true, "Stone", 25.0f, 37.0f, 10, glm::vec3(0.75f, 0.75f, 0.75f)));
-    m_terrain->AddLayer(pwg::TerrainLayer(true, "Snow", 37.0f, 45.0f, 10, glm::vec3(0.9f, 0.9f, 0.9f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Water", 1, 0.0f, 19.0f, 10, glm::vec3(0.0f, 0.0f, 1.0f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Sand", 2, 19.0f, 20.0f, 10, glm::vec3(1.0f, 1.0f, 0.0f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Grass", 3, 20.0f, 25.0f, 10, glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Stone", 4, 25.0f, 37.0f, 10, glm::vec3(0.75f, 0.75f, 0.75f)));
+    m_terrain->AddLayer(pwg::TerrainLayer(true, "Snow", 5, 37.0f, 45.0f, 10, glm::vec3(0.9f, 0.9f, 0.9f)));
 
     pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(m_editorSceneRegistry, m_terrain->GetSize());
 
@@ -135,6 +136,7 @@ void pwg::EditorScene::Draw()
     if (ImGui::BeginTabBar("MainTabs"))
     {
         controls::NoiseControls::ShowControl(*m_terrain->GetNoiseTexture());
+        controls::TerrainLayerControls::ShowControl(*m_terrain);
     } 
     ImGui::EndTabBar(); // MainTabs 
     

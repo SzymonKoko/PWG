@@ -59,3 +59,24 @@ struct
 	uint textureID;
 	vec3 color;
 }
+
+
+TerrainLayerControl
+
+----------------------
+Name                  
+Checkbox enabled      
+Min - Max             
+Color Picker          
+Remove "X"            
+----------------------
+AddLayer              
+----------------------
+
+vector < Layer > 
+
+sort vector by height
+
+fix boundries of layers
+
+clamp max value of i-1 to min value of i

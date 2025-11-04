@@ -11,12 +11,15 @@ namespace pwg
 	 */
 	struct TerrainLayer
 	{
-		bool enabled;			/**< Determines whether the layer is active. */
-		std::string name;		/**< Name of the terrain layer. */
-		float minHeight;		/**< Minimum height at which this layer is applied. */
-		float maxHeight;		/**< Maximum height at which this layer is applied. */
-		unsigned int textureID;	/**< ID of the texture associated with this layer. */
-		glm::vec3 color;		/**< Color of the terrain layer (used if no texture). */
+		bool enabled;				/**< Determines whether the layer is active. */
+		std::string name;			/**< Name of the terrain layer. */
+		unsigned int layerLevel;	/**< Level of layer in hierarchy */
+		float minHeight;			/**< Minimum height at which this layer is applied. */
+		float maxHeight;			/**< Maximum height at which this layer is applied. */
+		unsigned int textureID;		/**< ID of the texture associated with this layer. */
+		glm::vec3 color;			/**< Color of the terrain layer (used if no texture). */
+
+		inline void SetStatus(bool enabled) { enabled = enabled; }
 	};
 }
 

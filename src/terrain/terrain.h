@@ -64,6 +64,12 @@ namespace pwg
 		std::shared_ptr<NoiseTexture> GetNoiseTexture() { return m_noiseTexture; }
 
 		/**
+		 * @brief Returns the terrain layers vector
+		 * @return Reference to the terrain layer vecotr.
+		*/
+		std::vector<TerrainLayer>& GetTerrainLayers();
+
+		/**
 		 * @brief Returns the size of the terrain.
 		 * @return Terrain size (width/height).
 		 */
@@ -81,9 +87,23 @@ namespace pwg
 		 */
 		void ApplyLayers();
 
+		/**
+		 * @brief Sorts all added terrain layers by their minHeight.
+		 */
+		void SortLayers();
+
+		/**
+		 * @brief Clamps minHeight value of the layer to maxHeight value of the previous layer.
+		 */
+		void FixBoundaries();
+
+		glm::vec3 BlendColors(float height);
+
+		void NormalizeHeight();
+
 	private:
 		int m_size;														/**< Terrain size (width/height). */
-		std::unordered_map<std::string, TerrainLayer> m_terrainLayers;	/**< Map of terrain layers by name. */
+		std::vector<TerrainLayer> m_terrainLayers;						/**< Vector of terrain layers. */
 	
 		entt::registry& m_registry;										/**< Reference to ECS registry. */
 		std::shared_ptr<NoiseTexture> m_noiseTexture;					/**< Noise texture used for terrain deformation. */

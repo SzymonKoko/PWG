@@ -42,6 +42,7 @@ void pwg::Gui::Update(const float& dt)
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 	EnableDockSpace();
+	ImGui::ShowDemoWindow();
 	
 	m_scene->Update(dt);
 	m_scene->Draw();

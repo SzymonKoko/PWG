@@ -30,16 +30,67 @@ void pwg::Terrain::ApplyLayers()
     {
         for (auto layer : m_terrainLayers)
         {
-            if (layer.second.enabled)
+            if (layer.enabled)
             {
-                if (v.position.y >= layer.second.minHeight && v.position.y <= layer.second.maxHeight)
-                {
-                    v.color = layer.second.color;
-                }
+                /*if (v.position.y >= layer.minHeight && v.position.y <= layer.maxHeight)
+                {*/
+                    v.color = BlendColors(v.position.y);
+                //}
             }
         }
     }
     m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->SetVertices(vertices);
+}
+
+void pwg::Terrain::SortLayers()
+{
+    std::sort(m_terrainLayers.begin(), m_terrainLayers.end(),
+        [](const TerrainLayer& a, const TerrainLayer& b)
+        {
+            return a.minHeight < b.minHeight;
+        });
+}
+
+void pwg::Terrain::FixBoundaries()
+{
+    for (int i = 1; i < m_terrainLayers.size(); i++)
+    {
+        if (m_terrainLayers[i].enabled && m_terrainLayers[i - 1].enabled)
+        {
+            m_terrainLayers[i].minHeight = m_terrainLayers[i - 1].maxHeight;
+            if (m_terrainLayers[i].minHeight >= m_terrainLayers[i].maxHeight)
+            {
+                m_terrainLayers[i].maxHeight = m_terrainLayers[i].minHeight + 0.01f;
+            }
+        }
+        
+    }
+}
+
+glm::vec3 pwg::Terrain::BlendColors(float height)
+{
+    glm::vec3 color = {0.0f, 0.0f, 0.0f};
+
+    for (int i = 0; i < m_terrainLayers.size(); i++)
+    {
+        const auto& lowerLayer = m_terrainLayers[i];
+        const auto& upperLayer = m_terrainLayers[i + 1];
+
+        if (height >= lowerLayer.minHeight && height <= lowerLayer.maxHeight)
+        {
+            float normalized = (height - lowerLayer.maxHeight) / (upperLayer.minHeight - lowerLayer.maxHeight);
+            normalized = std::clamp(normalized, 0.0f, 1.0f);
+            color = glm::mix(lowerLayer.color, upperLayer.color, normalized);
+        }
+    }
+
+
+    return color;
+}
+
+void pwg::Terrain::NormalizeHeight()
+{
+
 }
 
 void pwg::Terrain::Update()
@@ -51,12 +102,14 @@ void pwg::Terrain::Update()
 		m_noiseTexture->UpdateNoiseData(m_noiseTexture->GetNoiseParameters());
 	}
     ApplyNoise();
+    SortLayers();
+    FixBoundaries();
     ApplyLayers();
 }
 
 void pwg::Terrain::AddLayer(const TerrainLayer& terrainLayer)
 {
-    m_terrainLayers.emplace(terrainLayer.name, terrainLayer);
+    m_terrainLayers.push_back(terrainLayer);
     PWG_DEBUG("Terrain layer added ({0}, {1}, {2}-{3}, {4}, color: {5} {6} {7})", 
         terrainLayer.name, 
         terrainLayer.enabled, 
@@ -67,12 +120,16 @@ void pwg::Terrain::AddLayer(const TerrainLayer& terrainLayer)
         terrainLayer.color.y,
         terrainLayer.color.z
     );
+    SortLayers();
+    FixBoundaries();
 }
 
 void pwg::Terrain::RemoveLayer(std::string name)
 {
-    m_terrainLayers.erase(name);
+    //m_terrainLayers.erase(name);
     PWG_DEBUG("Removed terrain layer {0}", name);
+    SortLayers();
+    FixBoundaries();
 }
 
 std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()
@@ -95,6 +152,11 @@ std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()
     auto mesh = m_resourceManager->GetMeshManager().GetMesh(meshComponent->meshID);
 
     return mesh;
+}
+
+std::vector<pwg::TerrainLayer>& pwg::Terrain::GetTerrainLayers()
+{
+    return m_terrainLayers;
 }
 
 int pwg::Terrain::GetSize()
