@@ -6,6 +6,8 @@
 #include "core/logger/logger.h"
 #include "core/input/keyboardInput.h"
 #include "core/input/mouseInput.h"
+#include <chrono>
+#include <thread>
 
 namespace pwg
 {
@@ -73,12 +75,18 @@ namespace pwg
 		*/
 		float GetWindowHeight() { return m_windowHeight; }
 
+		float GetFrameTimeLimit() { return m_frameTimeLimit; }
+
 		/**
 		* @brief Sets a new window size.
 		* @param width New width in pixels.
 		* @param height New height in pixels.
 		*/
 		void SetWindowSize(float width, float height);
+
+		void SetFramerateLimit(unsigned int limit);
+
+		void EnableVSync(bool enabled);
 
 	private:
 		GLFWwindow* m_window;				/**< Pointer to the GLFW window instance. */
@@ -91,6 +99,7 @@ namespace pwg
 		uint16_t m_screenHeight{ 0 };		/**< Current screen height in pixels. */
 		float m_deltaTime{ 0.0f };			/**< Time elapsed between the last and current frame. */
 		float m_lastFrame{ 0.0f };			/**< Timestamp of the last rendered frame. */
+		float m_frameTimeLimit{ 0.0f };
 
 		/**
 		* @brief Polls GLFW window events such as input and resize.

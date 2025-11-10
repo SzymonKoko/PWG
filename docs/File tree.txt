@@ -1,0 +1,74 @@
+Engine/
+├─ Core/                        # Główne systemy silnika
+│  ├─ Application.h/.cpp        # Inicjalizacja, main loop
+│  ├─ Engine.h/.cpp             # Singleton, zarządza modułami
+│  ├─ Config.h/.cpp             # Ustawienia silnika / sceny
+│  ├─ Time.h/.cpp               # DeltaTime, FPS itd.
+│  ├─ Logger.h/.cpp             # System logowania
+│  ├─ Input.h/.cpp              # Klawiatura, mysz, kontrolery
+│  ├─ Event.h/.cpp              # System eventów
+│  ├─ Profiler.h/.cpp           # Pomiar wydajności
+│
+├─ Renderer/                    # Wszystko związane z renderowaniem
+│  ├─ Renderer.h/.cpp           # Interfejs główny (Forward/Deferred)
+│  ├─ Shader.h/.cpp             # System shaderów GLSL
+│  ├─ Texture.h/.cpp            # Ładowanie i zarządzanie teksturami
+│  ├─ Material.h/.cpp           # System materiałów (PBR)
+│  ├─ Mesh.h/.cpp               # Siatki, VBO, VAO, EBO
+│  ├─ Camera.h/.cpp             # Kamera + macierze
+│  ├─ Light.h/.cpp              # Punktowe, kierunkowe, spot
+│  ├─ Skybox.h/.cpp             # Niebo / HDR environment
+│  ├─ PostProcessing.h/.cpp     # Bloom, SSAO, tone mapping itd.
+│  ├─ Framebuffer.h/.cpp        # Zarządzanie FBO i teksturami buforów
+│  ├─ RendererUtils.h/.cpp      # Pomocnicze klasy (np. debug draw)
+│
+├─ World/                       # Generacja proceduralna i biomy
+│  ├─ WorldGenerator.h/.cpp     # Główny manager generowania chunków
+│  ├─ Chunk.h/.cpp              # Pojedynczy fragment świata
+│  ├─ Noise.h/.cpp              # Perlin/Simplex/FBM
+│  ├─ Biome.h/.cpp              # Klasa bazowa biomu
+│  ├─ BiomeManager.h/.cpp       # Łączenie biomów / blending
+│  ├─ TerrainMesh.h/.cpp        # Generacja mesha z mapy wysokości
+│  ├─ Vegetation.h/.cpp         # Drzewa, trawa, obiekty proceduralne
+│  ├─ Water.h/.cpp              # Render wody (reflections/refractions)
+│
+├─ Resources/                   # System zasobów (ładowanie i zarządzanie)
+│  ├─ ResourceManager.h/.cpp    # Singleton do zarządzania zasobami
+│  ├─ TextureLoader.h/.cpp
+│  ├─ MeshLoader.h/.cpp
+│  ├─ ShaderLoader.h/.cpp
+│  ├─ MaterialLoader.h/.cpp
+│
+├─ Editor/                      # Interfejs użytkownika (ImGui)
+│  ├─ Editor.h/.cpp             # Główny layout edytora
+│  ├─ Panels/
+│  │  ├─ ScenePanel.cpp         # Widok hierarchii sceny
+│  │  ├─ InspectorPanel.cpp     # Edycja właściwości obiektów
+│  │  ├─ ContentBrowser.cpp     # Przeglądarka plików (teksty, modele)
+│  │  ├─ MaterialEditor.cpp     # Edycja materiałów (PBR GUI)
+│  │  ├─ NoiseEditor.cpp        # Edytor szumu / map wysokości
+│  │  ├─ TerrainEditor.cpp      # Parametry generacji terenu
+│  │  ├─ PerformancePanel.cpp   # FPS, GPU, debug rendering
+│  │  ├─ SettingsPanel.cpp      # Ustawienia renderera / sceny
+│
+├─ Scene/                       # System sceny i komponentów
+│  ├─ Scene.h/.cpp              # Główna scena (ECS lub drzewo obiektów)
+│  ├─ Entity.h/.cpp             # Encje, transformacje
+│  ├─ Component.h/.cpp          # Komponenty (Renderable, Light, Camera)
+│
+├─ Assets/                      # Folder na wgrywane zasoby użytkownika
+│  ├─ Textures/
+│  ├─ Models/
+│  ├─ Materials/
+│  ├─ Shaders/
+│  ├─ Worlds/
+│
+├─ Vendor/                      # Biblioteki zewnętrzne
+│  ├─ imgui/
+│  ├─ glad/
+│  ├─ glfw/
+│  ├─ stb/
+│  ├─ glm/
+│  ├─ tinyobjloader/
+│
+└─ main.cpp  

@@ -19,6 +19,9 @@ pwg::Application::Application()
     m_scene = std::make_shared<SceneManager>(m_window->GetWindow(), *m_mouseInput, *m_keyboardInput, m_resourceManager, *m_renderer);
     m_gui = std::make_unique<Gui>(*m_window, m_scene);
 
+    m_window->SetFramerateLimit(120);
+    m_window->EnableVSync(false);
+
     PWG_INFO("Application initialized");
 }
 
@@ -50,5 +53,11 @@ void pwg::Application::Run()
     while (!m_window->WindowShouldClose()) {
         Update();
         Render();
+
+        float frameLimit = m_window->GetFrameTimeLimit();
+        if (frameLimit > 0.0f && m_window->GetDeltaTime() < frameLimit)
+        {
+            std::this_thread::sleep_for(std::chrono::duration<double>(frameLimit - m_window->GetDeltaTime()));
+        }
     }
 }

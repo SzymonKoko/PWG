@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include "window.h"
 
+
 pwg::Window::Window(MouseInput& mouseInput, KeyboardInput& keyboardInput)
     : m_mouseInput(mouseInput),
       m_keyboardInput(keyboardInput),
@@ -64,7 +65,7 @@ void pwg::Window::Update(float dt)
 {
     PollEvents();
     UpdateDeltaTime();
-    CountFPS(dt);
+    CountFPS(m_deltaTime);
 }
 
 bool pwg::Window::WindowShouldClose() const
@@ -80,6 +81,30 @@ void pwg::Window::SetWindowSize(float width, float height)
 {
     m_windowWidth = width;
     m_windowHeight = height;
+}
+
+void pwg::Window::SetFramerateLimit(unsigned int limit)
+{
+    if (limit > 0)
+    {
+        m_frameTimeLimit = 1.0f / (float)limit;
+    }
+    else
+    {
+        m_frameTimeLimit = 0.0f;
+    }
+}
+
+void pwg::Window::EnableVSync(bool enabled)
+{
+    if (enabled)
+    {
+        glfwSwapInterval(1);
+    }
+    else
+    {
+        glfwSwapInterval(0);
+    }
 }
 
 void pwg::Window::PollEvents()
@@ -101,11 +126,22 @@ void pwg::Window::UpdateDeltaTime()
 
 void pwg::Window::CountFPS(const float& dt)
 {
-    auto fps = 1000 / dt;
-    std::stringstream ss;
-    ss << "PWG" << " " << "v0.5" << " [" << fps << " FPS]";
+    static float timer = 0.0f;
+    static int frames = 0;
+    timer += dt;
+    frames++;
 
-    glfwSetWindowTitle(m_window, ss.str().c_str());
+    if (timer >= 1.0f) // co 1 sekunda
+    {
+        float fps = frames / timer;
+
+        std::stringstream ss;
+        ss << "PWG v0.5 [" << static_cast<int>(fps) << " FPS]";
+        glfwSetWindowTitle(m_window, ss.str().c_str());
+
+        frames = 0;
+        timer = 0.0f;
+    }
 }
 
 void pwg::Window::framebuffer_size_callback(GLFWwindow* window, int width, int height)
