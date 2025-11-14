@@ -13,6 +13,7 @@ namespace pwg
 		 m_indices(indices),
 		 m_meshSize(size)
 	{
+		//RecalculateNormals();
 		SetupMesh();
 	}
 
@@ -61,6 +62,7 @@ namespace pwg
 
 	void Mesh::UpdateMeshData(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, int& size)
 	{
+		//RecalculateNormals();
 		m_vertices = vertices;
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboID);
 		glBufferSubData(GL_ARRAY_BUFFER, 0, m_vertices.size() * sizeof(Vertex), m_vertices.data());
@@ -72,6 +74,35 @@ namespace pwg
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 		m_meshSize = size;
+	}
+
+	void Mesh::RecalculateNormals()
+	{
+		for (auto& v : m_vertices)
+			v.normal = glm::vec3(0.0f);
+
+		glm::vec3 normal(0.0f, 0.0f, 0.0f);
+
+		for (int i = 0; i < m_indices.size(); i+= 3)
+		{
+			glm::vec3 A = m_vertices[m_indices[i]].position;
+			glm::vec3 B = m_vertices[m_indices[i+1]].position;
+			glm::vec3 C = m_vertices[m_indices[i+2]].position;
+
+			glm::vec3 a = C - B;
+			glm::vec3 b = A - B;
+
+			normal = glm::normalize(glm::cross(a, b));
+
+			m_vertices[m_indices[i]].normal += normal;
+			m_vertices[m_indices[i+1]].normal += normal;
+			m_vertices[m_indices[i+2]].normal += normal;
+		}
+
+		for (auto& v : m_vertices)
+			v.normal = glm::normalize(v.normal);
+
+		SetVertices(m_vertices);
 	}
 
 	int Mesh::GetSize()

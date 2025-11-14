@@ -65,6 +65,8 @@ namespace pwg
 		*/
 		void UpdateMeshData(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, int& size);
 
+		void RecalculateNormals();
+
 		/**
 		* @brief Getter for vertex data.
 		* @return Reference to a vector of mesh vertices.

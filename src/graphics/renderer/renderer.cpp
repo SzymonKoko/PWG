@@ -42,18 +42,10 @@ void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
 	mesh.Update(m_currentShader->GetShaderID());
 }
 
-void pwg::Renderer::Draw(Mesh& mesh) 
+void pwg::Renderer::Draw(Terrain& terrain) 
 {
-	//auto& shader = *m_resourceManager->GetShaderManager().GetShader("default");
 	m_currentShader->ActivateShader();
-	//std::cout << "Shader ID 22: " << shader.GetShaderID() << std::endl;
-
-	auto& texDirt = *m_resourceManager->GetTextureManager().GetTexture("dirt");
-	//texDirt.Bind();
-
-	//m_currentShader->SetUniformInt("Texture", 0);
-	mesh.Draw();
-
-	//texDirt.Unbind();
+	
+	terrain.Draw(*m_currentShader);
 
 }

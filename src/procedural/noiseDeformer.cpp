@@ -15,7 +15,7 @@ void pwg::NoiseDeformer::ApplyNoise(pwg::Mesh& mesh, const std::vector<float>& n
 		for (int x = 0; x < size; x++)
 		{
 			int i = y * size + x;
-			vertices[i].position.y = noiseData[y * size + x] * 25.f;
+			vertices[i].position.y = noiseData[y * size + x];
 
 			if (vertices[i].position.y <= m_minNoiseHeight)
 			{

@@ -1,0 +1,5 @@
+Compute shader 
+
+
+1. Add shader type enum in shader class
+2. Add shader constructor with compute path

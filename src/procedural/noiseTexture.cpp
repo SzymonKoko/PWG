@@ -2,6 +2,7 @@
 #include "noiseTexture.h"
 #include <iostream>
 #include "core/logger/logger.h"
+#include <omp.h>
 
 pwg::NoiseTexture::NoiseTexture(int terrainSize)
 {
@@ -33,8 +34,7 @@ pwg::NoiseTexture::NoiseTexture(const NoiseParameters& noiseParams)
 pwg::NoiseTexture::NoiseTexture(const NoiseTexture& other)
 	: m_noiseParams(other.m_noiseParams),
 	  m_noise(other.m_noise),
-	  m_pixels(other.m_pixels),
-	  m_noiseData(other.m_noiseData)
+	  m_pixels(other.m_pixels)
 {
 	glGenTextures(1, &m_textureID);
 	UploadToGPU(); 
@@ -149,22 +149,26 @@ void pwg::NoiseTexture::SetCellularJitter(float jitter)
 
 void pwg::NoiseTexture::GenerateNoiseData()
 {
-	m_pixels.resize(m_noiseParams.size * m_noiseParams.size * 4);
-	m_noiseData.resize(m_noiseParams.size * m_noiseParams.size);
+	omp_set_num_threads(std::thread::hardware_concurrency());
 
+	m_pixels.resize(m_noiseParams.size * m_noiseParams.size);
+
+	#pragma omp parallel for 
 	for (int y = 0; y < m_noiseParams.size; y++)
 	{
 		for (int x = 0; x < m_noiseParams.size; x++)
 		{
+			float totalAmp = 0.0f;
 			float noiseHeight = 0.0f;
 			float amplitude = m_noiseParams.amplitude;
 			float frequency = m_noiseParams.frequency;
 
+			float newX = (float)x / (m_noiseParams.size-1);
+			float newY = (float)y / (m_noiseParams.size-1);
+
 			for (int i = 0; i < m_noiseParams.octaves; i++)
 			{
-				float newX = (float)x / m_noiseParams.size;
-				float newY = (float)y / m_noiseParams.size;
-
+				totalAmp += amplitude;
 				float scaledX = (newX * m_noiseParams.scale * frequency) + m_noiseParams.offset.x;
 				float scaledY = (newY * m_noiseParams.scale * frequency) + m_noiseParams.offset.y;
 
@@ -177,29 +181,21 @@ void pwg::NoiseTexture::GenerateNoiseData()
 				frequency *= m_noiseParams.lacunarity;
 			}
 
-			unsigned char pixelValue = (unsigned char)std::clamp(noiseHeight * 255.0f, 0.0f, 255.0f);
-
-			
-
-			size_t pixelIndex = (y * m_noiseParams.size + x) * 4;
-			m_pixels[pixelIndex + 0] = pixelValue;
-			m_pixels[pixelIndex + 1] = pixelValue;
-			m_pixels[pixelIndex + 2] = pixelValue;
-			m_pixels[pixelIndex + 3] = 255;
-
-			size_t noiseDataIndex = y * m_noiseParams.size + x;
-			m_noiseData[noiseDataIndex] = noiseHeight;
+			noiseHeight /= totalAmp;
+			size_t pixelIndex = (y * m_noiseParams.size + x);
+			m_pixels[pixelIndex] = noiseHeight;
 		}
 	}
 }
 
 void pwg::NoiseTexture::UploadToGPU()
 {
-
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_noiseParams.size, m_noiseParams.size, 0, GL_RGBA, GL_UNSIGNED_BYTE, m_pixels.data());
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m_noiseParams.size, m_noiseParams.size, 0, GL_RED, GL_FLOAT, m_pixels.data());
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }

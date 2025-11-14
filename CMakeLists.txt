@@ -49,6 +49,9 @@ set(IMGUI_SOURCES
 # Group source files in Visual Studio
 source_group(TREE ${PROJECT_SOURCE_DIR}/src PREFIX "src" FILES ${ALL_SOURCES})
 
+# --- [OpenMP] ---
+find_package(OpenMP REQUIRED)
+
 # Find packages
 find_package(OpenGL REQUIRED)
 
@@ -105,6 +108,7 @@ target_link_libraries(${PROJECT_NAME}
 		OpenGL::GL
 		spdlog::spdlog
 		FastNoiseLite
+		OpenMP::OpenMP_CXX
 )
 
 # Configure output directories for game

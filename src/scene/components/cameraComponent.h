@@ -15,7 +15,7 @@ namespace pwg::components
 
 		float fov = 45.0f;						/**< Field of view in degrees. */
 		float nearPlane = 0.01f;				/**< Near clipping plane distance. */
-		float farPlane = 2000.0f;				/**< Far clipping plane distance. */
+		float farPlane = 20000.0f;				/**< Far clipping plane distance. */
 		float aspectRatio = 16.0f / 9.0f;		/**< Aspect ratio (width / height). */
 		glm::vec3 up = { 0.0f, 1.0f, 0.0f };	/**< Up direction vector for the camera. */
 

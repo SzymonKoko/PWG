@@ -16,7 +16,7 @@ namespace pwg
 		int seed = 1000;
 		float amplitude = 1.0f;
 		float frequency = 0.02f;
-		float scale = 100.0f;
+		float scale = 10.0f;
 		int octaves = 4;
 		float persistance = 0.5f;
 		float lacunarity = 2.0f;
@@ -79,12 +79,6 @@ namespace pwg
 		* @return Returns id of the noise texture
 		*/
 		unsigned int GetTextureID() { return m_textureID; }
-
-		/**
-		* @brief Noise data getter
-		* @return Returns vector of noise data float values
-		*/
-		std::vector<float> GetNoiseData() { return m_noiseData; }
 
 		/**
 		* @brief Noise amplitude setter
@@ -210,8 +204,8 @@ namespace pwg
 		unsigned int m_textureID{ 0 };					/**< OpenGL texture ID */
 		FastNoiseLite m_noise;							/**< FastNoiseLite noise generator instance */
 		NoiseParameters m_noiseParams;					/**< Parameters used for noise generation */
-		std::vector<unsigned char> m_pixels;			/**< Pixel data of generated noise texture (grayscale) */
-		std::vector<float> m_noiseData;					/**< Raw noise values before normalization */
+		std::vector<float> m_pixels;					/**< Pixel data of generated noise texture (grayscale) */
+		//std::vector<float> m_noiseData;					/**< Raw noise values before normalization */
 	};
 }
 #endif // !SRC_PROCEDURAL_NOISE_TEXTURE_H

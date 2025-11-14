@@ -6,6 +6,7 @@
 #include "scene/components/cameraComponent.h"
 #include "graphics/mesh/mesh.h"
 #include "resources/resourceManager.h"
+#include "terrain/terrain.h"
 
 namespace pwg
 {
@@ -46,7 +47,7 @@ namespace pwg
 		* @brief Draws a given mesh using the currently bound shader and resources.
 		* @param mesh Reference to the mesh to draw.
 		*/
-		void Draw(Mesh& mesh);
+		void Draw(Terrain& terrain);
 
 	private:
 		std::shared_ptr<ResourceManager> m_resourceManager; /**< Access to resources like shaders, textures, and meshes. */

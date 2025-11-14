@@ -50,7 +50,7 @@ void pwg::systems::EditorCameraControllerSystem::HandleMouseInput(pwg::MouseInpu
     if (scroll != 0.0f)
     {
         editorData.distanceToTarget -= scroll * editorData.zoomSpeed;
-        editorData.distanceToTarget = glm::clamp(editorData.distanceToTarget, editorData.minZoom, editorData.maxZoom);
+        //editorData.distanceToTarget = glm::clamp(editorData.distanceToTarget, editorData.minZoom, editorData.maxZoom);
 
         mouseInput.ResetScrollOffset();
     }
@@ -65,6 +65,7 @@ void pwg::systems::EditorCameraControllerSystem::HandleMouseInput(pwg::MouseInpu
     transform.position.z = editorData.target.z + editorData.distanceToTarget * cos(pitchRad) * sin(yawRad);
 
     camera.viewMatrix = glm::lookAt(transform.position, editorData.target, camera.up);
+
 }
 
 void pwg::systems::EditorCameraControllerSystem::HandleProjection(pwg::components::CameraComponent& camera, float aspectRatio)

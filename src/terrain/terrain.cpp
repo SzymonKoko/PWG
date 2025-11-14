@@ -1,3 +1,4 @@
+#include <glad/glad.h>
 #include "terrain.h"
 
 pwg::Terrain::Terrain(entt::registry& registry, std::shared_ptr<ResourceManager> resourceManager, int size)
@@ -18,28 +19,9 @@ pwg::Terrain::~Terrain()
 {
 }
 
-void pwg::Terrain::ApplyNoise()
-{
-    NoiseDeformer::ApplyNoise(*m_resourceManager->GetMeshManager().GetMesh("PlaneMesh"), m_noiseTexture->GetNoiseData());
-}
-
 void pwg::Terrain::ApplyLayers()
 {
-    std::vector<Vertex> vertices = m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->GetVertices();
-    for (auto& v : vertices)
-    {
-        for (auto layer : m_terrainLayers)
-        {
-            if (layer.enabled)
-            {
-                /*if (v.position.y >= layer.minHeight && v.position.y <= layer.maxHeight)
-                {*/
-                    v.color = BlendColors(v.position.y);
-                //}
-            }
-        }
-    }
-    m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->SetVertices(vertices);
+
 }
 
 void pwg::Terrain::SortLayers()
@@ -53,39 +35,12 @@ void pwg::Terrain::SortLayers()
 
 void pwg::Terrain::FixBoundaries()
 {
-    for (int i = 1; i < m_terrainLayers.size(); i++)
-    {
-        if (m_terrainLayers[i].enabled && m_terrainLayers[i - 1].enabled)
-        {
-            m_terrainLayers[i].minHeight = m_terrainLayers[i - 1].maxHeight;
-            if (m_terrainLayers[i].minHeight >= m_terrainLayers[i].maxHeight)
-            {
-                m_terrainLayers[i].maxHeight = m_terrainLayers[i].minHeight + 0.01f;
-            }
-        }
-        
-    }
+
 }
 
 glm::vec3 pwg::Terrain::BlendColors(float height)
 {
-    glm::vec3 color = {0.0f, 0.0f, 0.0f};
-
-    for (int i = 0; i < m_terrainLayers.size(); i++)
-    {
-        const auto& lowerLayer = m_terrainLayers[i];
-        const auto& upperLayer = m_terrainLayers[i + 1];
-
-        if (height >= lowerLayer.minHeight && height <= lowerLayer.maxHeight)
-        {
-            float normalized = (height - lowerLayer.maxHeight) / (upperLayer.minHeight - lowerLayer.maxHeight);
-            normalized = std::clamp(normalized, 0.0f, 1.0f);
-            color = glm::mix(lowerLayer.color, upperLayer.color, normalized);
-        }
-    }
-
-
-    return color;
+    return glm::vec3(0.0f, 1.0f, 1.0f);
 }
 
 void pwg::Terrain::NormalizeHeight()
@@ -101,10 +56,17 @@ void pwg::Terrain::Update()
 	{
 		m_noiseTexture->UpdateNoiseData(m_noiseTexture->GetNoiseParameters());
 	}
-    ApplyNoise();
-    SortLayers();
-    FixBoundaries();
-    ApplyLayers();
+
+}
+
+void pwg::Terrain::Draw(Shader& shader)
+{
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_noiseTexture->GetTextureID());
+    shader.SetUniformFloat("heightmap", 0);
+
+    shader.SetUniformFloat("amplitude", m_noiseTexture->GetNoiseParameters().amplitude);
+    m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->Draw();
 }
 
 void pwg::Terrain::AddLayer(const TerrainLayer& terrainLayer)

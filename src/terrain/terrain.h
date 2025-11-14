@@ -39,6 +39,8 @@ namespace pwg
 		 */
 		void Update();
 
+		void Draw(Shader& shader);
+
 		/**
 		 * @brief Adds a terrain layer to the terrain.
 		 * @param terrainLayer TerrainLayer instance to add.
@@ -76,11 +78,6 @@ namespace pwg
 		int GetSize();
 
 	private:
-
-		/**
-		 * @brief Applies the noise data to the terrain mesh.
-		 */
-		void ApplyNoise();
 
 		/**
 		 * @brief Applies all added terrain layers to modify the mesh.
