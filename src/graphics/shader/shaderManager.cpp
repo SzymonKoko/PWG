@@ -13,6 +13,18 @@ void pwg::ShaderManager::Load(const std::string& shaderID, const std::string& ve
 	
 }
 
+void pwg::ShaderManager::Load(const std::string& shaderID, const std::string& computePath)
+{
+	if (m_shaders.contains(shaderID))
+	{
+		return;
+	}
+
+	auto shader = std::make_shared<Shader>(computePath);
+	m_shaders[shaderID] = shader;
+	PWG_DEBUG("Compute shader has been added to map ({0}, {1})", shaderID, computePath);
+}
+
 void pwg::ShaderManager::Unload(std::string& shaderID)
 {
 	m_shaders.erase(shaderID);

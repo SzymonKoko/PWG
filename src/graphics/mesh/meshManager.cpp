@@ -17,50 +17,47 @@ namespace pwg
 		std::vector<Vertex> vertices;
 		std::vector<unsigned int> indices;
 
-		int width = size;
-		int height = size;
+		vertices.resize(size * size);
+		indices.resize(((size - 1) * (size - 1) * 6));
+
+		uint16_t width = size;
+		uint16_t height = size;
 
 		float topLeftX = (width - 1) / -2.0f;
 		float topLeftZ = (height - 1) / 2.0f;
 
-		for (int y = 0; y < height; y++)
+		for (uint32_t y = 0; y < height; y++)
 		{
-			for (int x = 0; x < width; x++)
+			for (uint32_t x = 0; x < width; x++)
 			{
-				Vertex v;
-				v.position = glm::vec3((topLeftX + x), 0, (topLeftZ - y));
-				v.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-				v.uv = glm::vec2(float(x) / (width - 1), float(y) / (height - 1));
-				vertices.push_back(v);
+				uint32_t idx = y * width + x;
+				vertices[idx].position = glm::vec3((topLeftX + x), 0, (topLeftZ - y));
+				vertices[idx].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+				vertices[idx].uv = glm::vec2(float(x) / (width - 1), float(y) / (height - 1));
 			}
 		}
 
-		for (int y = 0; y < height-1; y++)
+		for (uint32_t y = 0; y < height-1; y++)
 		{
-			for (int x = 0; x < width-1; x++)
+			for (uint32_t x = 0; x < width-1; x++)
 			{
-				unsigned int i0 = y * width + x;	
-				unsigned int i1 = i0 + 1;			
-				unsigned int i2 = i0 + width;		
-				unsigned int i3 = i2 + 1;
+				uint32_t idx = (y * (width - 1) + x) * 6;
+				uint32_t i0 = y * width + x;
+				uint32_t i1 = i0 + 1;
+				uint32_t i2 = i0 + width;
+				uint32_t i3 = i2 + 1;
 
-				indices.push_back(i0);
-				indices.push_back(i1);
-				indices.push_back(i2);
+				indices[idx] = i0;
+				indices[idx+1] = i1;
+				indices[idx+2] = i2;
 
-				indices.push_back(i1);
-				indices.push_back(i3);
-				indices.push_back(i2);
+				indices[idx+3] = i1;
+				indices[idx+4] = i3;
+				indices[idx+5] = i2;
 			}
 		}
-		if (m_meshes.contains(name))
-		{
-			m_meshes[name]->UpdateMeshData(vertices, indices, size);
-		}
-		else
-		{
-			m_meshes.emplace(name, std::make_shared<Mesh>(vertices, indices, size));
-		}
+
+		m_meshes.emplace(name, std::make_shared<Mesh>(vertices, indices, size));
 
 		PWG_INFO("Created mesh \"{0}\" ({1}x{1})", name, size);
 		return name;

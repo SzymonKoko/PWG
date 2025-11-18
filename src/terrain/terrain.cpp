@@ -4,14 +4,14 @@
 pwg::Terrain::Terrain(entt::registry& registry, std::shared_ptr<ResourceManager> resourceManager, int size)
 	: m_registry(registry),
 	  m_resourceManager(resourceManager),
-	  m_size(size),
-	  m_noiseTexture(nullptr)
+	  m_size(size)
+	  //m_noiseTexture(nullptr)
 {
 	Entity planeMesh(&m_registry, "PlaneMesh");
 	planeMesh.AddComponent<components::MeshComponent>();
 	planeMesh.AddComponent<components::PlaneMeshComponent>(size);
 
-	m_noiseTexture = std::make_shared<NoiseTexture>(size);
+	//m_noiseTexture = std::make_shared<NoiseTexture>(size);
     PWG_INFO("Terrain created ({0}x{0})", size);
 }
 
@@ -33,39 +33,40 @@ void pwg::Terrain::SortLayers()
         });
 }
 
-void pwg::Terrain::FixBoundaries()
-{
-
-}
-
-glm::vec3 pwg::Terrain::BlendColors(float height)
-{
-    return glm::vec3(0.0f, 1.0f, 1.0f);
-}
-
-void pwg::Terrain::NormalizeHeight()
-{
-
-}
-
 void pwg::Terrain::Update()
 {
 	pwg::systems::PlaneMeshSystem::Update(m_registry, m_resourceManager->GetMeshManager());
 
-	if (m_noiseTexture)
-	{
-		m_noiseTexture->UpdateNoiseData(m_noiseTexture->GetNoiseParameters());
-	}
-
 }
 
-void pwg::Terrain::Draw(Shader& shader)
+void pwg::Terrain::Draw(Shader& shader, Shader& noise)
 {
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_noiseTexture->GetTextureID());
-    shader.SetUniformFloat("heightmap", 0);
+    
+    if (!m_created)
+    {
+        glGenTextures(1, &m_texture);
+        glBindTexture(GL_TEXTURE_2D, m_texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_size, m_size, 0, GL_RGBA, GL_FLOAT, NULL);
+        m_created = true;
+    }
+    
+    glBindImageTexture(0, m_texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    noise.ActivateShader();
+    noise.SetUniformInt("size", m_size);
+    glDispatchCompute(m_size/8, m_size/8, 1);
 
-    shader.SetUniformFloat("amplitude", m_noiseTexture->GetNoiseParameters().amplitude);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+    shader.ActivateShader();
+    shader.SetUniformInt("heightmap", 0);
+
+    shader.SetUniformFloat("amplitude", 500);
     m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->Draw();
 }
 
@@ -83,7 +84,6 @@ void pwg::Terrain::AddLayer(const TerrainLayer& terrainLayer)
         terrainLayer.color.z
     );
     SortLayers();
-    FixBoundaries();
 }
 
 void pwg::Terrain::RemoveLayer(std::string name)
@@ -91,7 +91,6 @@ void pwg::Terrain::RemoveLayer(std::string name)
     //m_terrainLayers.erase(name);
     PWG_DEBUG("Removed terrain layer {0}", name);
     SortLayers();
-    FixBoundaries();
 }
 
 std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()

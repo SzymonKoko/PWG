@@ -7,6 +7,7 @@ pwg::Shader::Shader(const std::string vertexFilePath, const std::string fragment
     std::string vertexCode = ReadFromShaderFile(vertexFilePath);
     std::string fragmentCode = ReadFromShaderFile(fragmentFilePath);
 
+    m_shaderType = STANDARD;
     
     // Convert the shader source strings into character arrays
     const char* vertexSource = vertexCode.c_str();
@@ -70,6 +71,58 @@ pwg::Shader::Shader(const std::string vertexFilePath, const std::string fragment
     glDeleteShader(fragmentShader);
 }
 
+pwg::Shader::Shader(const std::string computeFilePath)
+{
+    // Read vertexFile and fragmentFile and store the strings
+    std::string computeCode = ReadFromShaderFile(computeFilePath); 
+    std::string noiseCode = ReadFromShaderFile("../assets/shaders/FastNoiseLite.glsl");
+
+    m_shaderType = COMPUTE;
+
+    computeCode = noiseCode + "\n" + computeCode;
+
+    // Convert the shader source strings into character arrays
+    const char* computeSource = computeCode.c_str();
+
+    //Create vertex shader
+    GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
+
+    //Attach vertex shader code to the shader object and compile shader
+    glShaderSource(computeShader, 1, &computeSource, NULL);
+    glCompileShader(computeShader);
+
+
+    //Check if compilation was successful
+    int success;
+    char infoLog[512];
+    glGetShaderiv(computeShader, GL_COMPILE_STATUS, &success);
+
+    if (!success)
+    {
+        glGetShaderInfoLog(computeShader, 512, NULL, infoLog);
+        PWG_ERROR("ERROR::SHADER::COMPUTE::COMPILATION_FAILED\n {0}", infoLog);
+    }
+
+    //Create shader program
+    m_shaderID = glCreateProgram();
+
+    //Attach shaders to the program and link them
+    glAttachShader(m_shaderID, computeShader);
+    glLinkProgram(m_shaderID);
+
+
+    //Check if linking was successful
+    glGetProgramiv(m_shaderID, GL_LINK_STATUS, &success);
+
+    if (!success)
+    {
+        glGetProgramInfoLog(m_shaderID, 512, NULL, infoLog);
+        PWG_ERROR("ERROR::SHADER::PROGRAM::LINKING_FAILED\n {0}", infoLog);
+    }
+
+    glDeleteShader(computeShader);
+}
+
 pwg::Shader::~Shader()
 {
 }
@@ -107,27 +160,44 @@ void pwg::Shader::DeleteShader()
 
 void pwg::Shader::SetUniformBool(const std::string& name, bool value) const
 {
-    glUniform1i(glGetUniformLocation(m_shaderID, name.c_str()), (int)value);
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(name);
+    glUniform1i(location, (int)value);
 }
 
 void pwg::Shader::SetUniformInt(const std::string& name, int value) const
 {
-    glUniform1i(glGetUniformLocation(m_shaderID, name.c_str()), value);
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(name);
+    glUniform1i(location, value);
 }
 
 void pwg::Shader::SetUniformFloat(const std::string& name, float value) const
 {
-    glUniform1f(glGetUniformLocation(m_shaderID, name.c_str()), value);
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(name);
+    glUniform1f(location, value);
 }
 
 void pwg::Shader::SetUniformMat4(const std::string& name, glm::mat4 value) const
 {
-    glUniformMatrix4fv(glGetUniformLocation(m_shaderID, name.c_str()),1, GL_FALSE, glm::value_ptr(value));
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(name);
+    glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
 }
 
 void pwg::Shader::SetUniformVec3(const std::string& name, glm::vec3 value) const
 {
-    glUniform3fv(glGetUniformLocation(m_shaderID, name.c_str()), 1, glm::value_ptr(value));
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(name);
+    glUniform3fv(location, 1, glm::value_ptr(value));
+}
+
+int pwg::Shader::GetUniformLocation(const std::string& uniformName)
+{
+    if (m_uniformLocations.contains(uniformName))
+    {
+        return m_uniformLocations.at(uniformName);
+    }
+
+    int location = glGetUniformLocation(m_shaderID, uniformName.c_str());
+    m_uniformLocations[uniformName] = location;
+    return location;
 }
 
 unsigned int pwg::Shader::GetShaderID()

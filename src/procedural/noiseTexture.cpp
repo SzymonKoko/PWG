@@ -14,7 +14,7 @@ pwg::NoiseTexture::NoiseTexture(int terrainSize)
 
 	glGenTextures(1, &m_textureID);
 
-	UpdateNoiseData(m_noiseParams);
+	//UpdateNoiseData(m_noiseParams);
 	PWG_INFO("Noise texture has been created ({0}x{0}, id={1})",terrainSize, m_textureID);
 }
 
@@ -149,7 +149,7 @@ void pwg::NoiseTexture::SetCellularJitter(float jitter)
 
 void pwg::NoiseTexture::GenerateNoiseData()
 {
-	omp_set_num_threads(std::thread::hardware_concurrency());
+	/*omp_set_num_threads(std::thread::hardware_concurrency());
 
 	m_pixels.resize(m_noiseParams.size * m_noiseParams.size);
 
@@ -185,7 +185,7 @@ void pwg::NoiseTexture::GenerateNoiseData()
 			size_t pixelIndex = (y * m_noiseParams.size + x);
 			m_pixels[pixelIndex] = noiseHeight;
 		}
-	}
+	}*/
 }
 
 void pwg::NoiseTexture::UploadToGPU()

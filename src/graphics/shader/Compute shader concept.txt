@@ -1,5 +1,32 @@
 Compute shader 
 
 
-1. Add shader type enum in shader class
-2. Add shader constructor with compute path
+1. Add shader type enum in shader class DONE
+2. Add shader constructor with compute path DONE
+3. Add noise uniforms to shader
+4. Add uniform getters in shader class
+5. Update noise controls
+6. Find place for compute shader (terrain?)
+7. Write compute noise shader
+8. 
+
+
+Useful:
+https://learnopengl.com/Guest-Articles/2022/Compute-Shaders/Introduction
+https://stackoverflow.com/questions/7954927/passing-a-list-of-values-to-fragment-shader
+https://thebookofshaders.com/
+
+
+While traditionally the graphics card (GPU) has been a rendering co-processor which is handling graphics, it got more and more common to use graphics cards for other (not necessarily graphics related) computational tasks (General Purpose Computing on Graphics Processing Units; short: GPGPU-Programming). The reason for this purpose change is performance, as GPUs perform floating-point calculations much faster than today's CPUs. However, this performance boost comes with a hurdle in programming algorithms. Since the GPU is not a serial but a stream processor it's not trivial to program the same algorithms which were designed for the CPU to run on the GPU as well.
+
+As stated above the most important (mandatory) aspect of programs running on GPUs is that they must be parallelizable. Sharing of memory is not easily possible and very limited for kernels running on the graphics card, this means that calculations that the kernel performs must be computed independently of each other.
+
+The compute shader itself defines the data "space" it operates on. An OpenGL function can be used to define the amount of executions that also initiates the execution of the compute operation. The computer shader does not have user-defined inputs or any outputs as known from the other shaders.
+
+To pass data to the compute shader, the shader needs to fetch the data for example via texture access, image loads or shader storage block access, which has to be used as target to explicitly write the computed data to an image or shader storage block as well.
+
+The user can use a concept called work groups to define the space the compute shader is operating on. Work Groups are the smallest amount of compute operations that the user can execute (from the host application). Wile the space of the work groups is a three-dimensional space ("X", "Y", "Z") the user can set any of the dimension to 1 to perform the computation in one- or two-dimensional space. In the image below every green cube is one work group.
+
+The work group may contain many compute shader invocations. The amount of invocations of the shader is defined by the local size of the work group, which is again three-dimensional.
+
+The image below shows how every work group is splitted in its local space invocations represented by the red cubes.

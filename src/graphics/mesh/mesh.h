@@ -88,6 +88,8 @@ namespace pwg
 		unsigned int m_vboID{ 0 };                /**< OpenGL Vertex Buffer Object ID. */
 		unsigned int m_eboID{ 0 };                /**< OpenGL Element Buffer Object ID. */
 
+		int m_modelUniformLocation{ -1 };
+
 		/**
 		* @brief Initializes VAO, VBO, and EBO for the mesh and uploads vertex data to GPU.
 		*/

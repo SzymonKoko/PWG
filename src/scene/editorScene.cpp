@@ -22,7 +22,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     editorCam.AddComponent<pwg::components::CameraComponent>();
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
-    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 1000);
+    m_terrain = std::make_unique<Terrain>(m_editorSceneRegistry, m_resourceManager, 5000);
 
     m_terrain->AddLayer(pwg::TerrainLayer(true, "Water", 1, 0.0f, 19.0f, 10, glm::vec3(0.0f, 0.0f, 1.0f)));
     m_terrain->AddLayer(pwg::TerrainLayer(true, "Sand", 2, 19.0f, 20.0f, 10, glm::vec3(1.0f, 1.0f, 0.0f)));
@@ -135,7 +135,7 @@ void pwg::EditorScene::Draw()
 
     if (ImGui::BeginTabBar("MainTabs"))
     {
-        controls::NoiseControls::ShowControl(*m_terrain->GetNoiseTexture());
+        //controls::NoiseControls::ShowControl(*m_terrain->GetNoiseTexture());
         controls::TerrainLayerControls::ShowControl(*m_terrain);
     } 
     ImGui::EndTabBar(); // MainTabs 

@@ -35,6 +35,13 @@ namespace pwg
 		void Load(const std::string& shaderID, const std::string& vertexPath, const std::string& fragmentPath);
 
 		/**
+		 * @brief Loads a shader from compute shader files and stores it by ID.
+		 * @param shaderID Unique identifier for the shader.
+		 * @param computePath Path to the compute shader file.
+		 */
+		void Load(const std::string& shaderID, const std::string& computePath);
+
+		/**
 		 * @brief Unloads and deletes a shader by its ID.
 		 * @param shaderID ID of the shader to remove.
 		 */

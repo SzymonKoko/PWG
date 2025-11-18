@@ -11,6 +11,14 @@
 
 namespace pwg
 {
+	enum ShaderType
+	{
+		DEFAULT = 0,
+		STANDARD,
+		COMPUTE,
+		COUNT
+	};
+
 	/**
 	 * @brief Class responsible for creating, activating, and deleting OpenGL shaders.
 	 * Provides convenient methods to set shader uniforms of various types.
@@ -26,6 +34,13 @@ namespace pwg
 		 * @param fragmentFilePath Path to the fragment shader file.
 		 */
 		Shader(const std::string vertexFilePath, const std::string fragmentFilePath);
+
+		/**
+		 * @brief Constructs a shader program from compute shader files.
+		 * Compiles and links shaders into a single program.
+		 * @param computeFilePath Path to the compute shader file.
+		 */
+		Shader(const std::string computeFilePath);
 
 		/**
 		 * @brief Destructor. Deletes the shader program.
@@ -85,6 +100,13 @@ namespace pwg
 		void SetUniformVec3(const std::string& name, glm::vec3 value) const;
 
 		/**
+		 * @brief Returns the OpenGL uniform location ID.
+		 * @param uniformName Name of the uniform.
+		 * @return Uniform location ID.
+		 */
+		int GetUniformLocation(const std::string& uniformName);
+
+		/**
 		 * @brief Returns the OpenGL shader program ID.
 		 * @return Shader program ID.
 		 */
@@ -92,6 +114,9 @@ namespace pwg
 
 	private:
 		unsigned int m_shaderID{ 0 }; /**< OpenGL shader program ID. */
+		std::unordered_map<std::string, int> m_uniformLocations;
+		ShaderType m_shaderType{ DEFAULT };
+
 	};
 } // namespace pwg
 

@@ -7,6 +7,7 @@ pwg::Renderer::Renderer(std::shared_ptr<ResourceManager> resourceManager)
 {
 	auto& shaderManager = m_resourceManager->GetShaderManager();
 	shaderManager.Load("default", "../assets/shaders/default.vert", "../assets/shaders/default.frag");
+	shaderManager.Load("noise", "../assets/shaders/noise.comp");
 
 	auto& textureManager = m_resourceManager->GetTextureManager();
 	textureManager.Load("dirt", "../assets/textures/dirt.png");
@@ -29,8 +30,6 @@ void pwg::Renderer::Clear()
 
 void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
 {
-	
-	//std::cout << "Shader ID: " << shader.GetShaderID() << std::endl;
 	m_currentShader->ActivateShader();
 	
 	if (camera)
@@ -44,8 +43,7 @@ void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
 
 void pwg::Renderer::Draw(Terrain& terrain) 
 {
-	m_currentShader->ActivateShader();
 	
-	terrain.Draw(*m_currentShader);
+	terrain.Draw(*m_currentShader, *m_resourceManager->GetShaderManager().GetShader("noise"));
 
 }

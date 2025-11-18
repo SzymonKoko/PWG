@@ -126,7 +126,7 @@ namespace pwg::controls
 
                 if (updated)
                 {
-                    noiseTexture.UpdateNoiseData(noiseTexture.GetNoiseParameters());
+                    //noiseTexture.UpdateNoiseData(noiseTexture.GetNoiseParameters());
                 }
 
                 //ImVec2 windowSize = ImGui::GetContentRegionAvail();
