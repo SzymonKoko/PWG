@@ -93,6 +93,13 @@ namespace pwg
 		void SetUniformMat4(const std::string& name, glm::mat4 value) const;
 
 		/**
+		 * @brief Sets a vec2 uniform in the shader.
+		 * @param name Name of the uniform variable in the shader.
+		 * @param value 2D vector value to set.
+		 */
+		void SetUniformVec2(const std::string& name, glm::vec2 value) const;
+
+		/**
 		 * @brief Sets a vec3 uniform in the shader.
 		 * @param name Name of the uniform variable in the shader.
 		 * @param value 3D vector value to set.
@@ -105,6 +112,41 @@ namespace pwg
 		 * @return Uniform location ID.
 		 */
 		int GetUniformLocation(const std::string& uniformName);
+
+		/**
+		 * @brief Returns the OpenGL uniform integer value.
+		 * @param uniformName Name of the uniform.
+		 * @return Uniform integer value.
+		 */
+		int GetUniformInt(const std::string& uniformName) const;
+
+		/**
+		 * @brief Returns the OpenGL uniform float value.
+		 * @param uniformName Name of the uniform.
+		 * @return Uniform float value.
+		 */
+		float GetUniformFloat(const std::string& uniformName) const;
+
+		/**
+		 * @brief Returns the OpenGL uniform mat4 value.
+		 * @param uniformName Name of the uniform.
+		 * @return Uniform mat4 value.
+		 */
+		glm::mat4 GetUniformMat4(const std::string& uniformName) const;
+
+		/**
+		 * @brief Returns the OpenGL uniform vec2 value.
+		 * @param uniformName Name of the uniform.
+		 * @return Uniform vec2 value.
+		 */
+		glm::vec2 GetUniformVec2(const std::string& uniformName) const;
+
+		/**
+		 * @brief Returns the OpenGL uniform vec3 value.
+		 * @param uniformName Name of the uniform.
+		 * @return Uniform vec3 value.
+		 */
+		glm::vec3 GetUniformVec3(const std::string& uniformName) const;
 
 		/**
 		 * @brief Returns the OpenGL shader program ID.

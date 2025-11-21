@@ -2,31 +2,53 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout (rgba32f, binding = 0) uniform image2D imgOutput;
 
 
-uint noiseType;
-float amplitude;
-float frequency = 8.0;
-int seed = 1337;
-uniform int size = 1000;
-float scale = 30.0;
+uniform int noiseType;
+uniform float amplitude = 0.01;
+uniform float frequency = 0.01;
+uniform int octaves = 1;
+uniform float persistance = 0.5;
+uniform float lacunarity = 2.0;
+uniform int seed = 1337;
+uniform int size;
+uniform float scale = 30.0;
+uniform vec2 offset = vec2(0, 0);
 
 
 void main()
 {
 	fnl_state noise = fnlCreateState(seed);
-	noise.noise_type = FNL_NOISE_OPENSIMPLEX2;
+	noise.noise_type = noiseType;
 
 	vec4 noiseValue = vec4(0.0, 0.0, 0.0, 1.0);
 	ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
+	float amp = amplitude;
+	float freq = frequency;
+
+	float result = 0;
+	float totalAmp = 0;
+
 	float newX = float(texelCoord.x) / float(size);
 	float newY = float(texelCoord.y) / float(size);
 
-	float scaledX = newX * scale * frequency;
-	float scaledY = newY * scale * frequency;
+	for (int i = 0; i < octaves; i++)
+	{
+		totalAmp += amp;
+		float scaledX = (newX * scale * freq) + offset.x;
+		float scaledY = (newY * scale * freq) + offset.y;
 
-	float n = fnlGetNoise2D(noise, scaledX, scaledY);
-	n = (n + 1.0) * 0.5;
+		float n = fnlGetNoise2D(noise, scaledX, scaledY);
+		n = (n + 1.0) * 0.5;
 
-	imageStore(imgOutput, texelCoord, vec4(n,n,n,1.0));
+		result += n * amp;
+
+		amp *= persistance;
+		freq *= lacunarity;
+	}
+
+	result /= totalAmp; // normalizacja do [0,1]
+	//noiseHeight /= totalAmp;
+
+	imageStore(imgOutput, texelCoord, vec4(result, result, result ,1.0));
 
 }

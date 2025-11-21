@@ -5,7 +5,7 @@ layout (location = 2) in vec2 aTextureCoordinates;
 layout (location = 3) in vec3 aColor;
 
 uniform sampler2D heightmap;
-uniform float amplitude;
+uniform float amplitude = 0.01;
 
 uniform mat4 model;
 uniform mat4 view;

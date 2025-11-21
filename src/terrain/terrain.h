@@ -77,6 +77,8 @@ namespace pwg
 		 */
 		int GetSize();
 
+		int GetTextureID() { return m_texture; }
+
 	private:
 
 		/**

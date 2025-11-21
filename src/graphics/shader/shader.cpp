@@ -182,6 +182,12 @@ void pwg::Shader::SetUniformMat4(const std::string& name, glm::mat4 value) const
     glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
 }
 
+void pwg::Shader::SetUniformVec2(const std::string& name, glm::vec2 value) const
+{
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(name);
+    glUniform2fv(location, 1, glm::value_ptr(value));
+}
+
 void pwg::Shader::SetUniformVec3(const std::string& name, glm::vec3 value) const
 {
     int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(name);
@@ -198,6 +204,46 @@ int pwg::Shader::GetUniformLocation(const std::string& uniformName)
     int location = glGetUniformLocation(m_shaderID, uniformName.c_str());
     m_uniformLocations[uniformName] = location;
     return location;
+}
+
+int pwg::Shader::GetUniformInt(const std::string& uniformName) const
+{
+    int value;
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(uniformName);
+    glGetUniformiv(m_shaderID, location, &value);
+    return value;
+}
+
+float pwg::Shader::GetUniformFloat(const std::string& uniformName) const
+{
+    float value;
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(uniformName);
+    glGetUniformfv(m_shaderID, location, &value);
+    return value;
+}
+
+glm::mat4 pwg::Shader::GetUniformMat4(const std::string& uniformName) const
+{
+    glm::mat4 value(0);
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(uniformName);
+    glGetUniformfv(m_shaderID, location, glm::value_ptr(value));
+    return value;
+}
+
+glm::vec2 pwg::Shader::GetUniformVec2(const std::string& uniformName) const
+{
+    glm::vec2 value(0);
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(uniformName);
+    glGetUniformfv(m_shaderID, location, glm::value_ptr(value));
+    return value;
+}
+
+glm::vec3 pwg::Shader::GetUniformVec3(const std::string& uniformName) const
+{
+    glm::vec3 value(0);
+    int location = const_cast<pwg::Shader*>(this)->GetUniformLocation(uniformName);
+    glGetUniformfv(m_shaderID, location, glm::value_ptr(value));
+    return value;
 }
 
 unsigned int pwg::Shader::GetShaderID()
