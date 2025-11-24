@@ -13,16 +13,28 @@ void pwg::ShaderManager::Load(const std::string& shaderID, const std::string& ve
 	
 }
 
-void pwg::ShaderManager::Load(const std::string& shaderID, const std::string& computePath)
+void pwg::ShaderManager::LoadCompute(const std::string& shaderID, const std::string& computePath)
 {
 	if (m_shaders.contains(shaderID))
 	{
 		return;
 	}
 
-	auto shader = std::make_shared<Shader>(computePath);
+	auto shader = std::make_shared<ComputeShader>(computePath);
 	m_shaders[shaderID] = shader;
 	PWG_DEBUG("Compute shader has been added to map ({0}, {1})", shaderID, computePath);
+}
+
+void pwg::ShaderManager::LoadComputeWithInclude(const std::string& shaderID, const std::string& computePath, const std::string& includePath)
+{
+	if (m_shaders.contains(shaderID))
+	{
+		return;
+	}
+
+	auto shader = std::make_shared<ComputeShader>(computePath, includePath);
+	m_shaders[shaderID] = shader;
+	PWG_DEBUG("Compute shader with include has been added to map ({0}, {1}, {2})", shaderID, computePath, includePath);
 }
 
 void pwg::ShaderManager::Unload(std::string& shaderID)
@@ -37,12 +49,3 @@ void pwg::ShaderManager::UnloadAll()
 	PWG_DEBUG("All shaders have been unloaded");
 }
 
-std::shared_ptr<pwg::Shader> pwg::ShaderManager::GetShader(const std::string& shaderID)
-{
-	if (!m_shaders.contains(shaderID))
-	{
-		PWG_ERROR("Shader {0} does not exits!\n", shaderID);
-		return nullptr;
-	}
-	return m_shaders.at(shaderID);
-}

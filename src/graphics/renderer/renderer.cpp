@@ -7,11 +7,11 @@ pwg::Renderer::Renderer(std::shared_ptr<ResourceManager> resourceManager)
 {
 	auto& shaderManager = m_resourceManager->GetShaderManager();
 	shaderManager.Load("default", "../assets/shaders/default.vert", "../assets/shaders/default.frag");
-	shaderManager.Load("noise", "../assets/shaders/noise.comp");
+	shaderManager.LoadComputeWithInclude("noise", "../assets/shaders/noise.comp", "../assets/shaders/FastNoiseLite.glsl");
 
 	auto& textureManager = m_resourceManager->GetTextureManager();
 	textureManager.Load("dirt", "../assets/textures/dirt.png");
-	m_currentShader = m_resourceManager->GetShaderManager().GetShader("default");
+	m_currentShader = m_resourceManager->GetShaderManager().GetShader<pwg::Shader>("default");
 	glEnable(GL_DEPTH_TEST);
 
 	PWG_INFO("Renderer initialized");
@@ -44,6 +44,6 @@ void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
 void pwg::Renderer::Draw(Terrain& terrain) 
 {
 	
-	terrain.Draw(*m_currentShader, *m_resourceManager->GetShaderManager().GetShader("noise"));
+	terrain.Draw(*m_currentShader, *m_resourceManager->GetShaderManager().GetShader<pwg::ComputeShader>("noise"));
 
 }

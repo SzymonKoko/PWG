@@ -2,6 +2,7 @@
 #define SRC_GRAPHICS_SHADER_SHADER_MANAGER_H
 
 #include "shader.h"
+#include "computeShader.h"
 #include <string>
 #include <memory>
 #include <unordered_map>
@@ -39,7 +40,14 @@ namespace pwg
 		 * @param shaderID Unique identifier for the shader.
 		 * @param computePath Path to the compute shader file.
 		 */
-		void Load(const std::string& shaderID, const std::string& computePath);
+		void LoadCompute(const std::string& shaderID, const std::string& computePath);
+
+		/**
+		 * @brief Loads a shader from compute shader files and stores it by ID.
+		 * @param shaderID Unique identifier for the shader.
+		 * @param computePath Path to the compute shader file.
+		 */
+		void LoadComputeWithInclude(const std::string& shaderID, const std::string& computePath, const std::string& includePath);
 
 		/**
 		 * @brief Unloads and deletes a shader by its ID.
@@ -57,10 +65,19 @@ namespace pwg
 		 * @param shaderID ID of the shader to retrieve.
 		 * @return Shared pointer to the requested Shader instance.
 		 */
-		std::shared_ptr<Shader> GetShader(const std::string& shaderID);
+		template<typename T>
+		std::shared_ptr<T> GetShader(const std::string& shaderID)
+		{
+			if (!m_shaders.contains(shaderID))
+			{
+				PWG_ERROR("Shader {0} does not exits!\n", shaderID);
+				return nullptr;
+			}
+			return std::dynamic_pointer_cast<T>(m_shaders.at(shaderID));
+		}
 
 	private:
-		std::unordered_map<std::string, std::shared_ptr<Shader>> m_shaders; /**< Container storing all loaded shaders. */
+		std::unordered_map<std::string, std::shared_ptr<IShader>> m_shaders; /**< Container storing all loaded shaders. */
 	};
 } // namespace pwg
 

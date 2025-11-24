@@ -39,7 +39,7 @@ namespace pwg
 		 */
 		void Update();
 
-		void Draw(Shader& shader, Shader& noise);
+		void Draw(Shader& shader, ComputeShader& noise);
 
 		/**
 		 * @brief Adds a terrain layer to the terrain.

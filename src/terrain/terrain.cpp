@@ -39,7 +39,7 @@ void pwg::Terrain::Update()
 
 }
 
-void pwg::Terrain::Draw(Shader& shader, Shader& noise)
+void pwg::Terrain::Draw(Shader& shader, ComputeShader& noise)
 {
     
     if (!m_created)
@@ -57,13 +57,18 @@ void pwg::Terrain::Draw(Shader& shader, Shader& noise)
     noise.ActivateShader();
     noise.SetUniformInt("size", m_size);
     float amplitude = noise.GetUniformFloat("amplitude");
-    glBindImageTexture(0, m_texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glDispatchCompute(m_size/8, m_size/8, 1);
+    noise.BindImage(0, m_texture, GL_READ_WRITE, GL_RGBA32F);
+    noise.DispatchForTexture(m_size, m_size);
+    noise.MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+    //glBindImageTexture(0, m_texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    //glDispatchCompute(m_size/8, m_size/8, 1);
+    //glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_texture);
+    noise.BindTextureSampler(0, m_texture);
+
+    //glActiveTexture(GL_TEXTURE0);
+    //glBindTexture(GL_TEXTURE_2D, m_texture);
     shader.ActivateShader();
     shader.SetUniformInt("heightmap", 0);
 

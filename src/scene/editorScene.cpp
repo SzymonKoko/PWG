@@ -136,7 +136,7 @@ void pwg::EditorScene::Draw()
     if (ImGui::BeginTabBar("MainTabs"))
     {
         
-        auto& noiseShader = *m_resourceManager->GetShaderManager().GetShader("noise");
+        auto& noiseShader = *m_resourceManager->GetShaderManager().GetShader<pwg::ComputeShader>("noise");
         controls::NoiseControls::ShowControl(noiseShader, m_terrain->GetTextureID());
         controls::TerrainLayerControls::ShowControl(*m_terrain);
     } 

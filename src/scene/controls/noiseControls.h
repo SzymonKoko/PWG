@@ -11,7 +11,7 @@ namespace pwg::controls
 	{
 	public:
 
-		static void ShowControl(Shader& noiseComputeShader, int tex)
+		static void ShowControl(ComputeShader& noiseComputeShader, int tex)
 		{
 
             if (ImGui::BeginTabItem("Noise"))
@@ -136,10 +136,13 @@ namespace pwg::controls
 
                 if (updated)
                 {
-                    glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-                    glDispatchCompute(size / 8, size / 8, 1);
+                    //glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+                    //glDispatchCompute(size / 8, size / 8, 1);
+                    // glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
-                    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+                    noiseComputeShader.BindImage(0, tex, GL_READ_WRITE, GL_RGBA32F);
+                    noiseComputeShader.DispatchForTexture(size, size);
+                    noiseComputeShader.MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
                 }
 
                 ImVec2 windowSize = ImGui::GetContentRegionAvail();

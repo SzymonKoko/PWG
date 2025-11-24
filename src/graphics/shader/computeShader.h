@@ -1,5 +1,5 @@
-#ifndef SRC_GRAPHICS_SHADER_SHADER_H_
-#define SRC_GRAPHICS_SHADER_SHADER_H_
+#ifndef SRC_GRAPHICS_SHADER_COMPUTE_SHADER_H_
+#define SRC_GRAPHICS_SHADER_COMPUTE_SHADER_H_
 
 #include <iostream>
 #include <fstream>
@@ -13,25 +13,33 @@
 namespace pwg
 {
 	/**
-	 * @brief Class responsible for creating, activating, and deleting OpenGL shaders.
+	 * @brief Class responsible for creating, activating, and deleting OpenGL compute shaders.
 	 * Provides convenient methods to set shader uniforms of various types.
 	 */
-	class Shader : public IShader
+	class ComputeShader : public IShader
 	{
 	public:
 
 		/**
-		 * @brief Constructs a shader program from vertex and fragment shader files.
+		 * @brief Constructs a compute shader program from compute shader files.
 		 * Compiles and links shaders into a single program.
-		 * @param vertexFilePath Path to the vertex shader file.
-		 * @param fragmentFilePath Path to the fragment shader file.
+		 * @param computeFilePath Path to the compute shader file.
 		 */
-		Shader(const std::string& vertexFilePath, const std::string& fragmentFilePath);
+		ComputeShader(const std::string& computeFilePath);
 
 		/**
-		 * @brief Destructor. Deletes the shader program.
+		 * @brief Constructs a compute shader program from compute shader files. 
+		 * Attaches another shader file to compute shader.
+		 * Compiles and links shaders into a single program.
+		 * @param computeFilePath Path to the compute shader file.
+		 * @param shaderToAttachFilePath Path to the shader that have to be attached to compute shader.
 		 */
-		~Shader();
+		ComputeShader(const std::string& computeFilePath, const std::string& shaderToAttachFilePath);
+
+		/**
+		 * @brief Destructor. Deletes the compute shader program.
+		 */
+		~ComputeShader();
 
 		/**
 		 * @brief Reads shader code from a file.
@@ -49,6 +57,22 @@ namespace pwg
 		 * @brief Deletes the shader program from GPU memory.
 		 */
 		void DeleteShader() override;
+
+		/**
+		 * @brief Dispatches compute shader and sets quantity of work groups.
+		 * @param x Number of work groups in X dimension.
+		 * @param y Number of work groups in Y dimension. Default 1.
+		 * @param z Number of work groups in Z dimension. Default 1.
+		 */
+		void Dispatch(const int x, const int y = 1, const int z = 1);
+
+		void DispatchForTexture(const int width, const int height);
+
+		void MemoryBarrier(const int bits);
+
+		void BindImage(const unsigned int textureUnit, const unsigned int textureID, const unsigned int access, const unsigned int format);
+
+		void BindTextureSampler(const unsigned int textureUnit, const unsigned int textureID);
 
 		/**
 		 * @brief Sets a boolean uniform in the shader.
@@ -142,9 +166,9 @@ namespace pwg
 
 	private:
 		unsigned int m_shaderID{ 0 }; /**< OpenGL shader program ID. */
+		glm::uvec3 m_localGroupSize;
 		std::unordered_map<std::string, int> m_uniformLocations;
-
 	};
 } // namespace pwg
 
-#endif // !SRC_GRAPHICS_SHADER_SHADER_H_
+#endif // !SRC_GRAPHICS_SHADER_COMPUTE_SHADER_H_
