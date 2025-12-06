@@ -5,11 +5,20 @@
 #include <fstream>
 #include <string>
 #include <stb_image.h>
+#include "graphics/common/GL_Types.h"
 
 #include "core/logger/logger.h"
 
 namespace pwg
 {
+
+	enum class TextureType
+	{
+		Texture2D,
+		CubeMap,
+		NoiseTexture
+	};
+
 	/**
 	 * @brief Class responsible for creating, binding, and deleting textures.
 	 * Supports loading from image files or creating empty textures with specified dimensions.
@@ -44,38 +53,65 @@ namespace pwg
 		/**
 		 * @brief Binds the texture as the current active texture in OpenGL.
 		 */
-		void Bind();
+		void Bind(int slot);
 
 		/**
 		 * @brief Unbinds the texture, setting the active texture to 0.
 		 */
 		void Unbind();
 
+		void SetTextureWrapping(int wrapS, int wrapT);
+
+		void SetTextureFiltering(int minFilter, int magFilter);
+
+		void UpdateData(unsigned char* data, int width, int height, int nrChannels);
+
 		/**
 		 * @brief Getter for OpenGL texture ID.
 		 * @return OpenGL texture ID.
 		 */
-		unsigned int GetTextureID() { return m_textureID; }
+		unsigned int GetTextureID();
 
 		/**
 		 * @brief Getter for texture width.
 		 * @return Width of the texture in pixels.
 		 */
-		int GetWidth() { return m_width; }
+		int GetWidth();
 
 		/**
 		 * @brief Getter for texture height.
 		 * @return Height of the texture in pixels.
 		 */
-		int GetHeight() { return m_height; }
+		int GetHeight();
 
 	private:
 		unsigned char* m_image{ nullptr }; /**< Raw image data loaded from file. */
 		int m_width{ 0 };                  /**< Texture width in pixels. */
 		int m_height{ 0 };                 /**< Texture height in pixels. */
 		int m_nrChannels{ 0 };             /**< Number of channels in the texture (RGB, RGBA, etc.). */
+
 		unsigned int m_textureID{ 0 };     /**< OpenGL texture ID. */
+
+		int m_slot{ 0 };
+
+		int m_wrapS;
+		int m_wrapT;
+
+		int m_minFilter;
+		int m_magFilter;
+
+		bool m_hasMipmap{ true };
+
+		TextureType m_textureType{ TextureType::Texture2D };
+
 	};
 } // namespace pwg
 
 #endif // !SRC_GRAPHICS_TEXTURE_TEXTURE_H_
+
+
+//Filtering
+//Wrapping
+//Slot
+//Texture type
+
