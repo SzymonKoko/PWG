@@ -4,7 +4,6 @@
 #include <string>
 #include <memory>
 #include "resources/resourceManager.h"
-#include "graphics/renderer/renderer.h"
 #include "graphics/renderer/irenderable.h"
 #include "terrain/terrainGenerator.h"
 
@@ -28,7 +27,7 @@ namespace pwg
 	/**
 	 * @brief Handles terrain generation, noise application, and terrain layers.
 	 */
-	class Terrain
+	class Terrain : public IRenderable
 	{
 	public:
 		/**
@@ -44,15 +43,17 @@ namespace pwg
 		 */
 		~Terrain();
 
-		void Update();
+		void Update(float dt) override;
 
-		void Draw(Renderer& renderer);
+		void Draw(Renderer& renderer) override;
 
 		/**
 		 * @brief Returns the terrain mesh.
 		 * @return Shared pointer to the Mesh instance.
 		 */
-		std::shared_ptr<Mesh> GetMesh();
+		std::shared_ptr<Mesh> GetMesh() override;
+
+		std::shared_ptr<Material> GetMaterial() override;
 
 		/**
 		 * @brief Returns the size of the terrain.

@@ -14,6 +14,8 @@ namespace pwg
 		 m_meshSize(size)
 	{
 		//RecalculateNormals();
+		transform.position = { 0.0f, 0.0f, 0.0f };
+		transform.rotation = { 0.0f, 0.5f, 0.0f };
 		SetupMesh();
 	}
 
@@ -26,20 +28,10 @@ namespace pwg
 
 	void Mesh::Update(unsigned int shaderID)
 	{
-		glm::vec3 start_pos(0.0f, 0.0f, 0.0f);
-		
-		if (m_modelUniformLocation == -1)
-		{
-			m_modelUniformLocation = glGetUniformLocation(shaderID, "model");
-		}
-		m_model = glm::translate(m_model, glm::vec3(0.0f, 0.0f, 0.0f));
-		m_model = glm::rotate(m_model, (float)glfwGetTime() * glm::radians(10.0f), glm::vec3(0.0f, 0.5f, 0.0f));
 
-		glUseProgram(shaderID);
+		m_model = glm::translate(m_model, transform.position);
+		m_model = glm::rotate(m_model, (float)glfwGetTime() * glm::radians(10.0f), transform.rotation);
 
-		glUniformMatrix4fv(m_modelUniformLocation, 1, GL_FALSE, glm::value_ptr(m_model));
-
-		m_model = glm::mat4(1.0f);
 	}
 
 	void Mesh::Draw()

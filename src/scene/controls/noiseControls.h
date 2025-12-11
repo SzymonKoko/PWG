@@ -11,25 +11,24 @@ namespace pwg::controls
 	{
 	public:
 
-		static void ShowControl(ComputeShader& noiseComputeShader)
+		static void ShowControl(TerrainNoiseSettings& noiseSettings, int terrainSize)
 		{
 
             if (ImGui::BeginTabItem("Noise"))
             {
                 
-            noiseComputeShader.ActivateShader();
                 //General options
                 static int selectedNoiseType = 0;
-                int size = noiseComputeShader.GetUniformInt("size");
-                int noiseType = noiseComputeShader.GetUniformInt("noiseType");
-                float amplitude = noiseComputeShader.GetUniformFloat("amplitude");
-                float frequency = noiseComputeShader.GetUniformFloat("frequency");
-                float scale = noiseComputeShader.GetUniformFloat("scale");
-                glm::vec2 offset = noiseComputeShader.GetUniformVec2("offset");
-                int seed = noiseComputeShader.GetUniformInt("seed");
-                int octaves = noiseComputeShader.GetUniformInt("octaves");
-                float persistance = noiseComputeShader.GetUniformFloat("persistance");
-                float lacunarity = noiseComputeShader.GetUniformFloat("lacunarity");
+                int size = terrainSize;
+                int noiseType = noiseSettings.noiseType;
+                int seed = noiseSettings.seed;
+                int octaves = noiseSettings.octaves;
+                float amplitude = noiseSettings.amplitude;
+                float frequency = noiseSettings.frequency;
+                float scale = noiseSettings.scale;
+                float persistance = noiseSettings.persistance;
+                float lacunarity = noiseSettings.lacunarity;
+                glm::vec2 offset = noiseSettings.offset;
 
                 //PWG_ERROR("AMP: {0}, FREQ: {1}, TYPE: {2}", amplitude, frequency, noiseType);
 
@@ -61,18 +60,18 @@ namespace pwg::controls
 
                 if (ImGui::Combo("Noise type", &selectedNoiseType, noiseTypes, IM_ARRAYSIZE(noiseTypes)))
                 {
-                    noiseComputeShader.SetUniformInt("noiseType", (FastNoiseLite::NoiseType)selectedNoiseType);
+                    noiseSettings.noiseType = (FastNoiseLite::NoiseType)selectedNoiseType;
                     updated = true;
                 }
 
-                if (ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5000.0f)) { noiseComputeShader.SetUniformFloat("amplitude", amplitude); updated = true; }
-                if (ImGui::SliderFloat("Frequency", &frequency, 0.001f, 1.0f)) { noiseComputeShader.SetUniformFloat("frequency", frequency); updated = true; }
-                if (ImGui::SliderFloat("Scale", &scale, 0.1f, 200.0f)) { noiseComputeShader.SetUniformFloat("scale", scale); updated = true; }
-                if (ImGui::SliderInt("Octaves", &octaves, 1, 16)) { noiseComputeShader.SetUniformInt("octaves", octaves); updated = true; }
-                if (ImGui::SliderFloat("Persistance", &persistance, 0.01f, 2.0f)) { noiseComputeShader.SetUniformFloat("persistance", persistance); updated = true; }
-                if (ImGui::SliderFloat("Lacunarity", &lacunarity, 0.01f, 10.0f)) { noiseComputeShader.SetUniformFloat("lacunarity", lacunarity); updated = true; }
-                if (ImGui::DragFloat2("Offset", &offset.x, 0.1f, 100.0f)) { noiseComputeShader.SetUniformVec2("offset", offset); updated = true; }
-                if (ImGui::InputInt("Seed", &seed)) { noiseComputeShader.SetUniformInt("seed", seed); updated = true; }
+                if (ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5000.0f)) { noiseSettings.amplitude = amplitude; updated = true; }
+                if (ImGui::SliderFloat("Frequency", &frequency, 0.001f, 1.0f)) { noiseSettings.frequency = frequency; updated = true; }
+                if (ImGui::SliderFloat("Scale", &scale, 0.1f, 200.0f)) { noiseSettings.scale = scale; updated = true; }
+                if (ImGui::SliderInt("Octaves", &octaves, 1, 16)) { noiseSettings.octaves = octaves; updated = true; }
+                if (ImGui::SliderFloat("Persistance", &persistance, 0.01f, 2.0f)) { noiseSettings.persistance = persistance; updated = true; }
+                if (ImGui::SliderFloat("Lacunarity", &lacunarity, 0.01f, 10.0f)) { noiseSettings.lacunarity = lacunarity; updated = true; }
+                if (ImGui::DragFloat2("Offset", &offset.x, 0.1f, 100.0f)) { noiseSettings.offset.x = offset.x; noiseSettings.offset.y = offset.y; updated = true; }
+                if (ImGui::InputInt("Seed", &seed)) { noiseSettings.seed = seed; updated = true; }
 
 
                 //if (ImGui::Combo("Fractal type", &fractalType, fractalTypes, IM_ARRAYSIZE(fractalTypes)))
@@ -136,7 +135,7 @@ namespace pwg::controls
 
                 if (updated)
                 {
-
+                    noiseSettings.dirty = true;
                 }
 
                 ImVec2 windowSize = ImGui::GetContentRegionAvail();

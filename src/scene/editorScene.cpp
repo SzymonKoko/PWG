@@ -26,7 +26,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     auto material = m_resourceManager->GetMaterialManager().CreateMaterial("TerrainMaterial", terrainShader);
     auto noiseComputeShader = m_resourceManager->GetShaderManager().GetShader<pwg::ComputeShader>("noise");
 
-    m_terrain = std::make_unique<Terrain>(mesh, material, noiseComputeShader);
+    m_terrain = std::make_shared<Terrain>(mesh, material, noiseComputeShader);
 
     pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(m_editorSceneRegistry, m_terrain->GetSize());
 
@@ -74,7 +74,7 @@ pwg::EditorScene& pwg::EditorScene::operator=(const EditorScene& otherEditorScen
 void pwg::EditorScene::Update(const float& dt)
 {
     pwg::systems::EditorCameraControllerSystem::Update(m_editorSceneRegistry, m_mouseInput, m_aspectRatio);
-    m_terrain->Update();
+    m_terrain->Update(dt);
 }
 
 void pwg::EditorScene::Draw()
@@ -114,10 +114,11 @@ void pwg::EditorScene::Draw()
     }
 
     m_frameBuffer->Bind();
-    m_renderer.Clear();
-    m_renderer.Update(activeCamera, *m_terrain->GetMesh());
-    m_terrain->Draw(m_renderer);
-    //m_renderer.Draw(*m_terrain);
+    m_renderer.BeginFrame();
+    m_renderer.SetCamera(activeCamera);
+    m_renderer.AddToQueue(m_terrain.get());
+    m_renderer.DrawAll();
+    m_renderer.EndFrame();
     m_frameBuffer->Unbind();
 
     ImGui::Image(
@@ -134,9 +135,9 @@ void pwg::EditorScene::Draw()
 
     if (ImGui::BeginTabBar("MainTabs"))
     {
-        
-        auto& noiseShader = *m_resourceManager->GetShaderManager().GetShader<pwg::ComputeShader>("noise");
-        controls::NoiseControls::ShowControl(noiseShader);
+        auto& settings = m_terrain->GetNoiseSettings();
+        auto size = m_terrain->GetSize();
+        controls::NoiseControls::ShowControl(settings, size);
     } 
     ImGui::EndTabBar(); // MainTabs 
     

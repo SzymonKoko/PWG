@@ -14,7 +14,7 @@ pwg::Application::Application()
     m_mouseInput->SetWindow(m_window->GetWindow());
 
     m_resourceManager = std::make_shared<ResourceManager>();
-    m_renderer = std::make_shared<Renderer>(m_resourceManager);
+    m_renderer = std::make_shared<Renderer>();
 
     m_scene = std::make_shared<SceneManager>(m_window->GetWindow(), *m_mouseInput, *m_keyboardInput, m_resourceManager, *m_renderer);
     m_gui = std::make_unique<Gui>(*m_window, m_scene);

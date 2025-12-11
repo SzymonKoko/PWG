@@ -13,7 +13,7 @@ pwg::Terrain::~Terrain()
 {
 }
 
-void pwg::Terrain::Update()
+void pwg::Terrain::Update(float dt)
 {
     if (m_terrainNoiseSettings.dirty)
     {
@@ -72,6 +72,11 @@ void pwg::Terrain::Draw(Renderer& renderer)
 std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()
 {
     return m_mesh;
+}
+
+std::shared_ptr<pwg::Material> pwg::Terrain::GetMaterial()
+{
+    return m_material;
 }
 
 int pwg::Terrain::GetSize()

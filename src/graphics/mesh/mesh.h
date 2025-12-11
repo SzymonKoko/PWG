@@ -5,6 +5,7 @@
 #include <glm/vec3.hpp>
 #include <glm/vec2.hpp>
 #include <glm/mat4x4.hpp>
+#include <graphics/common/transform.h>
 
 namespace pwg
 {
@@ -94,6 +95,7 @@ namespace pwg
 		int m_modelUniformLocation{ -1 };
 
 		glm::mat4 m_model{ 1.0f };
+		Transform transform;
 
 		/**
 		* @brief Initializes VAO, VBO, and EBO for the mesh and uploads vertex data to GPU.

@@ -7,8 +7,10 @@
 #include "graphics/mesh/mesh.h"
 #include "resources/resourceManager.h"
 
+
 namespace pwg
 {
+	class IRenderable;
 	/**
 	* @brief Class responsible for rendering meshes using shaders and textures.
 	* Handles basic draw calls, clearing the screen, and shader management.
@@ -21,7 +23,7 @@ namespace pwg
 		* @brief Constructs a renderer with access to the resource manager.
 		* @param resourceManager Shared pointer to the ResourceManager for shaders, textures, and meshes.
 		*/
-		Renderer(std::shared_ptr<ResourceManager> resourceManager);
+		Renderer();
 
 		/**
 		* @brief Destructor. Cleans up renderer resources.
@@ -32,26 +34,34 @@ namespace pwg
 		* @brief Clears the screen before rendering a new frame.
 		* Typically clears color and depth buffers.
 		*/
-		void Clear();
+		void BeginFrame();
+
+		void EndFrame();
 
 		/**
-		* @brief Updates renderer state for the current frame.
-		* Can update camera uniforms and mesh data before drawing.
-		* @param camera Pointer to a CameraComponent providing view/projection matrices.
-		* @param mesh Reference to the mesh being rendered.
+		* @brief Draws a given renderable object.
+		* @param renderable Pointer to the renderable objcet to draw.
 		*/
-		void Update(pwg::components::CameraComponent* camera, Mesh& mesh);
+		void Draw(IRenderable* renderable);
 
 		/**
-		* @brief Draws a given mesh using the currently bound shader and resources.
-		* @param mesh Reference to the mesh to draw.
+		* @brief Draws a given renderable objects vector.
+		* @param renderQueue Vector of pointers to the renderable objects to draw.
 		*/
-		void Draw();
+		void DrawAll();
 
+		void AddToQueue(IRenderable* renderable);
+
+		void ClearQueue();
+
+		void SetCamera(pwg::components::CameraComponent* camera);
 	private:
-		std::shared_ptr<ResourceManager> m_resourceManager; /**< Access to resources like shaders, textures, and meshes. */
-		std::shared_ptr<Shader> m_currentShader{ nullptr }; /**< Currently bound shader for rendering. */
+		std::vector<IRenderable*> m_renderQueue;
+
+		glm::mat4 m_viewMatrix{ 1.0f };
+		glm::mat4 m_projectionMatrix{ 1.0f };
 	};
 } // namespace pwg
 
 #endif // !SRC_GRAPHICS_RENDERER_RENDERER_H_
+

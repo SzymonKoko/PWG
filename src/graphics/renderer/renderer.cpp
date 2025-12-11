@@ -1,18 +1,18 @@
 #include <glad/glad.h>
 #include "renderer.h"
 #include "core/logger/logger.h"
+#include "graphics/renderer/irenderable.h"
 
-pwg::Renderer::Renderer(std::shared_ptr<ResourceManager> resourceManager)
-	:m_resourceManager(resourceManager)
+pwg::Renderer::Renderer()
 {
-	auto& shaderManager = m_resourceManager->GetShaderManager();
+	/*auto& shaderManager = m_resourceManager->GetShaderManager();
 	shaderManager.Load("default", "../assets/shaders/default.vert", "../assets/shaders/default.frag");
 	shaderManager.LoadComputeWithInclude("noise", "../assets/shaders/noise.comp", "../assets/shaders/FastNoiseLite.glsl");
 
 	auto& textureManager = m_resourceManager->GetTextureManager();
 	textureManager.Load("dirt", "../assets/textures/dirt.png");
-	m_currentShader = m_resourceManager->GetShaderManager().GetShader<pwg::Shader>("default");
-	glEnable(GL_DEPTH_TEST);
+	m_currentShader = m_resourceManager->GetShaderManager().GetShader<pwg::Shader>("default");*/
+	
 
 	PWG_INFO("Renderer initialized");
 }
@@ -22,28 +22,47 @@ pwg::Renderer::~Renderer()
 
 }
 
-void pwg::Renderer::Clear()
+void pwg::Renderer::BeginFrame()
 {
+	glEnable(GL_DEPTH_TEST);
+
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	m_renderQueue.clear();
 }
 
-void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
+void pwg::Renderer::EndFrame()
 {
-	m_currentShader->ActivateShader();
-	
-	if (camera)
+}
+
+void pwg::Renderer::Draw(IRenderable* renderable)
+{
+	renderable->Draw(*this);
+}
+
+void pwg::Renderer::DrawAll()
+{
+	for (auto& r : m_renderQueue)
 	{
-		m_currentShader->SetUniformMat4("view", camera->viewMatrix);
-		m_currentShader->SetUniformMat4("projection", camera->projectionMatrix);
+		r->Draw(*this);
 	}
-
-	mesh.Update(m_currentShader->GetShaderID());
 }
 
-void pwg::Renderer::Draw() 
+void pwg::Renderer::AddToQueue(IRenderable* renderable)
 {
-	
-	//terrain.Draw(*m_currentShader, *m_resourceManager->GetShaderManager().GetShader<pwg::ComputeShader>("noise"));
-
+	m_renderQueue.push_back(renderable);
 }
+
+void pwg::Renderer::ClearQueue()
+{
+	m_renderQueue.clear();
+}
+
+void pwg::Renderer::SetCamera(pwg::components::CameraComponent* camera)
+{
+	m_viewMatrix = camera->viewMatrix;
+	m_projectionMatrix = camera->projectionMatrix;
+}
+
+

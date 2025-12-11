@@ -78,7 +78,7 @@ namespace pwg
 		std::shared_ptr<ResourceManager> m_resourceManager;		/**< Shared pointer to the resource manager. */
 
 		std::unique_ptr<FrameBuffer> m_frameBuffer;				/**< Framebuffer used for rendering. */
-		std::unique_ptr<Terrain> m_terrain;						/**< Terrain instance of the scene. */
+		std::shared_ptr<Terrain> m_terrain;						/**< Terrain instance of the scene. */
 		std::unique_ptr<MeshManager> m_meshManager;				/**< Mesh manager for procedural and loaded meshes. */
 		entt::registry m_editorSceneRegistry;					/**< ECS registry storing scene entities. */
 
