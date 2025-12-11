@@ -27,6 +27,8 @@ void main()
    TextureCoordinates = aTextureCoordinates; 
    Height = realHeight;
    
+
+   //Calculating normals
    vec2 texel = 1.0 / textureSize(heightmap, 0);
 
 	float hL = texture(heightmap, aTextureCoordinates - vec2(texel.x, 0)).r;

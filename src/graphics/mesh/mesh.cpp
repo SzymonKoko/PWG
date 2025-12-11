@@ -27,18 +27,19 @@ namespace pwg
 	void Mesh::Update(unsigned int shaderID)
 	{
 		glm::vec3 start_pos(0.0f, 0.0f, 0.0f);
-		glm::mat4 model = glm::mat4(1.0f);
 		
 		if (m_modelUniformLocation == -1)
 		{
 			m_modelUniformLocation = glGetUniformLocation(shaderID, "model");
 		}
-		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-		model = glm::rotate(model, (float)glfwGetTime() * glm::radians(10.0f), glm::vec3(0.0f, 0.5f, 0.0f));
+		m_model = glm::translate(m_model, glm::vec3(0.0f, 0.0f, 0.0f));
+		m_model = glm::rotate(m_model, (float)glfwGetTime() * glm::radians(10.0f), glm::vec3(0.0f, 0.5f, 0.0f));
 
 		glUseProgram(shaderID);
 
-		glUniformMatrix4fv(m_modelUniformLocation, 1, GL_FALSE, glm::value_ptr(model));
+		glUniformMatrix4fv(m_modelUniformLocation, 1, GL_FALSE, glm::value_ptr(m_model));
+
+		m_model = glm::mat4(1.0f);
 	}
 
 	void Mesh::Draw()
@@ -52,6 +53,11 @@ namespace pwg
 	std::vector<Vertex>& Mesh::GetVertices()
 	{
 		return m_vertices;
+	}
+
+	glm::mat4& Mesh::GetModelMatrix()
+	{
+		return m_model;
 	}
 
 	void Mesh::SetVertices(std::vector<Vertex>& vertices)

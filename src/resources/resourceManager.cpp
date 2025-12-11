@@ -5,7 +5,7 @@ pwg::ResourceManager::ResourceManager()
 	m_shaderManager = std::make_shared<ShaderManager>();
 	m_textureManager = std::make_shared<TextureManager>();
 	m_meshManager = std::make_shared<MeshManager>();
-	//Material manager dodam potem
+	m_materialManager = std::make_shared<MaterialManager>();
 
 	PWG_INFO("Resource manager initialized");
 }

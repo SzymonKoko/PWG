@@ -41,9 +41,9 @@ void pwg::Renderer::Update(pwg::components::CameraComponent* camera, Mesh& mesh)
 	mesh.Update(m_currentShader->GetShaderID());
 }
 
-void pwg::Renderer::Draw(Terrain& terrain) 
+void pwg::Renderer::Draw() 
 {
 	
-	terrain.Draw(*m_currentShader, *m_resourceManager->GetShaderManager().GetShader<pwg::ComputeShader>("noise"));
+	//terrain.Draw(*m_currentShader, *m_resourceManager->GetShaderManager().GetShader<pwg::ComputeShader>("noise"));
 
 }

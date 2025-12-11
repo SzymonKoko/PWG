@@ -3,18 +3,25 @@ layout (rgba32f, binding = 0) uniform image2D imgOutput;
 
 
 uniform int noiseType;
-uniform float amplitude = 0.01;
-uniform float frequency = 0.01;
-uniform int octaves = 1;
-uniform float persistance = 0.5;
-uniform float lacunarity = 2.0;
-uniform int seed = 1337;
+uniform float amplitude;
+uniform float frequency;
+uniform int octaves;
+uniform float persistance;
+uniform float lacunarity;
+uniform int seed;
 uniform int size;
-uniform float scale = 30.0;
-uniform vec2 offset = vec2(0, 0);
+uniform float scale;
+uniform vec2 offset;
 
+void GenerateHeightmap();
 
 void main()
+{
+	GenerateHeightmap();
+
+}
+
+void GenerateHeightmap()
 {
 	fnl_state noise = fnlCreateState(seed);
 	noise.noise_type = noiseType;
@@ -50,5 +57,4 @@ void main()
 	//noiseHeight /= totalAmp;
 
 	imageStore(imgOutput, texelCoord, vec4(result, result, result ,1.0));
-
 }

@@ -2,7 +2,7 @@
 
 namespace pwg
 {
-	std::shared_ptr<Material> MaterialManager::CreateMaterial(const std::string& name, Shader& shader)
+	std::shared_ptr<Material> MaterialManager::CreateMaterial(const std::string& name, std::shared_ptr<Shader> shader)
 	{
 		auto material = std::make_shared<Material>(shader);
 		m_materials[name] = material;

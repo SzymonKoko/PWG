@@ -11,7 +11,7 @@ namespace pwg::controls
 	{
 	public:
 
-		static void ShowControl(ComputeShader& noiseComputeShader, int tex)
+		static void ShowControl(ComputeShader& noiseComputeShader)
 		{
 
             if (ImGui::BeginTabItem("Noise"))
@@ -65,10 +65,10 @@ namespace pwg::controls
                     updated = true;
                 }
 
-                if (ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 1000.0f)) { noiseComputeShader.SetUniformFloat("amplitude", amplitude); updated = true; }
+                if (ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5000.0f)) { noiseComputeShader.SetUniformFloat("amplitude", amplitude); updated = true; }
                 if (ImGui::SliderFloat("Frequency", &frequency, 0.001f, 1.0f)) { noiseComputeShader.SetUniformFloat("frequency", frequency); updated = true; }
                 if (ImGui::SliderFloat("Scale", &scale, 0.1f, 200.0f)) { noiseComputeShader.SetUniformFloat("scale", scale); updated = true; }
-                if (ImGui::SliderInt("Octaves", &octaves, 1, 8)) { noiseComputeShader.SetUniformInt("octaves", octaves); updated = true; }
+                if (ImGui::SliderInt("Octaves", &octaves, 1, 16)) { noiseComputeShader.SetUniformInt("octaves", octaves); updated = true; }
                 if (ImGui::SliderFloat("Persistance", &persistance, 0.01f, 2.0f)) { noiseComputeShader.SetUniformFloat("persistance", persistance); updated = true; }
                 if (ImGui::SliderFloat("Lacunarity", &lacunarity, 0.01f, 10.0f)) { noiseComputeShader.SetUniformFloat("lacunarity", lacunarity); updated = true; }
                 if (ImGui::DragFloat2("Offset", &offset.x, 0.1f, 100.0f)) { noiseComputeShader.SetUniformVec2("offset", offset); updated = true; }
@@ -136,46 +136,40 @@ namespace pwg::controls
 
                 if (updated)
                 {
-                    //glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-                    //glDispatchCompute(size / 8, size / 8, 1);
-                    // glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
-                    noiseComputeShader.BindImage(0, tex, GL_READ_WRITE, GL_RGBA32F);
-                    noiseComputeShader.DispatchForTexture(size, size);
-                    noiseComputeShader.MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
                 }
 
                 ImVec2 windowSize = ImGui::GetContentRegionAvail();
 
-                if (tex != 0)
-                {
+                //if (tex != 0)
+                //{
 
-                    ImVec2 windowSize = ImGui::GetContentRegionAvail();
-                    ImVec2 noiseSize((float)tex, (float)size);
-                    float scaleX= windowSize.x / noiseSize.x;
-                    float scaleY = windowSize.y / noiseSize.y;
+                //    ImVec2 windowSize = ImGui::GetContentRegionAvail();
+                //    ImVec2 noiseSize((float)tex, (float)size);
+                //    float scaleX= windowSize.x / noiseSize.x;
+                //    float scaleY = windowSize.y / noiseSize.y;
 
-                    ImVec2 textureSize(noiseSize.x * scaleX, noiseSize.y * scaleX);
+                //    ImVec2 textureSize(noiseSize.x * scaleX, noiseSize.y * scaleX);
 
-                    textureSize.x = std::clamp(textureSize.x, 10.0f, 400.0f);
-                    textureSize.y = std::clamp(textureSize.y, 10.0f, 400.0f);
+                //    textureSize.x = std::clamp(textureSize.x, 10.0f, 400.0f);
+                //    textureSize.y = std::clamp(textureSize.y, 10.0f, 400.0f);
 
-                    //Center noise image on the window
-                    ImVec2 cursorPos = ImGui::GetCursorPos();
-                    ImVec2 offset((windowSize.x - textureSize.x) * 0.5f, (windowSize.y - textureSize.y) * 0.5f);
+                //    //Center noise image on the window
+                //    ImVec2 cursorPos = ImGui::GetCursorPos();
+                //    ImVec2 offset((windowSize.x - textureSize.x) * 0.5f, (windowSize.y - textureSize.y) * 0.5f);
 
-                    ImGui::SetCursorPos(ImVec2(cursorPos.x + offset.x, cursorPos.y + offset.y));
+                //    ImGui::SetCursorPos(ImVec2(cursorPos.x + offset.x, cursorPos.y + offset.y));
 
-                    ImGui::Image(
-                        (ImTextureID)(intptr_t)tex,
-                        textureSize,
-                        ImVec2(0, 1), ImVec2(1, 0)
-                    );
-                }
-                else
-                {
-                    ImGui::Text("Noise texture not initialized.");
-                }
+                //    ImGui::Image(
+                //        (ImTextureID)(intptr_t)tex,
+                //        textureSize,
+                //        ImVec2(0, 1), ImVec2(1, 0)
+                //    );
+                //}
+                //else
+                //{
+                //    ImGui::Text("Noise texture not initialized.");
+                //}
 
                 ImGui::EndTabItem();
             }

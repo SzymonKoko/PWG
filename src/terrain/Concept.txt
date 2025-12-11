@@ -2,81 +2,74 @@
 
 Structure:
 
+irenderable - interfejs dla każdego obiektu który można wyrenderować. Przekazywane do renderera jako vector
+
+
+
 terrain/
-	systems/
-		terrainSystem .h/.cpp
-	components/
-		terrainComponent .h/.cpp
 	terrain .h/.cpp
 	terrainLayer .h
+	terrainGenerator .h/.cpp
 	
+terrain.h - przechowuje referencje do mesh, material, i tekstur (heightmap, normalmap, splatmap)
+terrainGenerator - używa compute shaderów do generacji tekstur (heightmap, normalmap, splatmap)
+
+
 terrain.h
 
 public:
-	Terrain(entt::registry& reg, int size);
-	- Create Entity
-	- Create MeshManager
-	- Create NoiseTexture
+	Terrain(sptr<Mesh>, sprt<Material>);
 	
-	void UpdateSystems(); 
-	- update planeMeshSystem
-	- update terrainSystem
+	void Draw(Renderer&) - ustawia mesh, material i renderuje
 	
-	void AddLayer(TerrainLayer& layer);
-	void RemoveLayer(string name);
+	Gettery
+
+private:
+
+	sptr<Mesh>
+	sptr<Material>
+	sptr<Textures>
+	uptr<NoiseGenerator>
+	int size;
 	
-	void ApplyLayers();
-	{
-		Iterujemy po m_layers
-		Jeżeli terrainHeight jest pomiędzy min i max to color = ...
-	}
+	struct NoiseSettings - podstawowe parametry szumu
 	
-	//Getters
-	TerrainLayer& GetLayer(string name);
-	unordered_map<TerrainLayer>& GetLayersMap();
-	Mesh& GetMesh();
+	
+terrainGenerator.h
+
+public:
+	TerrainGenerator()
+	
+	TerrainTextures GenerateTerrain(NoiseSettings&, size);
 	
 private:
+	GenerateHeightMap()
+	GenerateNormalMap()
+	GenerateSplatMap()
 	
-	int m_terrainSize;
-	unordered_map<TerrainLayer> m_terrainLayers;
+	struct TerrainTextures
+	{
+		sptr<HeightMap>
+		sptr<NormalMap>
+		sptr<SplatMap>
+	}
 	
-	entt::registry reg;
-	MeshManager m_meshManager;
-	NoiseTexture m_noiseTexture;
+CLEAN MESH!
+return guard in material.h!
+
+
+NoiseControls(NoiseSettings&)
+
+
+TODO
+
+1. Generator DONE
+2. Terrain DONE
+3. ComputeShader
+4. Renderable
+5. Renderer
+6. terrainMaterial
+7, terrainShader
+8. Editor scene
+
 	
-	
-TerrainSystem - update chunków, lod itd... 
-
-TerrainLayer
-
-struct 
-{
-	bool enabled;
-	string name;
-	float minHeight;
-	float maxHeight;
-	uint textureID;
-	vec3 color;
-}
-
-
-TerrainLayerControl
-
-----------------------
-Name                  
-Checkbox enabled      
-Min - Max             
-Color Picker          
-Remove "X"            
-----------------------
-AddLayer              
-----------------------
-
-vector < Layer > 
-
-sort vector by height
-
-fix boundries of layers
-
-clamp max value of i-1 to min value of i

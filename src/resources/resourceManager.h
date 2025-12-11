@@ -5,6 +5,7 @@
 #include "graphics/shader/shaderManager.h"
 #include "graphics/texture/textureManager.h"
 #include "graphics/mesh/meshManager.h"
+#include "graphics/material/materialManager.h"
 
 namespace pwg
 {
@@ -46,14 +47,21 @@ namespace pwg
 		MeshManager& GetMeshManager() { return *m_meshManager; }
 
 		/**
+		 * @brief Returns reference to the MaterialManager.
+		 * @return Reference to MaterialManager instance.
+		 */
+		MaterialManager& GetMaterialManager() { return *m_materialManager; }
+
+		/**
 		 * @brief Unloads all resources from all managers.
 		 */
 		void UnloadAll();
 
 	private:
-		std::shared_ptr<ShaderManager> m_shaderManager;   /**< Manages all shaders. */
-		std::shared_ptr<TextureManager> m_textureManager; /**< Manages all textures. */
-		std::shared_ptr<MeshManager> m_meshManager;       /**< Manages all meshes. */
+		std::shared_ptr<ShaderManager> m_shaderManager;			/**< Manages all shaders. */
+		std::shared_ptr<TextureManager> m_textureManager;		/**< Manages all textures. */
+		std::shared_ptr<MeshManager> m_meshManager;				/**< Manages all meshes. */
+		std::shared_ptr<MaterialManager> m_materialManager;     /**< Manages all materials. */
 	};
 } // namespace pwg
 

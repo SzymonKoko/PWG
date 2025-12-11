@@ -4,6 +4,7 @@
 #include <vector>
 #include <glm/vec3.hpp>
 #include <glm/vec2.hpp>
+#include <glm/mat4x4.hpp>
 
 namespace pwg
 {
@@ -73,6 +74,8 @@ namespace pwg
 		*/
 		std::vector<Vertex>& GetVertices();
 
+		glm::mat4& GetModelMatrix();
+
 		/**
 		* @brief Getter for mesh size.
 		* @return Number of vertices in the mesh.
@@ -89,6 +92,8 @@ namespace pwg
 		unsigned int m_eboID{ 0 };                /**< OpenGL Element Buffer Object ID. */
 
 		int m_modelUniformLocation{ -1 };
+
+		glm::mat4 m_model{ 1.0f };
 
 		/**
 		* @brief Initializes VAO, VBO, and EBO for the mesh and uploads vertex data to GPU.

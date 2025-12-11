@@ -2,7 +2,7 @@
 
 namespace pwg
 {
-	Material::Material(Shader& shader)
+	Material::Material(std::shared_ptr<Shader> shader)
 		: m_shader(shader)
 	{
 
@@ -16,22 +16,28 @@ namespace pwg
 	{
 		for (auto& [name, value] : m_floatUniforms)
 		{
-			m_shader.SetUniformFloat(name, value);
+			m_shader->SetUniformFloat(name, value);
 		}
 
 		for (auto& [name, value] : m_intUniforms)
 		{
-			m_shader.SetUniformInt(name, value);
+			m_shader->SetUniformInt(name, value);
 		}
 
 		for (auto& [name, value] : m_vec3Uniforms)
 		{
-			m_shader.SetUniformVec3(name, value);
+			m_shader->SetUniformVec3(name, value);
 		}
+
+		for (auto& [name, value] : m_mat4Uniforms)
+		{
+			m_shader->SetUniformMat4(name, value);
+		}
+
 		for (auto& [name, texData] : m_textureUniforms)
 		{
 			texData.texture->Bind(texData.slot);
-			m_shader.SetUniformInt(name, texData.slot);
+			m_shader->SetUniformInt(name, texData.slot);
 		}
 
 
@@ -57,7 +63,12 @@ namespace pwg
 		return m_vec3Uniforms[name];
 	}
 
-	void Material::SetShader(Shader& shader)
+	glm::mat4 Material::GetUniformMat4(const std::string& name)
+	{
+		return m_mat4Uniforms[name];
+	}
+
+	void Material::SetShader(std::shared_ptr<Shader> shader)
 	{
 		m_shader = shader;
 	}
@@ -80,6 +91,11 @@ namespace pwg
 	void Material::SetUniformVec3(const std::string& name, const glm::vec3& value)
 	{
 		m_vec3Uniforms[name] = value;
+	}
+
+	void Material::SetUniformMat4(const std::string& name, const glm::mat4& value)
+	{
+		m_mat4Uniforms[name] = value;
 	}
 
 }

@@ -1,0 +1,15 @@
+Shaders:
+
+Basic shaders
+
+1. terrain.vert
+ - Sets vertex y position based on the heightmap
+ - 
+2. terrain.frag
+ - Applies textures, colors etc based on splat maps
+
+Compute shaders
+
+1. noise.comp 
+2. terrain.comp
+ - Calculates heightmaps, normalmaps, splatmaps

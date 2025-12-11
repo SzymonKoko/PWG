@@ -61,7 +61,7 @@ pwg::Texture::Texture(int width, int height)
 	m_wrapS = ToGL(TextureWrapMode::REPEAT);
 	m_wrapT = ToGL(TextureWrapMode::REPEAT);
 
-	m_minFilter = ToGL(TextureFilterMode::MIPMAP_LINEAR_LINEAR);
+	m_minFilter = ToGL(TextureFilterMode::LINEAR);
 	m_magFilter = ToGL(TextureFilterMode::LINEAR);
 
 	glGenTextures(1, &m_textureID);
@@ -75,7 +75,7 @@ pwg::Texture::Texture(int width, int height)
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
-	PWG_DEBUG("Framebuffer texture created ({0}x{1})", width, height);
+	PWG_DEBUG("Texture created ({0}x{1})", width, height);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }

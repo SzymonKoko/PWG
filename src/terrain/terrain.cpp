@@ -1,48 +1,45 @@
-#include <glad/glad.h>
 #include "terrain.h"
 
-pwg::Terrain::Terrain(entt::registry& registry, std::shared_ptr<ResourceManager> resourceManager, int size)
-	: m_registry(registry),
-	  m_resourceManager(resourceManager),
-	  m_size(size)
-	  //m_noiseTexture(nullptr)
+pwg::Terrain::Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, std::shared_ptr<ComputeShader> noiseComputeShader)
+    : m_mesh(mesh),
+      m_material(material)
 {
-	Entity planeMesh(&m_registry, "PlaneMesh");
-	planeMesh.AddComponent<components::MeshComponent>();
-	planeMesh.AddComponent<components::PlaneMeshComponent>(size);
+    m_size = 512;
 
-	//m_noiseTexture = std::make_shared<NoiseTexture>(size);
-    PWG_INFO("Terrain created ({0}x{0})", size);
+    m_terrainGenerator = std::make_unique<TerrainGenerator>(noiseComputeShader);
 }
 
 pwg::Terrain::~Terrain()
 {
 }
 
-void pwg::Terrain::ApplyLayers()
-{
-
-}
-
-void pwg::Terrain::SortLayers()
-{
-    std::sort(m_terrainLayers.begin(), m_terrainLayers.end(),
-        [](const TerrainLayer& a, const TerrainLayer& b)
-        {
-            return a.minHeight < b.minHeight;
-        });
-}
-
 void pwg::Terrain::Update()
 {
-	pwg::systems::PlaneMeshSystem::Update(m_registry, m_resourceManager->GetMeshManager());
+    if (m_terrainNoiseSettings.dirty)
+    {
+        m_terrainTextures = m_terrainGenerator->GenerateTerrain(m_terrainNoiseSettings, m_size);
 
+        m_terrainNoiseSettings.dirty = false;
+    }
 }
 
-void pwg::Terrain::Draw(Shader& shader, ComputeShader& noise)
+void pwg::Terrain::Draw(Renderer& renderer)
 {
     
-    if (!m_created)
+    m_material->Apply();
+
+    glm::mat4 modelMatrix = m_mesh->GetModelMatrix();
+
+    m_material->SetUniformMat4("u_model", modelMatrix);
+
+    m_material->SetUniformTexture("u_heightmap", m_terrainTextures->heightmap, 0);
+    m_material->SetUniformTexture("u_normalmap", m_terrainTextures->normalmap, 1);
+    m_material->SetUniformTexture("u_splatmap", m_terrainTextures->splatmap, 2);
+
+    m_mesh->Draw();
+
+
+    /*if (!m_created)
     {
         glGenTextures(1, &m_texture);
         glBindTexture(GL_TEXTURE_2D, m_texture);
@@ -60,74 +57,29 @@ void pwg::Terrain::Draw(Shader& shader, ComputeShader& noise)
     noise.BindImage(0, m_texture, GL_READ_WRITE, GL_RGBA32F);
     noise.DispatchForTexture(m_size, m_size);
     noise.MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
-    //glBindImageTexture(0, m_texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    //glDispatchCompute(m_size/8, m_size/8, 1);
-    //glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
 
     noise.BindTextureSampler(0, m_texture);
 
-    //glActiveTexture(GL_TEXTURE0);
-    //glBindTexture(GL_TEXTURE_2D, m_texture);
     shader.ActivateShader();
     shader.SetUniformInt("heightmap", 0);
 
 
     shader.SetUniformFloat("amplitude", amplitude);
-    m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->Draw();
-}
-
-void pwg::Terrain::AddLayer(const TerrainLayer& terrainLayer)
-{
-    m_terrainLayers.push_back(terrainLayer);
-    PWG_DEBUG("Terrain layer added ({0}, {1}, {2}-{3}, {4}, color: {5} {6} {7})", 
-        terrainLayer.name, 
-        terrainLayer.enabled, 
-        terrainLayer.minHeight, 
-        terrainLayer.maxHeight, 
-        terrainLayer.textureID,
-        terrainLayer.color.x,
-        terrainLayer.color.y,
-        terrainLayer.color.z
-    );
-    SortLayers();
-}
-
-void pwg::Terrain::RemoveLayer(std::string name)
-{
-    //m_terrainLayers.erase(name);
-    PWG_DEBUG("Removed terrain layer {0}", name);
-    SortLayers();
+    m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->Draw();*/
 }
 
 std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()
 {
-    pwg::components::MeshComponent* meshComponent = nullptr;
-    pwg::components::PlaneMeshComponent* planeMeshComponent = nullptr;
-    auto meshView = m_registry.view<components::MeshComponent, components::PlaneMeshComponent>();
-    for (auto [entity, mesh, plane] : meshView.each())
-    {
-        meshComponent = &mesh;
-        planeMeshComponent = &plane;
-        break;
-    }
-
-    if (!meshComponent)
-    {
-        PWG_ERROR("Brak mesha");
-    }
-
-    auto mesh = m_resourceManager->GetMeshManager().GetMesh(meshComponent->meshID);
-
-    return mesh;
-}
-
-std::vector<pwg::TerrainLayer>& pwg::Terrain::GetTerrainLayers()
-{
-    return m_terrainLayers;
+    return m_mesh;
 }
 
 int pwg::Terrain::GetSize()
 {
     return m_size;
+}
+
+pwg::TerrainNoiseSettings& pwg::Terrain::GetNoiseSettings()
+{
+    return m_terrainNoiseSettings;
 }
