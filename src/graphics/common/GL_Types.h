@@ -22,8 +22,26 @@ namespace pwg
 		MIPMAP_NEAREST_LINEAR
 	};
 
+	enum class TextureFormats : uint8_t
+	{
+		R8,
+		R32F,
+		RGBA8,
+		RGBA16F,
+		RGBA32F
+		
+	};
+
+	struct GLTextureFormats
+	{
+		int internalFormat;
+		int format;
+		int type;
+	};
+
 	constexpr unsigned int ToGL(TextureWrapMode mode);
 	constexpr unsigned int ToGL(TextureFilterMode mode);
+	constexpr GLTextureFormats ToGL(TextureFormats format);
 }
 
 #include "GL_Types.inl"

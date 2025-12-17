@@ -65,8 +65,8 @@ namespace pwg::controls
                 }
 
                 if (ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5000.0f)) { noiseSettings.amplitude = amplitude; updated = true; }
-                if (ImGui::SliderFloat("Frequency", &frequency, 0.001f, 1.0f)) { noiseSettings.frequency = frequency; updated = true; }
-                if (ImGui::SliderFloat("Scale", &scale, 0.1f, 200.0f)) { noiseSettings.scale = scale; updated = true; }
+                if (ImGui::SliderFloat("Frequency", &frequency, 0.001f, 10.0f)) { noiseSettings.frequency = frequency; updated = true; }
+                if (ImGui::SliderFloat("Scale", &scale, 0.1f, 400.0f)) { noiseSettings.scale = scale; updated = true; }
                 if (ImGui::SliderInt("Octaves", &octaves, 1, 16)) { noiseSettings.octaves = octaves; updated = true; }
                 if (ImGui::SliderFloat("Persistance", &persistance, 0.01f, 2.0f)) { noiseSettings.persistance = persistance; updated = true; }
                 if (ImGui::SliderFloat("Lacunarity", &lacunarity, 0.01f, 10.0f)) { noiseSettings.lacunarity = lacunarity; updated = true; }

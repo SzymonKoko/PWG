@@ -1,0 +1,40 @@
+Terrain.vert
+
+inputs: heightmap, model, view, proj
+outputs: Texture coords, uvs
+
+tasks:
+- set height based on heightmap
+- set matrixes...
+
+----------------------------------------------------------------
+
+Terrain.frag
+
+inputs: normalmap, splatmap, textures
+
+----------------------------------------------------------------
+
+Terrain.comp
+
+inputs: noiseParams, terrainLayers
+outputs: heightmap, normalmap, splatmap
+
+tasks:
+- calculate heightmap based on noise
+- calculate normalmap based on heightmap (
+- calculate slope (1 - normal)
+- calculate weigth (height * slope)
+- save to splatmap
+
+functions: 
+- Calculate weigths (layer, height, slope) - smoothsteps
+
+----------------------------------------------------------------
+Terrain Layer:
+	min max height
+	min max slope
+	texture id
+	blending strength
+	
+TerrainLayer as SSBO

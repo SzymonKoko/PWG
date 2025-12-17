@@ -45,6 +45,11 @@ void pwg::Renderer::DrawAll()
 {
 	for (auto& r : m_renderQueue)
 	{
+		r->GetMaterial()->Apply();
+
+		r->GetMaterial()->SetUniformMat4("u_view", m_viewMatrix);
+		r->GetMaterial()->SetUniformMat4("u_projection", m_projectionMatrix);
+
 		r->Draw(*this);
 	}
 }

@@ -14,6 +14,8 @@ namespace pwg
 
 	void Material::Apply()
 	{
+		m_shader->ActivateShader();
+
 		for (auto& [name, value] : m_floatUniforms)
 		{
 			m_shader->SetUniformFloat(name, value);
@@ -38,6 +40,14 @@ namespace pwg
 		{
 			texData.texture->Bind(texData.slot);
 			m_shader->SetUniformInt(name, texData.slot);
+		}
+
+		int slot = 0;
+		for (auto& [name, texArray] : m_textureArrays)
+		{
+			texArray->Bind(slot);
+			m_shader->SetUniformInt(name, slot);
+			slot++;
 		}
 
 
@@ -96,6 +106,11 @@ namespace pwg
 	void Material::SetUniformMat4(const std::string& name, const glm::mat4& value)
 	{
 		m_mat4Uniforms[name] = value;
+	}
+
+	void Material::SetTextureArray(const std::string& name, std::shared_ptr<TextureArray> textureArray)
+	{
+		m_textureArrays[name] = textureArray;
 	}
 
 }

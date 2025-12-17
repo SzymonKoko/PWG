@@ -1,0 +1,36 @@
+#version 450 core
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (r32f, binding = 0) readonly uniform image2D heightmap;
+layout (rgba16f, binding = 1) writeonly uniform image2D normalmap;
+
+uniform float u_amplitude;
+
+void main()
+{
+
+	ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size  = imageSize(heightmap);
+
+    if (coord.x >= size.x || coord.y >= size.y)
+    {
+        return;
+    }
+
+    ivec2 cL = clamp(coord + ivec2(-1,  0), ivec2(0), size - 1);
+    ivec2 cR = clamp(coord + ivec2( 1,  0), ivec2(0), size - 1);
+    ivec2 cD = clamp(coord + ivec2( 0, -1), ivec2(0), size - 1);
+    ivec2 cU = clamp(coord + ivec2( 0,  1), ivec2(0), size - 1);
+
+    float hL = imageLoad(heightmap, cL).r;
+    float hR = imageLoad(heightmap, cR).r;
+    float hD = imageLoad(heightmap, cD).r;
+    float hU = imageLoad(heightmap, cU).r;
+
+    vec3 dx = vec3(1.0, (hR - hL) * u_amplitude, 0.0);
+    vec3 dz = vec3(0.0, (hU - hD) * u_amplitude, 1.0);
+
+    vec3 normal = normalize(cross(dz, dx));
+
+    vec3 encoded = normal * 0.5 + 0.5;
+    imageStore(normalmap, coord, vec4(encoded, 1.0));
+}

@@ -13,6 +13,21 @@ void pwg::TextureManager::Load(const std::string& textureID, const std::string& 
     PWG_DEBUG("Texture has been loaded ({0}, id={1}, {2}x{3})", textureID, texture->GetTextureID(), texture->GetWidth(), texture->GetHeight());
 }
 
+void pwg::TextureManager::LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths)
+{
+    if (m_textureArrays.contains(name))
+    {
+        return;
+    }
+
+    auto textureArray = std::make_shared<TextureArray>(1024, 1024, (int)texturePaths.size(), ToGL(TextureFormats::RGBA8));
+
+    textureArray->LoadTexturesIntoArray(texturePaths);
+
+    m_textureArrays[name] = textureArray;
+
+}
+
 void pwg::TextureManager::Unload(std::string& textureID)
 {
     m_textures.erase(textureID);
@@ -33,4 +48,9 @@ std::shared_ptr<pwg::Texture> pwg::TextureManager::GetTexture(const std::string&
         return nullptr;
     }
     return m_textures[textureID];
+}
+
+std::shared_ptr<pwg::TextureArray> pwg::TextureManager::GetTextureArray(const std::string& textureArrayID)
+{
+    return m_textureArrays[textureArrayID];
 }

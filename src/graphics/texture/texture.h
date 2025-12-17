@@ -43,7 +43,7 @@ namespace pwg
 		 * @param width Width of the texture in pixels.
 		 * @param height Height of the texture in pixels.
 		 */
-		Texture(int width, int height);
+		Texture(int width, int height, GLTextureFormats format);
 
 		/**
 		 * @brief Destructor. Frees image memory and deletes the OpenGL texture.
@@ -103,6 +103,7 @@ namespace pwg
 		bool m_hasMipmap{ true };
 
 		TextureType m_textureType{ TextureType::Texture2D };
+		GLTextureFormats m_format;
 
 	};
 } // namespace pwg

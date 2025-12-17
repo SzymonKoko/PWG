@@ -1,12 +1,15 @@
 #include "terrain.h"
 
-pwg::Terrain::Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, std::shared_ptr<ComputeShader> noiseComputeShader)
+pwg::Terrain::Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, TerrainComputeShaders& computeShaders)
     : m_mesh(mesh),
-      m_material(material)
+      m_material(material),
+      m_terrainComputeShaders(computeShaders)
 {
-    m_size = 512;
+    m_size = 2048;
 
-    m_terrainGenerator = std::make_unique<TerrainGenerator>(noiseComputeShader);
+    m_terrainGenerator = std::make_unique<TerrainGenerator>(m_terrainComputeShaders.heightmapShader, m_terrainComputeShaders.normalmapShader, m_terrainComputeShaders.splatmapShader);
+    m_terrainLayersManager = std::make_unique<TerrainLayersManager>();
+    m_terrainTextures = std::make_shared<TerrainTextures>();
 }
 
 pwg::Terrain::~Terrain()
@@ -15,12 +18,22 @@ pwg::Terrain::~Terrain()
 
 void pwg::Terrain::Update(float dt)
 {
-    if (m_terrainNoiseSettings.dirty)
+    m_mesh->Update();
+
+    if (!m_terrainTextures)
     {
-        m_terrainTextures = m_terrainGenerator->GenerateTerrain(m_terrainNoiseSettings, m_size);
+        m_terrainTextures = m_terrainGenerator->GenerateTerrain(m_terrainNoiseSettings, m_size, m_terrainLayersManager->GetLayers());
 
         m_terrainNoiseSettings.dirty = false;
     }
+
+    if (m_terrainNoiseSettings.dirty)
+    {
+        m_terrainTextures = m_terrainGenerator->GenerateTerrain(m_terrainNoiseSettings, m_size, m_terrainLayersManager->GetLayers());
+
+        m_terrainNoiseSettings.dirty = false;
+    }
+
 }
 
 void pwg::Terrain::Draw(Renderer& renderer)
@@ -28,13 +41,24 @@ void pwg::Terrain::Draw(Renderer& renderer)
     
     m_material->Apply();
 
-    glm::mat4 modelMatrix = m_mesh->GetModelMatrix();
+    auto modelMatrix = m_mesh->GetModelMatrix();
 
     m_material->SetUniformMat4("u_model", modelMatrix);
 
-    m_material->SetUniformTexture("u_heightmap", m_terrainTextures->heightmap, 0);
-    m_material->SetUniformTexture("u_normalmap", m_terrainTextures->normalmap, 1);
-    m_material->SetUniformTexture("u_splatmap", m_terrainTextures->splatmap, 2);
+    m_material->SetUniformFLoat("u_amplitude", m_terrainNoiseSettings.amplitude);
+
+
+    if (m_terrainTextures && m_terrainTextures->heightmap)
+    {
+        m_material->SetUniformTexture("u_Heightmap", m_terrainTextures->heightmap, 0);
+    }
+    //m_material->SetUniformTexture("u_normalmap", m_terrainTextures->normalmap, 1);
+    if (m_terrainTextures && m_terrainTextures->splatmap)
+    {
+        m_material->SetUniformTexture("u_Splatmap", m_terrainTextures->splatmap, 1);
+    }
+
+    
 
     m_mesh->Draw();
 

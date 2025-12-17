@@ -1,4 +1,4 @@
-#version 430 core
+#version 450 core
 
 // Switch between using floats or doubles for input position
 #define FNLfloat float

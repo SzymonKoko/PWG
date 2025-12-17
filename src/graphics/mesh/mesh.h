@@ -46,7 +46,7 @@ namespace pwg
 		* @brief Updates mesh uniforms or data on GPU.
 		* @param shaderID ID of the shader program currently in use.
 		*/
-		void Update(unsigned int shaderID);
+		void Update();
 
 		/**
 		* @brief Draws the mesh using bound vertex and index buffers.
@@ -75,7 +75,7 @@ namespace pwg
 		*/
 		std::vector<Vertex>& GetVertices();
 
-		glm::mat4& GetModelMatrix();
+		glm::mat4 GetModelMatrix();
 
 		/**
 		* @brief Getter for mesh size.

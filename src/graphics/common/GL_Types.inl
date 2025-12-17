@@ -31,6 +31,19 @@ namespace pwg
 		return GL_LINEAR;
 	}
 
+	constexpr GLTextureFormats ToGL(TextureFormats format)
+	{
+		switch (format)
+		{
+			case pwg::TextureFormats::R8:		return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
+			case pwg::TextureFormats::R32F:		return { GL_R32F, GL_RED, GL_FLOAT };
+			case pwg::TextureFormats::RGBA8:	return { GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE };
+			case pwg::TextureFormats::RGBA16F:	return { GL_RGBA16F, GL_RGBA, GL_FLOAT };
+			case pwg::TextureFormats::RGBA32F:	return { GL_RGBA32F, GL_RGBA, GL_FLOAT };
+		}
+		return { GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE };
+	}
+
 }
 
 #endif // !SRC_GRAPHICS_COMMON_GL_TYPES_INL_

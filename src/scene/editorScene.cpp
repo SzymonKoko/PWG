@@ -21,12 +21,41 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     editorCam.AddComponent<pwg::components::CameraComponent>();
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
-    auto terrainShader = m_resourceManager->GetShaderManager().GetShader<pwg::Shader>("default");
-    auto mesh = m_resourceManager->GetMeshManager().GetMesh("PlaneMesh");
-    auto material = m_resourceManager->GetMaterialManager().CreateMaterial("TerrainMaterial", terrainShader);
-    auto noiseComputeShader = m_resourceManager->GetShaderManager().GetShader<pwg::ComputeShader>("noise");
+    m_resourceManager->GetMeshManager().CreateMesh(2048, "PlaneMesh");
+    std::string terrainShadersPath = "../assets/shaders/terrainShaders/";
 
-    m_terrain = std::make_shared<Terrain>(mesh, material, noiseComputeShader);
+    auto shaderManager = m_resourceManager->GetShaderManager();
+    auto textureManager = m_resourceManager->GetTextureManager();
+
+    shaderManager.Load("terrainShader", terrainShadersPath + "terrain.vert", terrainShadersPath + "terrain.frag");
+    shaderManager.LoadComputeWithInclude("heightmapComputeShader", terrainShadersPath + "terrain_height.comp", terrainShadersPath + "FastNoiseLite.glsl");
+    shaderManager.LoadCompute("normalmapComputeShader", terrainShadersPath + "terrain_normal.comp");
+    shaderManager.LoadCompute("splatmapComputeShader", terrainShadersPath + "terrain_splat.comp");
+
+    std::string terrainTexturesPath = "../assets/textures/";
+    std::vector<std::string> texturesPaths;
+
+    texturesPaths.push_back(terrainTexturesPath + "grass.png");
+    texturesPaths.push_back(terrainTexturesPath + "dirt.png");
+    texturesPaths.push_back(terrainTexturesPath + "stone.png");
+    texturesPaths.push_back(terrainTexturesPath + "snow.png");
+
+    textureManager.LoadTextureArray("terrainTextures", texturesPaths);
+    auto textureArray = textureManager.GetTextureArray("terrainTextures");
+
+    auto terrainShader = shaderManager.GetShader<pwg::Shader>("terrainShader");
+    TerrainComputeShaders terrainComputeShaders(
+        shaderManager.GetShader<pwg::ComputeShader>("heightmapComputeShader"),
+        shaderManager.GetShader<pwg::ComputeShader>("normalmapComputeShader"),
+        shaderManager.GetShader<pwg::ComputeShader>("splatmapComputeShader")
+    );
+
+    auto terrainMesh = m_resourceManager->GetMeshManager().GetMesh("PlaneMesh");
+    auto terrainMaterial = m_resourceManager->GetMaterialManager().CreateMaterial("TerrainMaterial", terrainShader);
+
+    terrainMaterial->SetTextureArray("u_Textures", textureArray);
+
+    m_terrain = std::make_shared<Terrain>(terrainMesh, terrainMaterial, terrainComputeShaders);
 
     pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(m_editorSceneRegistry, m_terrain->GetSize());
 

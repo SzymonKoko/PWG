@@ -6,9 +6,11 @@
 #include "resources/resourceManager.h"
 #include "graphics/renderer/irenderable.h"
 #include "terrain/terrainGenerator.h"
+#include "terrain/terrainLayersManager.h"
 
 namespace pwg
 {
+	struct TerrainTextures;
 	struct TerrainNoiseSettings
 	{
 		int noiseType = 0;
@@ -24,6 +26,13 @@ namespace pwg
 		bool dirty = true;
 	};
 
+	struct TerrainComputeShaders
+	{
+		std::shared_ptr<ComputeShader> heightmapShader;
+		std::shared_ptr<ComputeShader> normalmapShader;
+		std::shared_ptr<ComputeShader> splatmapShader;
+	};
+
 	/**
 	 * @brief Handles terrain generation, noise application, and terrain layers.
 	 */
@@ -36,7 +45,7 @@ namespace pwg
 		 * @param resourceManager Shared pointer to resource manager for meshes/textures.
 		 * @param size Size of the terrain (width/height in units or grid points).
 		 */
-		Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, std::shared_ptr<ComputeShader> noiseComputeShader);
+		Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, TerrainComputeShaders& computeShaders);
 
 		/**
 		 * @brief Destructor. Cleans up terrain resources.
@@ -69,7 +78,9 @@ namespace pwg
 		std::shared_ptr<Material> m_material;
 		std::shared_ptr<TerrainTextures> m_terrainTextures;
 		std::unique_ptr<TerrainGenerator> m_terrainGenerator;
+		std::unique_ptr<TerrainLayersManager> m_terrainLayersManager;
 		TerrainNoiseSettings m_terrainNoiseSettings;
+		TerrainComputeShaders& m_terrainComputeShaders;
 	};
 }
 #endif // !SRC_TERRAIN_TERRAIN_H

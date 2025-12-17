@@ -26,11 +26,11 @@ namespace pwg
 		glDeleteBuffers(1, &m_eboID);
 	}
 
-	void Mesh::Update(unsigned int shaderID)
+	void Mesh::Update()
 	{
-
+		m_model = glm::mat4(1.0f);
 		m_model = glm::translate(m_model, transform.position);
-		m_model = glm::rotate(m_model, (float)glfwGetTime() * glm::radians(10.0f), transform.rotation);
+		//m_model = glm::rotate(m_model, (float)glfwGetTime() * glm::radians(10.0f), transform.rotation);
 
 	}
 
@@ -47,7 +47,7 @@ namespace pwg
 		return m_vertices;
 	}
 
-	glm::mat4& Mesh::GetModelMatrix()
+	glm::mat4 Mesh::GetModelMatrix()
 	{
 		return m_model;
 	}

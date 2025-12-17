@@ -2,6 +2,7 @@
 #define SRC_GRAPHICS_TEXTURE_TEXTURE_MANAGER_H
 
 #include "texture.h"
+#include "textureArray.h"
 #include <string>
 #include <memory>
 #include <unordered_map>
@@ -33,6 +34,8 @@ namespace pwg
 		 */
 		void Load(const std::string& textureID, const std::string& texturePath);
 
+		void LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths);
+
 		/**
 		 * @brief Unloads a texture by its ID and deletes it from GPU memory.
 		 * @param textureID ID of the texture to remove.
@@ -50,9 +53,11 @@ namespace pwg
 		 * @return Shared pointer to the requested Texture instance.
 		 */
 		std::shared_ptr<pwg::Texture> GetTexture(const std::string& textureID);
+		std::shared_ptr<TextureArray> GetTextureArray(const std::string& textureArrayID);
 
 	private:
 		std::unordered_map<std::string, std::shared_ptr<Texture>> m_textures; /**< Container storing all loaded textures. */
+		std::unordered_map<std::string, std::shared_ptr<TextureArray>> m_textureArrays;
 	};
 } // namespace pwg
 

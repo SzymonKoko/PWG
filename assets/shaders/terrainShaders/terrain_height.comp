@@ -1,5 +1,5 @@
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-layout (rgba32f, binding = 0) uniform image2D imgOutput;
+layout (r32f, binding = 0) uniform image2D heightmap;
 
 
 uniform int noiseType;
@@ -13,15 +13,7 @@ uniform int size;
 uniform float scale;
 uniform vec2 offset;
 
-void GenerateHeightmap();
-
 void main()
-{
-	GenerateHeightmap();
-
-}
-
-void GenerateHeightmap()
 {
 	fnl_state noise = fnlCreateState(seed);
 	noise.noise_type = noiseType;
@@ -53,8 +45,8 @@ void GenerateHeightmap()
 		freq *= lacunarity;
 	}
 
-	result /= totalAmp; // normalizacja do [0,1]
-	//noiseHeight /= totalAmp;
+	result /= totalAmp; 
 
-	imageStore(imgOutput, texelCoord, vec4(result, result, result ,1.0));
+	imageStore(heightmap, texelCoord,vec4(result, 0.0, 0.0, 1.0));
+
 }

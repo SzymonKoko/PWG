@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include "graphics/shader/shader.h"
 #include "graphics/texture/texture.h"
+#include "graphics/texture/textureArray.h"
 
 
 namespace pwg
@@ -31,6 +32,7 @@ namespace pwg
 		void SetUniformInt(const std::string& name, int value);
 		void SetUniformVec3(const std::string& name, const glm::vec3& value);
 		void SetUniformMat4(const std::string& name, const glm::mat4& value);
+		void SetTextureArray(const std::string& name, std::shared_ptr<TextureArray> textureArray);
 
 	private:
 		
@@ -45,7 +47,7 @@ namespace pwg
 		std::unordered_map<std::string, int> m_intUniforms;
 		std::unordered_map<std::string, glm::vec3> m_vec3Uniforms;
 		std::unordered_map<std::string, glm::mat4> m_mat4Uniforms;
-
+		std::unordered_map<std::string, std::shared_ptr<TextureArray>> m_textureArrays;
 		
 
 		std::shared_ptr<Shader> m_shader; 

@@ -1,8 +1,15 @@
-#ifndef SRC_TERRAIN_TERRAIN_LAYER_H
-#define SRC_TERRAIN_TERRAIN_LAYER_H
+#ifndef SRC_TERRAIN_TERRAIN_LAYERS_MANAGER_H
+#define SRC_TERRAIN_TERRAIN_LAYERS_MANAGER_H
+
+#include <vector>
+#include <string>
+#include <memory>
+#include <unordered_map>
+#include "graphics/texture/texture.h"
 
 namespace pwg
 {
+
 	/**
 	 * @brief Represents a single terrain layer used for coloring or texturing the terrain.
 	 */
@@ -15,6 +22,19 @@ namespace pwg
 		float blendStrength;
 		int textureIndex;			/**< ID of the texture associated with this layer. */
 	};
-}
 
-#endif // !SRC_TERRAIN_TERRAIN_LAYER_H
+	class TerrainLayersManager
+	{
+	public:
+		TerrainLayersManager();
+		~TerrainLayersManager() = default;
+
+		std::vector<TerrainLayer> GetLayers();
+
+	private:
+		std::vector<TerrainLayer> m_terrainLayers;
+		std::unordered_map<std::string, unsigned int> m_terrainTextureIndexes;
+
+	};
+}
+#endif // !SRC_TERRAIN_TERRAIN_LAYERS_MANAGER_H

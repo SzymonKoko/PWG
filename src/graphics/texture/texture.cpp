@@ -9,6 +9,8 @@ pwg::Texture::Texture()
 
 	m_minFilter = ToGL(TextureFilterMode::MIPMAP_LINEAR_LINEAR);
 	m_magFilter = ToGL(TextureFilterMode::LINEAR);
+
+	m_format = ToGL(TextureFormats::RGBA8);
 }
 
 pwg::Texture::Texture(const std::string& imagePath)
@@ -18,6 +20,8 @@ pwg::Texture::Texture(const std::string& imagePath)
 
 	m_minFilter = ToGL(TextureFilterMode::MIPMAP_LINEAR_LINEAR);
 	m_magFilter = ToGL(TextureFilterMode::LINEAR);
+
+	//m_format = ToGL(TextureFormats::RGBA8);
 
 	glGenTextures(1, &m_textureID);
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
@@ -56,13 +60,17 @@ pwg::Texture::Texture(const std::string& imagePath)
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-pwg::Texture::Texture(int width, int height)
+pwg::Texture::Texture(int width, int height, pwg::GLTextureFormats format)
 {
 	m_wrapS = ToGL(TextureWrapMode::REPEAT);
 	m_wrapT = ToGL(TextureWrapMode::REPEAT);
 
 	m_minFilter = ToGL(TextureFilterMode::LINEAR);
 	m_magFilter = ToGL(TextureFilterMode::LINEAR);
+
+	m_format = format;/*format.format;
+	m_format.internalFormat = format.internalFormat;
+	m_format.type = format.type;*/
 
 	glGenTextures(1, &m_textureID);
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
@@ -73,7 +81,7 @@ pwg::Texture::Texture(int width, int height)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, m_minFilter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, m_magFilter);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, m_format.internalFormat, width, height, 0, m_format.format, m_format.type, NULL);
 
 	PWG_DEBUG("Texture created ({0}x{1})", width, height);
 
@@ -91,10 +99,12 @@ pwg::Texture::~Texture()
 
 void pwg::Texture::Bind(int slot)
 {
+	//PWG_DEBUG("TEXTURE ID: {0}", m_textureID);
+
 	m_slot = slot;
 	glActiveTexture(GL_TEXTURE0 + slot);
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
-	PWG_DEBUG("Texture binded (id={0})", m_textureID);
+	//PWG_DEBUG("Texture binded (id={0})", m_textureID);
 }
 
 void pwg::Texture::Unbind()
@@ -129,18 +139,16 @@ void pwg::Texture::UpdateData(unsigned char* data, int width, int height, int nr
 {
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
 
-	GLenum format = (m_nrChannels == 4 ? GL_RGBA : GL_RGB);
-
 	if (width != m_width || height != m_height)
 	{
 		m_width = width;
 		m_height = height;
 		m_nrChannels = nrChannels;
-		glTexImage2D(GL_TEXTURE_2D, 0, format, m_width, m_height, 0, format, GL_UNSIGNED_BYTE, data);
+		glTexImage2D(GL_TEXTURE_2D, 0, m_format.internalFormat, m_width, m_height, 0, m_format.format, m_format.type, data);
 	}
 	else
 	{
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_width, m_height, format, GL_UNSIGNED_BYTE, data);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_width, m_height, m_format.format, m_format.type, data);
 	}
 
 	if (m_hasMipmap)
