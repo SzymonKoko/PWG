@@ -35,7 +35,7 @@ namespace pwg
 		* @param indices Reference to a vector of indices.
 		* @param size Number of vertices in the mesh.
 		*/
-		Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices, int size);
+		Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices, float size);
 
 		/**
 		* @brief Mesh destructor. Cleans up GPU buffers.
@@ -77,6 +77,9 @@ namespace pwg
 
 		glm::mat4 GetModelMatrix();
 
+		glm::vec3 GetPosition();
+		void SetPosition(glm::vec3 position);
+
 		/**
 		* @brief Getter for mesh size.
 		* @return Number of vertices in the mesh.
@@ -95,7 +98,7 @@ namespace pwg
 		int m_modelUniformLocation{ -1 };
 
 		glm::mat4 m_model{ 1.0f };
-		Transform transform;
+		Transform m_transform;
 
 		/**
 		* @brief Initializes VAO, VBO, and EBO for the mesh and uploads vertex data to GPU.

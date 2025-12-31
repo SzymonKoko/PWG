@@ -3,21 +3,24 @@
 
 namespace pwg
 {
-    Shader::Shader(const std::string& vertexFilePath, const std::string& fragmentFilePath)
+    Shader::Shader(const std::filesystem::path& vertexFilePath, const std::filesystem::path& fragmentFilePath)
     {
         // Read vertexFile and fragmentFile and store the strings
         std::string vertexCode = ReadFromShaderFile(vertexFilePath);
         std::string fragmentCode = ReadFromShaderFile(fragmentFilePath);
 
         // Convert the shader source strings into character arrays
-        const char* vertexSource = vertexCode.c_str();
-        const char* fragmentSource = fragmentCode.c_str();
+        std::string vertexSource = PreprocessShader(vertexCode, vertexFilePath);
+        std::string fragmentSource = PreprocessShader(fragmentCode, fragmentFilePath);
+
+        const char* vSource = vertexSource.c_str();
+        const char* fSource = fragmentSource.c_str();
 
         //Create vertex shader
         GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 
         //Attach vertex shader code to the shader object and compile shader
-        glShaderSource(vertexShader, 1, &vertexSource, NULL);
+        glShaderSource(vertexShader, 1, &vSource, nullptr);
         glCompileShader(vertexShader);
 
 
@@ -36,7 +39,7 @@ namespace pwg
         GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 
         //Attach fragment shader code to the shader object and compile shader
-        glShaderSource(fragmentShader, 1, &fragmentSource, NULL);
+        glShaderSource(fragmentShader, 1, &fSource, NULL);
         glCompileShader(fragmentShader);
 
 
@@ -75,7 +78,7 @@ namespace pwg
     {
     }
 
-    std::string Shader::ReadFromShaderFile(const std::string& shaderPath)
+    std::string Shader::ReadFromShaderFile(const std::filesystem::path& shaderPath)
     {
         std::string content{ "" };
         std::ifstream fileStream(shaderPath, std::ios::in);
@@ -89,11 +92,40 @@ namespace pwg
         }
         else
         {
-            PWG_ERROR("Could not read shader file ({0})", shaderPath);
+            //PWG_ERROR("Could not read shader file ({0})", shaderPath);
         }
 
         fileStream.close();
         return content;
+    }
+
+    std::string Shader::PreprocessShader(const std::string& shaderSource, const std::filesystem::path& filePath)
+    {
+        std::stringstream result;
+        std::istringstream stream(shaderSource);
+        std::string line;
+
+        while (std::getline(stream, line))
+        {
+            if (line.starts_with("#engine_include"))
+            {
+                auto first = line.find('"');
+                auto last = line.find_last_of('"');
+
+                auto includePath = line.substr(first + 1, last - first - 1);
+                auto fullPath = filePath.parent_path() / includePath;
+
+                std::string includedSource = ReadFromShaderFile(fullPath);
+
+                result << PreprocessShader(includedSource, fullPath) << "\n";
+            }
+            else
+            {
+                result << line << "\n";
+            }
+        }
+
+        return result.str();
     }
 
     void Shader::ActivateShader()

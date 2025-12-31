@@ -32,7 +32,9 @@ namespace pwg
 		* @param name Unique name (ID) for the mesh.
 		* @return Returns the name (ID) of the created mesh.
 		*/
-		std::string CreateMesh(int size, std::string name);
+		std::string CreatePlaneMesh(int size, std::string name);
+
+		std::string CreateSphereMesh(float radius, int sectorCount, int sliceCount, std::string name);
 
 		/**
 		* @brief Retrieves a mesh from the manager by its ID.

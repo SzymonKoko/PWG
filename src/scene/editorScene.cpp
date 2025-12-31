@@ -3,7 +3,6 @@
 #include "editorScene.h"
 #include "scene/systems/editorCameraControllerSystem.h"
 #include "scene/components/tagComponent.h"
-#include "scene/systems/planeMeshSystem.h"
 #include "controls/noiseControls.h"
 
 
@@ -21,17 +20,24 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     editorCam.AddComponent<pwg::components::CameraComponent>();
     editorCam.AddComponent<pwg::components::EditorCameraComponent>();
 
-    m_resourceManager->GetMeshManager().CreateMesh(2048, "PlaneMesh");
-    std::string terrainShadersPath = "../assets/shaders/terrainShaders/";
+    /*== CREATING MESH ==*/
+    m_resourceManager->GetMeshManager().CreatePlaneMesh(2000, "PlaneMesh");
+    m_resourceManager->GetMeshManager().CreateSphereMesh(128.0f, 36, 72, "SunMesh");
 
     auto shaderManager = m_resourceManager->GetShaderManager();
     auto textureManager = m_resourceManager->GetTextureManager();
 
+    /*== SHADER LOADING ==*/
+    std::string terrainShadersPath = "../assets/shaders/terrainShaders/";
+    std::string unlitShadersPath = "../assets/shaders/unlit/";
+
     shaderManager.Load("terrainShader", terrainShadersPath + "terrain.vert", terrainShadersPath + "terrain.frag");
-    shaderManager.LoadComputeWithInclude("heightmapComputeShader", terrainShadersPath + "terrain_height.comp", terrainShadersPath + "FastNoiseLite.glsl");
+    shaderManager.Load("unlitShader", unlitShadersPath + "unlit.vert", unlitShadersPath + "unlit.frag");
+    shaderManager.LoadCompute("heightmapComputeShader", terrainShadersPath + "terrain_height.comp");
     shaderManager.LoadCompute("normalmapComputeShader", terrainShadersPath + "terrain_normal.comp");
     shaderManager.LoadCompute("splatmapComputeShader", terrainShadersPath + "terrain_splat.comp");
 
+    /*== TEXTURE LOADING ==*/
     std::string terrainTexturesPath = "../assets/textures/";
     std::vector<std::string> texturesPaths;
 
@@ -44,18 +50,27 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     auto textureArray = textureManager.GetTextureArray("terrainTextures");
 
     auto terrainShader = shaderManager.GetShader<pwg::Shader>("terrainShader");
+    auto unlitShader = shaderManager.GetShader<pwg::Shader>("unlitShader");
+
+    /*== MESH LOADING ==*/
+    auto terrainMesh = m_resourceManager->GetMeshManager().GetMesh("PlaneMesh");
+    auto sunMesh = m_resourceManager->GetMeshManager().GetMesh("SunMesh");
+
+    /*== CREATING MATERIALS ==*/
+    auto terrainMaterial = m_resourceManager->GetMaterialManager().CreateMaterial("TerrainMaterial", terrainShader);
+    auto unlitMaterial = m_resourceManager->GetMaterialManager().CreateMaterial("UnlitMaterial", unlitShader);
+
+    /*== INITIALIZING TERRAIN ==*/
     TerrainComputeShaders terrainComputeShaders(
         shaderManager.GetShader<pwg::ComputeShader>("heightmapComputeShader"),
         shaderManager.GetShader<pwg::ComputeShader>("normalmapComputeShader"),
         shaderManager.GetShader<pwg::ComputeShader>("splatmapComputeShader")
     );
 
-    auto terrainMesh = m_resourceManager->GetMeshManager().GetMesh("PlaneMesh");
-    auto terrainMaterial = m_resourceManager->GetMaterialManager().CreateMaterial("TerrainMaterial", terrainShader);
-
     terrainMaterial->SetTextureArray("u_Textures", textureArray);
 
     m_terrain = std::make_shared<Terrain>(terrainMesh, terrainMaterial, terrainComputeShaders);
+    m_sunObject = std::make_shared<SunObject>(sunMesh, unlitMaterial);
 
     pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(m_editorSceneRegistry, m_terrain->GetSize());
 
@@ -102,8 +117,9 @@ pwg::EditorScene& pwg::EditorScene::operator=(const EditorScene& otherEditorScen
 
 void pwg::EditorScene::Update(const float& dt)
 {
-    pwg::systems::EditorCameraControllerSystem::Update(m_editorSceneRegistry, m_mouseInput, m_aspectRatio);
+    pwg::systems::EditorCameraControllerSystem::Update(m_editorSceneRegistry, m_mouseInput, m_keyboardInput, m_aspectRatio ,dt);
     m_terrain->Update(dt);
+    m_sunObject->Update(dt);
 }
 
 void pwg::EditorScene::Draw()
@@ -146,6 +162,7 @@ void pwg::EditorScene::Draw()
     m_renderer.BeginFrame();
     m_renderer.SetCamera(activeCamera);
     m_renderer.AddToQueue(m_terrain.get());
+    m_renderer.AddToQueue(m_sunObject.get());
     m_renderer.DrawAll();
     m_renderer.EndFrame();
     m_frameBuffer->Unbind();

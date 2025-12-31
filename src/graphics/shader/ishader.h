@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <filesystem>
 
 #include "core/logger/logger.h"
 #include <glm/glm.hpp>
@@ -32,7 +33,9 @@ namespace pwg
 		 * @param shaderPath Path to the shader file.
 		 * @return Shader source code as a string.
 		 */
-		virtual std::string ReadFromShaderFile(const std::string& shaderPath) = 0;
+		virtual std::string ReadFromShaderFile(const std::filesystem::path& shaderPath) = 0;
+
+		virtual std::string PreprocessShader(const std::string& shaderSource, const std::filesystem::path& filePath) = 0;
 
 		/**
 		 * @brief Activates the shader program for rendering.

@@ -4,6 +4,7 @@
 #include <entt/entt.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include "core/input/mouseInput.h"
+#include "core/input/keyboardInput.h"
 #include "scene/components/cameraComponent.h"
 #include "scene/components/transformComponent.h"
 #include "scene/components/editorCameraComponent.h"
@@ -34,7 +35,7 @@ namespace pwg::systems
 		 * @param mouseInput Reference to the MouseInput instance.
 		 * @param aspectRatio Aspect ratio of the viewport (width / height).
 		 */
-		static void Update(entt::registry& registry, pwg::MouseInput& mouseInput, float aspectRatio);
+		static void Update(entt::registry& registry, pwg::MouseInput& mouseInput, pwg::KeyboardInput& keyboardInput, float aspectRatio, float dt);
 
 		/**
 		 * @brief Sets the default position of the editor camera based on the scene size.
@@ -53,6 +54,10 @@ namespace pwg::systems
 		 * @param editorData Reference to the EditorCameraComponent of the entity.
 		 */
 		static void HandleMouseInput(pwg::MouseInput& mouseInput, pwg::components::CameraComponent& camera, pwg::components::TransformComponent& transform, pwg::components::EditorCameraComponent& editorData);
+
+		static void HandleKeyboardInput(pwg::KeyboardInput& keyboardInput, pwg::components::TransformComponent& transform, float dt, pwg::components::EditorCameraComponent& editorData, pwg::components::CameraComponent& camera);
+
+		static void CalculateCameraForward(pwg::components::EditorCameraComponent& editorData, pwg::components::CameraComponent camera);
 
 		/**
 		 * @brief Updates the projection matrix of the camera based on the aspect ratio.

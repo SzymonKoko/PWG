@@ -26,7 +26,7 @@ namespace pwg
 		 * @param vertexFilePath Path to the vertex shader file.
 		 * @param fragmentFilePath Path to the fragment shader file.
 		 */
-		Shader(const std::string& vertexFilePath, const std::string& fragmentFilePath);
+		Shader(const std::filesystem::path& vertexFilePath, const std::filesystem::path& fragmentFilePath);
 
 		/**
 		 * @brief Destructor. Deletes the shader program.
@@ -38,7 +38,9 @@ namespace pwg
 		 * @param shaderPath Path to the shader file.
 		 * @return Shader source code as a string.
 		 */
-		std::string ReadFromShaderFile(const std::string& shaderPath) override;
+		std::string ReadFromShaderFile(const std::filesystem::path& shaderPath) override;
+
+		std::string PreprocessShader(const std::string& shaderSource, const std::filesystem::path& filePath) override;
 
 		/**
 		 * @brief Activates the shader program for rendering.

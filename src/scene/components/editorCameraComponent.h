@@ -21,6 +21,8 @@ namespace pwg::components
 		float minZoom{ 5.0f };					/**< Minimum zoom distance. */
 		float maxZoom{ 700.0f };				/**< Maximum zoom distance. */
 		float zoomSpeed{ 50.0f };				/**< Speed factor for zooming in/out. */
+
+		float cameraSpeed{ 1000.0f };
 	};
 } // namespace pwg::components
 

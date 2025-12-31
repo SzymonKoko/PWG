@@ -1,0 +1,22 @@
+Light
+
+tasks
+
+
+--------------------------------------------------------
+LightData
+
+
+
+--------------------------------------------------------
+LightingUploader
+
+
+
+1. diffuse, etc textures in material
+2. light class
+3. light data
+4. LightUploader
+5. lightObject
+6. LightObject shader
+7. lighting shader (Phong)

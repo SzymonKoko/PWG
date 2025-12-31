@@ -11,6 +11,7 @@
 #include "scene/iscene.h"
 #include "resources/resourceManager.h"
 #include "terrain/terrain.h"
+#include "objects/sunObject.h"
 
 #include <memory>
 
@@ -81,8 +82,11 @@ namespace pwg
 		std::shared_ptr<Terrain> m_terrain;						/**< Terrain instance of the scene. */
 		std::unique_ptr<MeshManager> m_meshManager;				/**< Mesh manager for procedural and loaded meshes. */
 		entt::registry m_editorSceneRegistry;					/**< ECS registry storing scene entities. */
+		std::shared_ptr<pwg::SunObject> m_sunObject;
 
 		float m_aspectRatio = 16.0f / 9.0f;						/**< Aspect ratio of the viewport. */
+
+		//vector of lights
 	};
 } // namespace pwg
 

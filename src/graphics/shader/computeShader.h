@@ -25,16 +25,7 @@ namespace pwg
 		 * Compiles and links shaders into a single program.
 		 * @param computeFilePath Path to the compute shader file.
 		 */
-		ComputeShader(const std::string& computeFilePath);
-
-		/**
-		 * @brief Constructs a compute shader program from compute shader files. 
-		 * Attaches another shader file to compute shader.
-		 * Compiles and links shaders into a single program.
-		 * @param computeFilePath Path to the compute shader file.
-		 * @param shaderToAttachFilePath Path to the shader that have to be attached to compute shader.
-		 */
-		ComputeShader(const std::string& computeFilePath, const std::string& shaderToAttachFilePath);
+		ComputeShader(const std::filesystem::path& computeFilePath);
 
 		/**
 		 * @brief Destructor. Deletes the compute shader program.
@@ -46,7 +37,9 @@ namespace pwg
 		 * @param shaderPath Path to the shader file.
 		 * @return Shader source code as a string.
 		 */
-		std::string ReadFromShaderFile(const std::string& shaderPath) override;
+		std::string ReadFromShaderFile(const std::filesystem::path& shaderPath) override;
+
+		std::string PreprocessShader(const std::string& shaderSource, const std::filesystem::path& filePath) override;
 
 		/**
 		 * @brief Activates the shader program for rendering.

@@ -33,21 +33,14 @@ namespace pwg
 		 * @param vertexPath Path to the vertex shader file.
 		 * @param fragmentPath Path to the fragment shader file.
 		 */
-		void Load(const std::string& shaderID, const std::string& vertexPath, const std::string& fragmentPath);
+		void Load(const std::string& shaderID, const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
 
 		/**
 		 * @brief Loads a shader from compute shader files and stores it by ID.
 		 * @param shaderID Unique identifier for the shader.
 		 * @param computePath Path to the compute shader file.
 		 */
-		void LoadCompute(const std::string& shaderID, const std::string& computePath);
-
-		/**
-		 * @brief Loads a shader from compute shader files and stores it by ID.
-		 * @param shaderID Unique identifier for the shader.
-		 * @param computePath Path to the compute shader file.
-		 */
-		void LoadComputeWithInclude(const std::string& shaderID, const std::string& computePath, const std::string& includePath);
+		void LoadCompute(const std::string& shaderID, const std::filesystem::path& computePath);
 
 		/**
 		 * @brief Unloads and deletes a shader by its ID.

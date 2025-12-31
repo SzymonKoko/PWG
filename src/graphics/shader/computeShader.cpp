@@ -3,76 +3,21 @@
 
 namespace pwg
 {
-	ComputeShader::ComputeShader(const std::string& computeFilePath)
+	ComputeShader::ComputeShader(const std::filesystem::path& computeFilePath)
 	{
         // Read compute file and store the strings
         std::string computeCode = ReadFromShaderFile(computeFilePath);
 
         // Convert the shader source strings into character arrays
-        const char* computeSource = computeCode.c_str();
+        std::string computeSource = PreprocessShader(computeCode, computeFilePath);
+
+        const char* cSource = computeSource.c_str();
 
         //Create compute shader
         GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
 
         //Attach compute shader code to the shader object and compile shader
-        glShaderSource(computeShader, 1, &computeSource, NULL);
-        glCompileShader(computeShader);
-
-
-        //Check if compilation was successful
-        int success;
-        char infoLog[512];
-        glGetShaderiv(computeShader, GL_COMPILE_STATUS, &success);
-
-        if (!success)
-        {
-            glGetShaderInfoLog(computeShader, 512, NULL, infoLog);
-            PWG_ERROR("ERROR::SHADER::COMPUTE::COMPILATION_FAILED\n {0}", infoLog);
-        }
-
-        //Create shader program
-        m_shaderID = glCreateProgram();
-
-        //Attach shaders to the program and link them
-        glAttachShader(m_shaderID, computeShader);
-        glLinkProgram(m_shaderID);
-
-
-        //Check if linking was successful
-        glGetProgramiv(m_shaderID, GL_LINK_STATUS, &success);
-
-        if (!success)
-        {
-            glGetProgramInfoLog(m_shaderID, 512, NULL, infoLog);
-            PWG_ERROR("ERROR::SHADER::PROGRAM::LINKING_FAILED\n {0}", infoLog);
-        }
-
-        int workGroupSize[3];
-        glGetProgramiv(m_shaderID, GL_COMPUTE_WORK_GROUP_SIZE, workGroupSize);
-
-        m_localGroupSize.x = workGroupSize[0];
-        m_localGroupSize.y = workGroupSize[1];
-        m_localGroupSize.z = workGroupSize[2];
-
-        glDeleteShader(computeShader);
-	}
-
-	ComputeShader::ComputeShader(const std::string& computeFilePath, const std::string& shaderToAttachFilePath)
-	{
-        // Read compute file and store the strings
-        std::string computeCode = ReadFromShaderFile(computeFilePath);
-        std::string include = ReadFromShaderFile(shaderToAttachFilePath);
-
-        computeCode = include + "\n" + computeCode;
-
-        // Convert the shader source strings into character arrays
-        const char* computeSource = computeCode.c_str();
-
-        //Create compute shader
-        GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
-
-        //Attach compute shader code to the shader object and compile shader
-        glShaderSource(computeShader, 1, &computeSource, NULL);
+        glShaderSource(computeShader, 1, &cSource, NULL);
         glCompileShader(computeShader);
 
 
@@ -118,7 +63,7 @@ namespace pwg
 	{
 	}
 
-	std::string ComputeShader::ReadFromShaderFile(const std::string& shaderPath)
+	std::string ComputeShader::ReadFromShaderFile(const std::filesystem::path& shaderPath)
 	{
 		std::string content{ "" };
 		std::ifstream fileStream(shaderPath, std::ios::in);
@@ -132,12 +77,41 @@ namespace pwg
 		}
 		else
 		{
-			PWG_ERROR("Could not read shader file ({0})", shaderPath);
+			//PWG_ERROR("Could not read shader file ({0})", shaderPath.c_str());
 		}
 
 		fileStream.close();
 		return content;
 	}
+
+    std::string ComputeShader::PreprocessShader(const std::string& shaderSource, const std::filesystem::path& filePath)
+    {
+        std::stringstream result;
+        std::istringstream stream(shaderSource);
+        std::string line;
+
+        while (std::getline(stream, line))
+        {
+            if (line.starts_with("#engine_include"))
+            {
+                auto first = line.find('"');
+                auto last = line.find_last_of('"');
+
+                auto includePath = line.substr(first + 1, last - first - 1);
+                auto fullPath = filePath.parent_path() / includePath;
+
+                std::string includedSource = ReadFromShaderFile(fullPath);
+
+                result << PreprocessShader(includedSource, fullPath) << "\n";
+            }
+            else
+            {
+                result << line << "\n";
+            }
+        }
+
+        return result.str();
+    }
 
 	void ComputeShader::ActivateShader()
 	{

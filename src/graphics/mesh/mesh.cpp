@@ -8,14 +8,14 @@
 
 namespace pwg
 {
-	Mesh::Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices, int size)
+	Mesh::Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices, float size)
 		:m_vertices(vertices),
 		 m_indices(indices),
 		 m_meshSize(size)
 	{
 		//RecalculateNormals();
-		transform.position = { 0.0f, 0.0f, 0.0f };
-		transform.rotation = { 0.0f, 0.5f, 0.0f };
+		m_transform.position = { 0.0f, 0.0f, 0.0f };
+		m_transform.rotation = { 0.0f, 0.5f, 0.0f };
 		SetupMesh();
 	}
 
@@ -29,7 +29,7 @@ namespace pwg
 	void Mesh::Update()
 	{
 		m_model = glm::mat4(1.0f);
-		m_model = glm::translate(m_model, transform.position);
+		m_model = glm::translate(m_model, m_transform.position);
 		//m_model = glm::rotate(m_model, (float)glfwGetTime() * glm::radians(10.0f), transform.rotation);
 
 	}
@@ -50,6 +50,16 @@ namespace pwg
 	glm::mat4 Mesh::GetModelMatrix()
 	{
 		return m_model;
+	}
+
+	glm::vec3 Mesh::GetPosition()
+	{
+		return m_transform.position;
+	}
+
+	void Mesh::SetPosition(glm::vec3 position)
+	{
+		m_transform.position = position;
 	}
 
 	void Mesh::SetVertices(std::vector<Vertex>& vertices)

@@ -4,13 +4,15 @@ pwg::systems::EditorCameraControllerSystem::EditorCameraControllerSystem()
 {
 }
 
-void pwg::systems::EditorCameraControllerSystem::Update(entt::registry& registry, pwg::MouseInput& mouseInput, float aspectRatio)
+void pwg::systems::EditorCameraControllerSystem::Update(entt::registry& registry, pwg::MouseInput& mouseInput, pwg::KeyboardInput& keyboardInput, float aspectRatio, float dt)
 {
     auto view = registry.view<pwg::components::TransformComponent, pwg::components::CameraComponent, pwg::components::EditorCameraComponent>();
 
     for (auto [entity, transform, camera, editorData] : view.each())
     {
         //std::cout << transform.position.x << " " << transform.position.y << " " << transform.position.z << "Distance: " << editorData.distanceToTarget << std::endl;
+        CalculateCameraForward(editorData, camera);
+        //HandleKeyboardInput(keyboardInput, transform, dt, editorData, camera);
         HandleMouseInput(mouseInput, camera, transform, editorData);
         HandleProjection(camera, aspectRatio);
     }
@@ -38,7 +40,7 @@ void pwg::systems::EditorCameraControllerSystem::HandleMouseInput(pwg::MouseInpu
     {
         float panSpeed = 0.0005f * editorData.distanceToTarget;
 
-        glm::vec3 right = glm::normalize(glm::cross(transform.position - editorData.target , camera.up));
+        glm::vec3 right = glm::normalize(glm::cross(camera.forward, camera.up));
 
         glm::vec3 pan = (-right * deltaX + camera.up * deltaY) * panSpeed;
 
@@ -59,6 +61,7 @@ void pwg::systems::EditorCameraControllerSystem::HandleMouseInput(pwg::MouseInpu
     float yawRad = glm::radians(editorData.yaw);
     float pitchRad = glm::radians(editorData.pitch);
 
+
     //Setting new position
     transform.position.x = editorData.target.x + editorData.distanceToTarget * cos(pitchRad) * cos(yawRad);
     transform.position.y = editorData.target.y + editorData.distanceToTarget * sin(pitchRad);
@@ -68,6 +71,37 @@ void pwg::systems::EditorCameraControllerSystem::HandleMouseInput(pwg::MouseInpu
 
 }
 
+void pwg::systems::EditorCameraControllerSystem::HandleKeyboardInput(pwg::KeyboardInput& keyboardInput, pwg::components::TransformComponent& transform, float dt, pwg::components::EditorCameraComponent& editorData, pwg::components::CameraComponent& camera)
+{
+    float velocity = editorData.cameraSpeed * dt;
+
+    glm::vec3 cameraForward = glm::normalize(editorData.target - transform.position);
+    cameraForward.y = 0.0f;
+    cameraForward = glm::normalize(cameraForward);
+
+    glm::vec3 right = glm::normalize(glm::cross(cameraForward, camera.up));
+
+    if (keyboardInput.IsHeld(Action::MoveForward))
+    {
+        editorData.target += cameraForward * velocity;
+    }
+    else if (keyboardInput.IsHeld(Action::MoveBackward))
+    {
+        editorData.target -= cameraForward * velocity;
+    }
+    
+
+    camera.viewMatrix = glm::lookAt(transform.position, editorData.target, camera.up);
+}
+
+void pwg::systems::EditorCameraControllerSystem::CalculateCameraForward(pwg::components::EditorCameraComponent& editorData, pwg::components::CameraComponent camera)
+{
+    float yawRad = glm::radians(editorData.yaw);
+    float pitchRad = glm::radians(editorData.pitch);
+
+    camera.forward = glm::normalize(glm::vec3(cos(pitchRad) * cos(yawRad), sin(pitchRad), cos(pitchRad) * sin(yawRad)));
+}
+
 void pwg::systems::EditorCameraControllerSystem::HandleProjection(pwg::components::CameraComponent& camera, float aspectRatio)
 {
     camera.projectionMatrix = glm::perspective(glm::radians(camera.fov), aspectRatio, camera.nearPlane, camera.farPlane);
@@ -75,15 +109,17 @@ void pwg::systems::EditorCameraControllerSystem::HandleProjection(pwg::component
 
 void pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(entt::registry& registry, int size)
 {
-    auto view = registry.view<pwg::components::TransformComponent, pwg::components::EditorCameraComponent>();
+    auto view = registry.view<pwg::components::TransformComponent, pwg::components::CameraComponent, pwg::components::EditorCameraComponent>();
 
-    for (auto [entity, transform, editorData] : view.each())
+    for (auto [entity, transform, camera, editorData] : view.each())
     {
         transform.position.x = (float)size + 50.0f;
         transform.position.y = (transform.position.x / 50.0f) * 70;
         transform.position.z = -((float)size + 50.0f);
 
         editorData.distanceToTarget = transform.position.x * 2;
+
+        camera.viewMatrix = glm::lookAt(transform.position, editorData.target, camera.up);
 
         PWG_INFO("Camera set to default (Position: {0} {1} {2}, distance to target: {3}, target: {4} {5} {6})",
             transform.position.x,
@@ -94,5 +130,6 @@ void pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(entt::
             editorData.target.y,
             editorData.target.z
         );
+
     }
 }
