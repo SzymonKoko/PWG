@@ -37,11 +37,6 @@ namespace pwg
 		*/
 		void Draw() override;
 
-		/**
-		* @brief Clones the current play scene
-		* @return A unique_ptr to a deep-copied PlayScene
-		*/
-		std::unique_ptr<IScene> Clone() override;
 	private:
 		
 		//Play camera

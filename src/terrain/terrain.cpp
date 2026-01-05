@@ -10,6 +10,14 @@ pwg::Terrain::Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> mate
     m_terrainGenerator = std::make_unique<TerrainGenerator>(m_terrainComputeShaders.heightmapShader, m_terrainComputeShaders.normalmapShader, m_terrainComputeShaders.splatmapShader);
     m_terrainLayersManager = std::make_unique<TerrainLayersManager>();
     m_terrainTextures = std::make_shared<TerrainTextures>();
+
+    auto materialProps = m_material->GetMaterialProperties(); 
+    materialProps.ambient = glm::vec3(0.2f);//{ 1.0f, 0.5f, 0.31f };
+    materialProps.diffuse = glm::vec3(1.0f);//{ 1.0f, 0.5f, 0.31f };
+    materialProps.specular = { 0.5f, 0.5f, 0.5f };
+    materialProps.shininess = 12.0f;
+
+    m_material->SetMaterialProperties(materialProps);
 }
 
 pwg::Terrain::~Terrain()
@@ -45,17 +53,23 @@ void pwg::Terrain::Draw(Renderer& renderer)
 
     m_material->SetUniformMat4("u_model", modelMatrix);
 
-    m_material->SetUniformFLoat("u_amplitude", m_terrainNoiseSettings.amplitude);
+    m_material->SetUniformFloat("u_amplitude", m_terrainNoiseSettings.amplitude);
 
 
     if (m_terrainTextures && m_terrainTextures->heightmap)
     {
         m_material->SetUniformTexture("u_Heightmap", m_terrainTextures->heightmap, 0);
     }
-    //m_material->SetUniformTexture("u_normalmap", m_terrainTextures->normalmap, 1);
+
+    if (m_terrainTextures && m_terrainTextures->normalmap)
+    {
+        m_material->SetUniformTexture("u_Normalmap", m_terrainTextures->normalmap, 1);
+    }
+
+    
     if (m_terrainTextures && m_terrainTextures->splatmap)
     {
-        m_material->SetUniformTexture("u_Splatmap", m_terrainTextures->splatmap, 1);
+        m_material->SetUniformTexture("u_Splatmap", m_terrainTextures->splatmap, 2);
     }
 
     

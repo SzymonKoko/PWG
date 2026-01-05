@@ -6,6 +6,9 @@ namespace pwg
 		: m_mesh(mesh),
 		  m_material(material)
 	{
+		m_light.color = glm::vec3{ 1.0f };
+		m_light.intensivity = 1.0f;
+		
 	}
 
 	SunObject::~SunObject()
@@ -15,12 +18,13 @@ namespace pwg
 	void SunObject::Update(float dt)
 	{
 		m_time += dt;
-		float offsetY = 1400.0f;
+		float offsetY = 1000.0f;
 
 		m_position.x = cos(m_time * m_orbitSpeed) * m_orbitRadius;
 		m_position.y = sin(m_time * m_orbitSpeed) * m_orbitRadius + offsetY;
-		m_position.z = 0.0f;
+		m_position.z = 0.0f;// sin(m_time * m_orbitSpeed * 0.5f)* m_orbitRadius;
 
+		m_light.direction = -glm::normalize(m_position);
 		m_mesh->SetPosition(m_position);
 		m_mesh->Update();
 	}
@@ -46,13 +50,20 @@ namespace pwg
 	{
 		return m_material;
 	}
+
 	glm::vec3 SunObject::GetPosition()
 	{
 		return m_position;
 	}
+
 	glm::vec3 SunObject::GetColor()
 	{
 		return m_color;
+	}
+
+	Light& SunObject::GetLight()
+	{
+		return m_light;
 	}
 }
 

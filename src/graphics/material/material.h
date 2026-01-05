@@ -11,6 +11,14 @@
 
 namespace pwg
 {
+	struct MaterialProperties
+	{
+		glm::vec3 diffuse{ 0.0f };
+		glm::vec3 ambient{ 0.0f };
+		glm::vec3 specular{ 0.0f };
+		float shininess{ 0.0f };
+	};
+
 	class Material
 	{
 	public:
@@ -20,26 +28,28 @@ namespace pwg
 		void Apply();
 
 		//Gettery, Settery
-		float GetUniformFLoat(const std::string& name);
+		float GetUniformFloat(const std::string& name);
 		std::shared_ptr<Texture> GetUniformTexture(const std::string& name);
 		int GetUniformInt(const std::string& name);
 		glm::vec3 GetUniformVec3(const std::string& name);
 		glm::mat4 GetUniformMat4(const std::string& name);
+		MaterialProperties& GetMaterialProperties();
 
 		void SetShader(std::shared_ptr<Shader> shader);
-		void SetUniformFLoat(const std::string& name, float value);
+		void SetUniformFloat(const std::string& name, float value);
 		void SetUniformTexture(const std::string& name, std::shared_ptr<Texture> texture, int slot);
 		void SetUniformInt(const std::string& name, int value);
 		void SetUniformVec3(const std::string& name, const glm::vec3& value);
 		void SetUniformMat4(const std::string& name, const glm::mat4& value);
 		void SetTextureArray(const std::string& name, std::shared_ptr<TextureArray> textureArray);
+		void SetMaterialProperties(MaterialProperties& materialProperties);
 
 	private:
 		
 		struct TextureData
 		{
-			std::shared_ptr<Texture> texture;
-			int slot;
+			std::shared_ptr<Texture> texture{ nullptr };
+			int slot{ 0 };
 		};
 
 		std::unordered_map<std::string, float> m_floatUniforms;
@@ -51,6 +61,7 @@ namespace pwg
 		
 
 		std::shared_ptr<Shader> m_shader; 
+		MaterialProperties m_materialProperties;
 
 
 	};

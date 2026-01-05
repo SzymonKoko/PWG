@@ -12,7 +12,6 @@ namespace pwg
 
 		virtual void Update(const float& dt) = 0;
 		virtual void Draw() = 0;
-		virtual std::unique_ptr<IScene> Clone() = 0;
 
 	protected:
 

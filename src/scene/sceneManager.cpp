@@ -8,7 +8,7 @@ pwg::SceneManager::SceneManager(GLFWwindow* window, MouseInput& minput, Keyboard
 	  m_renderer(renderer)
 {
 	m_editorScene = std::make_unique<pwg::EditorScene>(m_window, m_mouseInput, m_keyboardInput, m_resourceManager, m_renderer);
-	m_currentScene = m_editorScene->Clone();
+
 
 	PWG_INFO("Scene manager initialized");
 }
@@ -22,7 +22,7 @@ void pwg::SceneManager::Play()
 
 void pwg::SceneManager::Stop()
 {
-	m_currentScene = m_editorScene->Clone();
+
 }
 
 void pwg::SceneManager::Update(const float& dt)

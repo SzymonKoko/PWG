@@ -14,7 +14,13 @@ namespace pwg
 
 	void Material::Apply()
 	{
+
 		m_shader->ActivateShader();
+
+		m_shader->SetUniformVec3("u_material.ambient", m_materialProperties.ambient);
+		m_shader->SetUniformVec3("u_material.diffuse", m_materialProperties.diffuse);
+		m_shader->SetUniformVec3("u_material.specular", m_materialProperties.specular);
+		m_shader->SetUniformFloat("u_material.shininess", m_materialProperties.shininess);
 
 		for (auto& [name, value] : m_floatUniforms)
 		{
@@ -53,7 +59,7 @@ namespace pwg
 
 	}
 
-	float Material::GetUniformFLoat(const std::string& name)
+	float Material::GetUniformFloat(const std::string& name)
 	{
 		return m_floatUniforms[name];
 	}
@@ -78,12 +84,17 @@ namespace pwg
 		return m_mat4Uniforms[name];
 	}
 
+	MaterialProperties& Material::GetMaterialProperties()
+	{
+		return m_materialProperties;
+	}
+
 	void Material::SetShader(std::shared_ptr<Shader> shader)
 	{
 		m_shader = shader;
 	}
 
-	void Material::SetUniformFLoat(const std::string& name, float value)
+	void Material::SetUniformFloat(const std::string& name, float value)
 	{
 		m_floatUniforms[name] = value;
 	}
@@ -111,6 +122,14 @@ namespace pwg
 	void Material::SetTextureArray(const std::string& name, std::shared_ptr<TextureArray> textureArray)
 	{
 		m_textureArrays[name] = textureArray;
+	}
+
+	void Material::SetMaterialProperties(MaterialProperties& materialProperties)
+	{
+		m_materialProperties.ambient = materialProperties.ambient;
+		m_materialProperties.diffuse = materialProperties.diffuse;
+		m_materialProperties.specular = materialProperties.specular;
+		m_materialProperties.shininess = materialProperties.shininess;
 	}
 
 }

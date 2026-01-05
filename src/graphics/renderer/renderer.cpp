@@ -45,10 +45,12 @@ void pwg::Renderer::DrawAll()
 {
 	for (auto& r : m_renderQueue)
 	{
+		m_lightingUploader->Upload(r->GetMaterial(), m_light);
 		r->GetMaterial()->Apply();
 
 		r->GetMaterial()->SetUniformMat4("u_view", m_viewMatrix);
 		r->GetMaterial()->SetUniformMat4("u_projection", m_projectionMatrix);
+
 
 		r->Draw(*this);
 	}
@@ -57,6 +59,11 @@ void pwg::Renderer::DrawAll()
 void pwg::Renderer::AddToQueue(IRenderable* renderable)
 {
 	m_renderQueue.push_back(renderable);
+}
+
+void pwg::Renderer::AddLight(Light& light)
+{
+	m_light = light;
 }
 
 void pwg::Renderer::ClearQueue()

@@ -3,6 +3,7 @@
 
 #include "graphics/renderer/irenderable.h"
 #include "resources/resourceManager.h"
+#include "scene/lights/light.h"
 
 namespace pwg
 {
@@ -24,9 +25,12 @@ namespace pwg
 
 		glm::vec3 GetColor();
 
+		Light& GetLight();
+
 	private:
 		std::shared_ptr<Mesh> m_mesh;
 		std::shared_ptr<Material> m_material;
+		Light m_light;
 
 		float m_orbitRadius{ 2000.f };
 		float m_orbitSpeed{ 0.1f };

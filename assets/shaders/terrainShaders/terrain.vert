@@ -14,6 +14,7 @@ uniform float u_amplitude;
 
 uniform sampler2D u_Heightmap;
 
+
 void main()
 {
 	float h = texture(u_Heightmap, a_TextureCoordinates).r;

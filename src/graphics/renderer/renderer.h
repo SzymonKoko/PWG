@@ -6,7 +6,7 @@
 #include "scene/components/cameraComponent.h"
 #include "graphics/mesh/mesh.h"
 #include "resources/resourceManager.h"
-
+#include "lightingUploader.h"
 
 namespace pwg
 {
@@ -51,15 +51,19 @@ namespace pwg
 		void DrawAll();
 
 		void AddToQueue(IRenderable* renderable);
+		void AddLight(Light& light);
 
 		void ClearQueue();
 
 		void SetCamera(pwg::components::CameraComponent* camera);
 	private:
 		std::vector<IRenderable*> m_renderQueue;
+		std::unique_ptr<LightingUploader> m_lightingUploader;
 
 		glm::mat4 m_viewMatrix{ 1.0f };
 		glm::mat4 m_projectionMatrix{ 1.0f };
+
+		Light m_light;
 	};
 } // namespace pwg
 

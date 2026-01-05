@@ -77,44 +77,6 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     PWG_INFO("Editor scene initialized");
 }
 
-pwg::EditorScene::EditorScene(const EditorScene& otherEditorScene)
-    : m_window(otherEditorScene.m_window),
-      m_keyboardInput(otherEditorScene.m_keyboardInput),
-      m_mouseInput(otherEditorScene.m_mouseInput), 
-      m_renderer(otherEditorScene.m_renderer),
-      m_resourceManager(otherEditorScene.m_resourceManager)
-{
-    if (otherEditorScene.m_frameBuffer)
-    {
-        m_frameBuffer = std::make_unique<FrameBuffer>(*otherEditorScene.m_frameBuffer);
-    }
-
-}
-
-pwg::EditorScene& pwg::EditorScene::operator=(const EditorScene& otherEditorScene)
-{
-    if (this == &otherEditorScene)
-    {
-        return *this;
-    }
-
-    m_window = otherEditorScene.m_window;
-    m_keyboardInput = otherEditorScene.m_keyboardInput;
-    m_mouseInput = otherEditorScene.m_mouseInput;
-    m_renderer = otherEditorScene.m_renderer;
-
-    if (otherEditorScene.m_frameBuffer)
-    {
-        m_frameBuffer = std::make_unique<FrameBuffer>(*otherEditorScene.m_frameBuffer);
-    }
-    else
-    {
-        m_frameBuffer.reset();
-    }
-
-    return *this;
-}
-
 void pwg::EditorScene::Update(const float& dt)
 {
     pwg::systems::EditorCameraControllerSystem::Update(m_editorSceneRegistry, m_mouseInput, m_keyboardInput, m_aspectRatio ,dt);
@@ -161,6 +123,7 @@ void pwg::EditorScene::Draw()
     m_frameBuffer->Bind();
     m_renderer.BeginFrame();
     m_renderer.SetCamera(activeCamera);
+    m_renderer.AddLight(m_sunObject->GetLight());
     m_renderer.AddToQueue(m_terrain.get());
     m_renderer.AddToQueue(m_sunObject.get());
     m_renderer.DrawAll();
@@ -190,7 +153,3 @@ void pwg::EditorScene::Draw()
     ImGui::End(); //Controls
 }
 
-std::unique_ptr<pwg::IScene> pwg::EditorScene::Clone()
-{
-	return std::make_unique<pwg::EditorScene>(*this);
-}

@@ -1,22 +1,38 @@
 Light
 
-tasks
+Keeps light data
 
-
---------------------------------------------------------
-LightData
-
-
+Light
+{
+	direction
+	color
+	intensivity
+	
+}
 
 --------------------------------------------------------
 LightingUploader
 
+Uploads Light to the shader by SSBO
 
 
-1. diffuse, etc textures in material
-2. light class
-3. light data
-4. LightUploader
-5. lightObject
-6. LightObject shader
-7. lighting shader (Phong)
+Lighting shader
+{
+	Takes struct LightData by SSBO
+	
+}
+
+Renderer
+{
+	SubmitLights()
+	SubmitLight()
+}
+
+1. diffuse, etc textures in material DONE
+2. light class DONE
+4. LightUploader DONE`
+5. lightObject DONE
+6. LightObject shader DONE
+7. lighting shader (Phong) DONE
+8. Renderer
+9. EditorScene

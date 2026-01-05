@@ -36,19 +36,6 @@ namespace pwg
 		EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput, std::shared_ptr<ResourceManager> resourceManager, Renderer& renderer);
 
 		/**
-		 * @brief Copy constructor. Performs a deep copy of another EditorScene.
-		 * @param otherEditorScene EditorScene instance to copy from.
-		 */
-		EditorScene(const EditorScene& otherEditorScene);
-
-		/**
-		 * @brief Copy assignment operator.
-		 * @param otherEditorScene EditorScene instance to copy from.
-		 * @return Reference to this EditorScene instance.
-		 */
-		EditorScene& operator=(const EditorScene& otherEditorScene);
-
-		/**
 		 * @brief Default destructor.
 		 */
 		~EditorScene() = default;
@@ -63,12 +50,6 @@ namespace pwg
 		 * @brief Draws all entities and components in the scene.
 		 */
 		void Draw() override;
-
-		/**
-		 * @brief Creates a deep copy of the current scene.
-		 * @return Unique pointer to a cloned EditorScene.
-		 */
-		std::unique_ptr<IScene> Clone() override;
 
 	private:
 
