@@ -11,44 +11,26 @@ namespace pwg::controls
     {
     public:
 
-        static void ShowControl(Terrain& terrain)
+        static void ShowControl(std::vector<TerrainLayer>& terrainLayers)
         {
-            
-            auto& terrainLayers = terrain.GetTerrainLayers();
+            static const char* textureNames[4] = { "Grass", "Dirt", "Stone", "Snow" };
+            //auto& terrainLayers = terrainLayers;
             if (ImGui::BeginTabItem("TerrainLayers"))
             {
                 for (auto& layer : terrainLayers)
                 {
-                    if (ImGui::CollapsingHeader(layer.name.c_str()), ImGuiTreeNodeFlags_DefaultOpen)
+                    if (ImGui::CollapsingHeader(textureNames[layer.layerID]), ImGuiTreeNodeFlags_DefaultOpen)
                     {
-                        ImGui::PushID(layer.name.c_str());
-                        ImGui::Text("Name: %s", layer.name);
-                        ImGui::Checkbox("Enabled", &layer.enabled);
-                        ImGui::BeginDisabled(!layer.enabled);
-                        ImGui::SliderFloat("Min Height", &layer.minHeight, 0.0f, 100.0f);
-                        ImGui::SliderFloat("Max Height", &layer.maxHeight, 0.0f, 100.0f);
-                        ImGui::ColorEdit3("Color", &layer.color[0]);
-                        ImGui::EndDisabled();
+                        ImGui::PushID(textureNames[layer.layerID]);
+                        ImGui::Text("Name: %s", textureNames[layer.layerID]);
+                        ImGui::SliderFloat("Min Height", &layer.minHeight, 0.0f, 1.0f); { layer.dirty = true; }
+                        ImGui::SliderFloat("Max Height", &layer.maxHeight, 0.0f, 1.0f); { layer.dirty = true; }
+                        ImGui::SliderFloat("Min Slope", &layer.minSlope, 0.0f, 1.0f); { layer.dirty = true; }
+                        ImGui::SliderFloat("Max Slope", &layer.maxSlope, 0.0f, 1.0f); { layer.dirty = true; }
+                        ImGui::SliderFloat("Blend Strength", &layer.blendStrength, 0.0f, 1.0f); { layer.dirty = true; }
                         ImGui::PopID();
                     }
                 }
-
-                static char newLayerNameBuffer[64] = "";
-                ImGui::Separator();
-
-                ImGui::InputTextWithHint("##LayerName", "Layer name", newLayerNameBuffer, IM_ARRAYSIZE(newLayerNameBuffer));
-
-                ImGui::SameLine();
-
-                if (ImGui::Button("Add layer"))
-                {
-                    std::string layerName = newLayerNameBuffer;
-                    memset(newLayerNameBuffer, 0, sizeof(newLayerNameBuffer));
-                    
-                    terrain.AddLayer(pwg::TerrainLayer(true, layerName, 1, -0.0f, -0.0f, 10, glm::vec3(0.0f, 0.0f, 1.0f)));
-                    
-                }
-                ImGui::Separator();
 
                 ImGui::EndTabItem();
             }

@@ -3,12 +3,15 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 struct TerrainLayer
 {
+	int layerID;
 	float minHeight;
 	float maxHeight;
 	float minSlope;
 	float maxSlope;
 	float blendStrength;
 	int textureIndex;
+
+	bool dirty;
 };
 
 layout (r32f, binding = 0) readonly uniform image2D heightmap;

@@ -72,6 +72,8 @@ namespace pwg
 
 		TerrainNoiseSettings& GetNoiseSettings();
 
+		std::vector<TerrainLayer>& GetTerrainLayers();
+
 	private:
 		int m_size;														/**< Terrain size (width/height). */
 		std::shared_ptr<Mesh> m_mesh;

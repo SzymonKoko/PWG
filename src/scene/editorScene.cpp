@@ -4,6 +4,7 @@
 #include "scene/systems/editorCameraControllerSystem.h"
 #include "scene/components/tagComponent.h"
 #include "controls/noiseControls.h"
+#include "controls/terrainLayerControls.h"
 
 
 pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput, std::shared_ptr<ResourceManager> resourceManager, Renderer& renderer)
@@ -130,11 +131,13 @@ void pwg::EditorScene::Draw()
     m_renderer.EndFrame();
     m_frameBuffer->Unbind();
 
+    ImGui::Text("SDSDSDSDS");
     ImGui::Image(
         (ImTextureID)(intptr_t)m_frameBuffer->GetTextureID(),
         windowSize,
         ImVec2(0, 1), ImVec2(1, 0)
     );
+
 
     ImGui::EndChild();
      
@@ -147,6 +150,7 @@ void pwg::EditorScene::Draw()
         auto& settings = m_terrain->GetNoiseSettings();
         auto size = m_terrain->GetSize();
         controls::NoiseControls::ShowControl(settings, size);
+        controls::TerrainLayerControls::ShowControl(m_terrain->GetTerrainLayers());
     } 
     ImGui::EndTabBar(); // MainTabs 
     

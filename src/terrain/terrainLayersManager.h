@@ -6,6 +6,7 @@
 #include <memory>
 #include <unordered_map>
 #include "graphics/texture/texture.h"
+#include <string>
 
 namespace pwg
 {
@@ -15,12 +16,15 @@ namespace pwg
 	 */
 	struct TerrainLayer
 	{
+		int layerID;
 		float minHeight;			/**< Minimum height at which this layer is applied. */
 		float maxHeight;			/**< Maximum height at which this layer is applied. */
 		float minSlope;				/**< Minimum slope at which this layer is applied. */
 		float maxSlope;				/**< Maximum slope at which this layer is applied. */
 		float blendStrength;
 		int textureIndex;			/**< ID of the texture associated with this layer. */
+
+		bool dirty = true;
 	};
 
 	class TerrainLayersManager
@@ -29,7 +33,7 @@ namespace pwg
 		TerrainLayersManager();
 		~TerrainLayersManager() = default;
 
-		std::vector<TerrainLayer> GetLayers();
+		std::vector<TerrainLayer>& GetLayers();
 
 	private:
 		std::vector<TerrainLayer> m_terrainLayers;

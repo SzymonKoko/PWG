@@ -12,12 +12,14 @@ pwg::Terrain::Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> mate
     m_terrainTextures = std::make_shared<TerrainTextures>();
 
     auto materialProps = m_material->GetMaterialProperties(); 
+
     materialProps.ambient = glm::vec3(0.2f);//{ 1.0f, 0.5f, 0.31f };
     materialProps.diffuse = glm::vec3(1.0f);//{ 1.0f, 0.5f, 0.31f };
     materialProps.specular = { 0.5f, 0.5f, 0.5f };
     materialProps.shininess = 12.0f;
 
     m_material->SetMaterialProperties(materialProps);
+
 }
 
 pwg::Terrain::~Terrain()
@@ -26,21 +28,31 @@ pwg::Terrain::~Terrain()
 
 void pwg::Terrain::Update(float dt)
 {
+    bool regenerateLayers = false;
+
+    for (auto& layer : m_terrainLayersManager->GetLayers())
+    {
+        if (layer.dirty)
+        {
+            regenerateLayers = true;
+        }
+    }
+
     m_mesh->Update();
 
-    if (!m_terrainTextures)
+    if (!m_terrainTextures || m_terrainNoiseSettings.dirty || regenerateLayers)
     {
         m_terrainTextures = m_terrainGenerator->GenerateTerrain(m_terrainNoiseSettings, m_size, m_terrainLayersManager->GetLayers());
 
         m_terrainNoiseSettings.dirty = false;
     }
 
-    if (m_terrainNoiseSettings.dirty)
+    /*if (m_terrainNoiseSettings.dirty)
     {
         m_terrainTextures = m_terrainGenerator->GenerateTerrain(m_terrainNoiseSettings, m_size, m_terrainLayersManager->GetLayers());
 
         m_terrainNoiseSettings.dirty = false;
-    }
+    }*/
 
 }
 
@@ -65,46 +77,13 @@ void pwg::Terrain::Draw(Renderer& renderer)
     {
         m_material->SetUniformTexture("u_Normalmap", m_terrainTextures->normalmap, 1);
     }
-
     
     if (m_terrainTextures && m_terrainTextures->splatmap)
     {
         m_material->SetUniformTexture("u_Splatmap", m_terrainTextures->splatmap, 2);
     }
 
-    
-
     m_mesh->Draw();
-
-
-    /*if (!m_created)
-    {
-        glGenTextures(1, &m_texture);
-        glBindTexture(GL_TEXTURE_2D, m_texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_size, m_size, 0, GL_RGBA, GL_FLOAT, NULL);
-        m_created = true;
-    }
-    
-    noise.ActivateShader();
-    noise.SetUniformInt("size", m_size);
-    float amplitude = noise.GetUniformFloat("amplitude");
-    noise.BindImage(0, m_texture, GL_READ_WRITE, GL_RGBA32F);
-    noise.DispatchForTexture(m_size, m_size);
-    noise.MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
-
-
-    noise.BindTextureSampler(0, m_texture);
-
-    shader.ActivateShader();
-    shader.SetUniformInt("heightmap", 0);
-
-
-    shader.SetUniformFloat("amplitude", amplitude);
-    m_resourceManager->GetMeshManager().GetMesh("PlaneMesh")->Draw();*/
 }
 
 std::shared_ptr<pwg::Mesh> pwg::Terrain::GetMesh()
@@ -125,4 +104,9 @@ int pwg::Terrain::GetSize()
 pwg::TerrainNoiseSettings& pwg::Terrain::GetNoiseSettings()
 {
     return m_terrainNoiseSettings;
+}
+
+std::vector<pwg::TerrainLayer>& pwg::Terrain::GetTerrainLayers()
+{
+    return m_terrainLayersManager->GetLayers();
 }
