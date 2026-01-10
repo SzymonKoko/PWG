@@ -16,10 +16,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 {
 	m_frameBuffer = std::make_unique<FrameBuffer>(600, 600, true);
 
-    Entity editorCam(&m_editorSceneRegistry, "EditorCamera");
-    editorCam.AddComponent<pwg::components::TransformComponent>();
-    editorCam.AddComponent<pwg::components::CameraComponent>();
-    editorCam.AddComponent<pwg::components::EditorCameraComponent>();
+    m_cameraManager = std::make_unique<CameraManager>(m_mouseInput, m_keyboardInput);
 
     /*== CREATING MESH ==*/
     m_resourceManager->GetMeshManager().CreatePlaneMesh(2000, "PlaneMesh");
@@ -73,14 +70,16 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     m_terrain = std::make_shared<Terrain>(terrainMesh, terrainMaterial, terrainComputeShaders);
     m_sunObject = std::make_shared<SunObject>(sunMesh, unlitMaterial);
 
-    pwg::systems::EditorCameraControllerSystem::SetCameraDefaultPosition(m_editorSceneRegistry, m_terrain->GetSize());
+    m_cameraManager->SetCamera(CameraType::EDITOR);
+    m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
 
     PWG_INFO("Editor scene initialized");
 }
 
 void pwg::EditorScene::Update(const float& dt)
 {
-    pwg::systems::EditorCameraControllerSystem::Update(m_editorSceneRegistry, m_mouseInput, m_keyboardInput, m_aspectRatio ,dt);
+    HandleKeyboardInputs();
+    m_cameraManager->Update(dt);
     m_terrain->Update(dt);
     m_sunObject->Update(dt);
 }
@@ -109,21 +108,9 @@ void pwg::EditorScene::Draw()
         m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     }
 
-    pwg::components::CameraComponent* activeCamera = nullptr;
-    auto camView = m_editorSceneRegistry.view<pwg::components::CameraComponent>();
-    for (auto [entity, camera] : camView.each())
-    {
-        activeCamera = &camera;
-        break;
-    }
-
-    if (!activeCamera) {
-        std::cerr << "Brak aktywnej kamery w ECS!\n";
-    }
-
     m_frameBuffer->Bind();
     m_renderer.BeginFrame();
-    m_renderer.SetCamera(activeCamera);
+    m_renderer.SetCamera(m_cameraManager->GetActiveCamera());
     m_renderer.AddLight(m_sunObject->GetLight());
     m_renderer.AddToQueue(m_terrain.get());
     m_renderer.AddToQueue(m_sunObject.get());
@@ -155,5 +142,18 @@ void pwg::EditorScene::Draw()
     ImGui::EndTabBar(); // MainTabs 
     
     ImGui::End(); //Controls
+}
+
+void pwg::EditorScene::HandleKeyboardInputs()
+{
+    if (m_keyboardInput.IsPressed(Action::EditorCamera))
+    {
+        m_cameraManager->SetCamera(CameraType::EDITOR);
+    }
+
+    if (m_keyboardInput.IsPressed(Action::PlayerCamera))
+    {
+        m_cameraManager->SetCamera(CameraType::PLAYER);
+    }
 }
 

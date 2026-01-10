@@ -71,10 +71,10 @@ void pwg::Renderer::ClearQueue()
 	m_renderQueue.clear();
 }
 
-void pwg::Renderer::SetCamera(pwg::components::CameraComponent* camera)
+void pwg::Renderer::SetCamera(std::shared_ptr<ICamera> camera)
 {
-	m_viewMatrix = camera->viewMatrix;
-	m_projectionMatrix = camera->projectionMatrix;
+	m_viewMatrix = camera->GetViewMatrix();
+	m_projectionMatrix = camera->GetProjectionMatrix();
 }
 
 

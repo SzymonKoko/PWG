@@ -10,7 +10,9 @@ pwg::KeyboardInput::KeyboardInput(GLFWwindow* window)
 	m_keyBindings[static_cast<int>(Action::MoveUp)] = GLFW_KEY_SPACE;
 	m_keyBindings[static_cast<int>(Action::MoveDown)] = GLFW_KEY_LEFT_SHIFT;
 	m_keyBindings[static_cast<int>(Action::Exit)] = GLFW_KEY_ESCAPE;
-	m_keyBindings[static_cast<int>(Action::ToggleDebug)] = GLFW_KEY_F1;
+	m_keyBindings[static_cast<int>(Action::EditorCamera)] = GLFW_KEY_F1;
+	m_keyBindings[static_cast<int>(Action::PlayerCamera)] = GLFW_KEY_F2;
+	m_keyBindings[static_cast<int>(Action::ToggleDebug)] = GLFW_KEY_F3;
 
 	PWG_INFO("Keyboard ready");
 }

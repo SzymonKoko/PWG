@@ -7,6 +7,7 @@
 #include "graphics/mesh/mesh.h"
 #include "resources/resourceManager.h"
 #include "lightingUploader.h"
+#include "scene/cameras/icamera.h"
 
 namespace pwg
 {
@@ -55,7 +56,7 @@ namespace pwg
 
 		void ClearQueue();
 
-		void SetCamera(pwg::components::CameraComponent* camera);
+		void SetCamera(std::shared_ptr<ICamera> camera);
 	private:
 		std::vector<IRenderable*> m_renderQueue;
 		std::unique_ptr<LightingUploader> m_lightingUploader;

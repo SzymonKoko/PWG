@@ -1,0 +1,21 @@
+Icamera
+
+Update
+SetDefaultPosition
+HandleMouseInput
+HandleKeyboardInput
+
+struct CameraProperties
+
+==============================================
+EditorCamera
+
+HandleOrbit
+HandlePan
+HandleZoom
+
+==============================================
+PlayerCamera
+
+HandleMove
+HandleLookAround

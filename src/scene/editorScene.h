@@ -12,6 +12,7 @@
 #include "resources/resourceManager.h"
 #include "terrain/terrain.h"
 #include "objects/sunObject.h"
+#include "cameras/cameraManager.h"
 
 #include <memory>
 
@@ -53,6 +54,8 @@ namespace pwg
 
 	private:
 
+		void HandleKeyboardInputs();
+
 		GLFWwindow* m_window;									/**< Pointer to the GLFW window. */
 		MouseInput& m_mouseInput;								/**< Reference to the mouse input instance. */
 		KeyboardInput& m_keyboardInput;							/**< Reference to the keyboard input instance. */
@@ -62,6 +65,7 @@ namespace pwg
 		std::unique_ptr<FrameBuffer> m_frameBuffer;				/**< Framebuffer used for rendering. */
 		std::shared_ptr<Terrain> m_terrain;						/**< Terrain instance of the scene. */
 		std::unique_ptr<MeshManager> m_meshManager;				/**< Mesh manager for procedural and loaded meshes. */
+		std::unique_ptr<CameraManager> m_cameraManager;
 		entt::registry m_editorSceneRegistry;					/**< ECS registry storing scene entities. */
 		std::shared_ptr<pwg::SunObject> m_sunObject;
 
