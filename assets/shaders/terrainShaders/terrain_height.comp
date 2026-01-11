@@ -19,11 +19,13 @@ void main()
 {
 	fnl_state noise = fnlCreateState(seed);
 	noise.noise_type = noiseType;
+	//noise.fractal_type = 1;
+
 
 	vec4 noiseValue = vec4(0.0, 0.0, 0.0, 1.0);
 	ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-	float amp = amplitude;
+	float amp = 1.0;
 	float freq = frequency;
 
 	float result = 0;

@@ -74,6 +74,7 @@ namespace pwg
 	std::shared_ptr<TerrainTextures> TerrainGenerator::GenerateTerrain(TerrainNoiseSettings& noiseSettings, int size, std::vector<TerrainLayer> layers)
 	{
 		m_size = size;
+		m_cpuHeightmap.resize(m_size * m_size);
 
 		//Initialize empty textures
 		m_textures = std::make_shared<TerrainTextures>();
@@ -94,11 +95,26 @@ namespace pwg
 		}
 
 		GenerateHeightmap(noiseSettings);
+
+		if (m_texturesCreated)
+		{
+			glBindTexture(GL_TEXTURE_2D, m_heightmapID);
+			glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, m_cpuHeightmap.data());
+		}
+		
 		GenerateNormalmap(noiseSettings.amplitude);
 		GenerateSplatmap(layers, noiseSettings.amplitude);
 
+
+
+		
 		
 		return m_textures;
+	}
+
+	std::vector<float> TerrainGenerator::GetCPUHeightmap()
+	{
+		return m_cpuHeightmap;
 	}
 
 }

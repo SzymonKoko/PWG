@@ -33,6 +33,11 @@ void pwg::EditorCamera::SetDefaultCameraPosition(int size)
     );
 }
 
+void pwg::EditorCamera::SetCameraPosition(float x, float y, float z)
+{
+    m_transform.position = { x, y, z };
+}
+
 glm::mat4& pwg::EditorCamera::GetViewMatrix()
 {
     return m_cameraProperties.viewMatrix;

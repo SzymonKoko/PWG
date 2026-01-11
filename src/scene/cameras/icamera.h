@@ -28,6 +28,7 @@ namespace pwg
 		virtual void Update(float dt, pwg::MouseInput& mouseInput, pwg::KeyboardInput& keyboardInput) = 0;
 
 		virtual void SetDefaultCameraPosition(int size) = 0;
+		virtual void SetCameraPosition(float x, float y, float z) = 0;
 
 		virtual glm::mat4& GetViewMatrix() = 0;
 		virtual glm::mat4& GetProjectionMatrix() = 0;

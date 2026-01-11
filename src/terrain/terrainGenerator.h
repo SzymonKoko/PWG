@@ -26,6 +26,8 @@ namespace pwg
 
 		std::shared_ptr<TerrainTextures> GenerateTerrain(TerrainNoiseSettings& noiseSettings, int size, std::vector<TerrainLayer> layers);
 
+		std::vector<float> GetCPUHeightmap();
+
 	private:
 		void GenerateHeightmap(TerrainNoiseSettings& noiseSettings);
 		void GenerateNormalmap(float amlitude);
@@ -43,6 +45,7 @@ namespace pwg
 		unsigned int m_splatmapID;
 
 		int m_size{ 0 };
+		std::vector<float> m_cpuHeightmap;
 
 	};
 }

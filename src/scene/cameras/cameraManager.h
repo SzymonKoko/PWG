@@ -23,15 +23,18 @@ namespace pwg
 		void SetCamera(CameraType type);
 
 		void SetDefaultCameraPosition(int size);
+		void SetCameraPosition(float x, float y, float z);
 		
 		std::shared_ptr<ICamera> GetActiveCamera();
+		CameraType& GetActiveCameraType();
 
 	private:
 		MouseInput& m_mouseInput;
 		KeyboardInput& m_keyboardInput;
+		CameraType m_activeCameraType;
 
 		std::shared_ptr<EditorCamera> m_editorCamera;
-		//shared ptr player cam
+		std::shared_ptr<PlayerCamera> m_playerCamera;
 		std::shared_ptr<ICamera> m_activeCamera;
 	};
 }

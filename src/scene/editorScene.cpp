@@ -39,7 +39,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     std::string terrainTexturesPath = "../assets/textures/";
     std::vector<std::string> texturesPaths;
 
-    texturesPaths.push_back(terrainTexturesPath + "grass.png");
+    texturesPaths.push_back(terrainTexturesPath + "grass2.png");
     texturesPaths.push_back(terrainTexturesPath + "dirt.png");
     texturesPaths.push_back(terrainTexturesPath + "stone.png");
     texturesPaths.push_back(terrainTexturesPath + "snow.png");
@@ -73,15 +73,30 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     m_cameraManager->SetCamera(CameraType::EDITOR);
     m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
 
+    m_cameraManager->SetCamera(CameraType::PLAYER);
+    m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
+
+    m_cameraManager->SetCamera(CameraType::EDITOR);
+
     PWG_INFO("Editor scene initialized");
 }
 
 void pwg::EditorScene::Update(const float& dt)
 {
     HandleKeyboardInputs();
+    auto cameraType = m_cameraManager->GetActiveCameraType();
+    if (cameraType == CameraType::EDITOR)
+    {
+
+    }
+    else if (cameraType == CameraType::PLAYER)
+    {
+       
+    }
     m_cameraManager->Update(dt);
     m_terrain->Update(dt);
     m_sunObject->Update(dt);
+    //PWG_ERROR("{0}", m_terrain->GetTerrainHeightAt(0, 0));
 }
 
 void pwg::EditorScene::Draw()

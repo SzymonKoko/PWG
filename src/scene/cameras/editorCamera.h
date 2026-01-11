@@ -27,6 +27,7 @@ namespace pwg
 		void Update(float dt, pwg::MouseInput& mouseInput, pwg::KeyboardInput& keyboardInput) override;
 
 		void SetDefaultCameraPosition(int size) override;
+		void SetCameraPosition(float x, float y, float z) override;
 
 		glm::mat4& GetViewMatrix() override;
 		glm::mat4& GetProjectionMatrix() override;

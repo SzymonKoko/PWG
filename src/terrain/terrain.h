@@ -74,6 +74,8 @@ namespace pwg
 
 		std::vector<TerrainLayer>& GetTerrainLayers();
 
+		float GetTerrainHeightAt(int x, int z);
+
 	private:
 		int m_size;														/**< Terrain size (width/height). */
 		std::shared_ptr<Mesh> m_mesh;

@@ -5,7 +5,9 @@ pwg::CameraManager::CameraManager(pwg::MouseInput& mouseInput, pwg::KeyboardInpu
 	  m_keyboardInput(keyboardInput)
 {
 	m_editorCamera = std::make_shared<EditorCamera>();
+	m_playerCamera = std::make_shared<PlayerCamera>();
 	m_activeCamera = m_editorCamera;
+	m_activeCameraType = CameraType::EDITOR;
 }
 
 void pwg::CameraManager::Update(float dt)
@@ -23,11 +25,14 @@ void pwg::CameraManager::SetCamera(CameraType type)
 	case CameraType::EDITOR:
 	{
 		m_activeCamera = m_editorCamera;
+		m_activeCameraType = CameraType::EDITOR;
 		PWG_INFO("SET CAMERA TO EDITOR MODE");
 		break;
 	}
 	case CameraType::PLAYER:
 	{
+		m_activeCamera = m_playerCamera;
+		m_activeCameraType = CameraType::PLAYER;
 		PWG_INFO("SET CAMERA TO PLAYER MODE");
 		break;
 	}
@@ -46,7 +51,20 @@ void pwg::CameraManager::SetDefaultCameraPosition(int size)
 	}
 }
 
+void pwg::CameraManager::SetCameraPosition(float x, float y, float z)
+{
+	if (m_activeCamera)
+	{
+		m_activeCamera->SetCameraPosition(x, y, z);
+	}
+}
+
 std::shared_ptr<pwg::ICamera> pwg::CameraManager::GetActiveCamera()
 {
 	return m_activeCamera;
+}
+
+pwg::CameraType& pwg::CameraManager::GetActiveCameraType()
+{
+	return m_activeCameraType;
 }

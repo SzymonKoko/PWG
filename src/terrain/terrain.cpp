@@ -110,3 +110,11 @@ std::vector<pwg::TerrainLayer>& pwg::Terrain::GetTerrainLayers()
 {
     return m_terrainLayersManager->GetLayers();
 }
+
+float pwg::Terrain::GetTerrainHeightAt(int x, int z)
+{
+    auto heightmapSample = m_terrainGenerator->GetCPUHeightmap();
+    x = (x - 0.0) / m_size;
+    z = (z - 0.0) / m_size;
+    return heightmapSample[z * m_size + x] * m_terrainNoiseSettings.amplitude;
+}
