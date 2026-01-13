@@ -59,6 +59,11 @@ void pwg::CameraManager::SetCameraPosition(float x, float y, float z)
 	}
 }
 
+glm::vec3 pwg::CameraManager::GetCameraPosition()
+{
+	return m_activeCamera->GetCameraPosition();
+}
+
 std::shared_ptr<pwg::ICamera> pwg::CameraManager::GetActiveCamera()
 {
 	return m_activeCamera;

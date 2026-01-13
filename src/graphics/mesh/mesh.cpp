@@ -13,7 +13,6 @@ namespace pwg
 		 m_indices(indices),
 		 m_meshSize(size)
 	{
-		//RecalculateNormals();
 		m_transform.position = { 0.0f, 0.0f, 0.0f };
 		m_transform.rotation = { 0.0f, 0.5f, 0.0f };
 		SetupMesh();
@@ -30,7 +29,6 @@ namespace pwg
 	{
 		m_model = glm::mat4(1.0f);
 		m_model = glm::translate(m_model, m_transform.position);
-		//m_model = glm::rotate(m_model, (float)glfwGetTime() * glm::radians(10.0f), transform.rotation);
 
 	}
 
@@ -84,35 +82,6 @@ namespace pwg
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 		m_meshSize = size;
-	}
-
-	void Mesh::RecalculateNormals()
-	{
-		for (auto& v : m_vertices)
-			v.normal = glm::vec3(0.0f);
-
-		glm::vec3 normal(0.0f, 0.0f, 0.0f);
-
-		for (int i = 0; i < m_indices.size(); i+= 3)
-		{
-			glm::vec3 A = m_vertices[m_indices[i]].position;
-			glm::vec3 B = m_vertices[m_indices[i+1]].position;
-			glm::vec3 C = m_vertices[m_indices[i+2]].position;
-
-			glm::vec3 a = C - B;
-			glm::vec3 b = A - B;
-
-			normal = glm::normalize(glm::cross(a, b));
-
-			m_vertices[m_indices[i]].normal += normal;
-			m_vertices[m_indices[i+1]].normal += normal;
-			m_vertices[m_indices[i+2]].normal += normal;
-		}
-
-		for (auto& v : m_vertices)
-			v.normal = glm::normalize(v.normal);
-
-		SetVertices(m_vertices);
 	}
 
 	int Mesh::GetSize()

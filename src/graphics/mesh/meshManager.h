@@ -9,43 +9,53 @@
 namespace pwg
 {
 	/**
-	* @brief Class responsible for managing and storing all mesh instances.
-	* Provides functionality to create, retrieve and keep track of loaded meshes.
+	* @brief Class responsible for managing and storing mesh instances.
+	* Provides centralized creation and access to all meshes used by the renderer.
 	*/
 	class MeshManager
 	{
 	public:
 
 		/**
-		* @brief Default constructor. Initializes an empty mesh manager.
+		* @brief Default constructor.
+		* Initializes an empty mesh manager.
 		*/
 		MeshManager();
 
 		/**
-		* @brief Destructor. Cleans up stored meshes.
+		* @brief Destructor.
+		* Releases all stored mesh resources.
 		*/
 		~MeshManager();
 
 		/**
-		* @brief Creates a new mesh and stores it in the manager.
-		* @param size Number of vertices for the new mesh.
-		* @param name Unique name (ID) for the mesh.
-		* @return Returns the name (ID) of the created mesh.
+		* @brief Creates a plane mesh and stores it in the manager.
+		* @param size Number of vertices defining the plane resolution.
+		* @param name Unique identifier for the mesh.
+		* @return Identifier of the created mesh.
 		*/
 		std::string CreatePlaneMesh(int size, std::string name);
 
+		/**
+		* @brief Creates a sphere mesh and stores it in the manager.
+		* @param radius Radius of the sphere.
+		* @param sectorCount Number of longitudinal segments.
+		* @param sliceCount Number of latitudinal segments.
+		* @param name Unique identifier for the mesh.
+		* @return Identifier of the created mesh.
+		*/
 		std::string CreateSphereMesh(float radius, int sectorCount, int sliceCount, std::string name);
 
 		/**
-		* @brief Retrieves a mesh from the manager by its ID.
+		* @brief Retrieves a mesh by its identifier.
 		* @param meshID Name or identifier of the mesh.
-		* @return Shared pointer to the requested mesh instance.
+		* @return Shared pointer to the mesh instance, or nullptr if not found.
 		*/
 		std::shared_ptr<Mesh> GetMesh(std::string meshID);
 
 	private:
-		std::string m_meshID;												/**< Identifier of the most recently created mesh. */
-		std::unordered_map<std::string, std::shared_ptr<Mesh>> m_meshes;	/**< Container storing all mesh instances. */
+		std::string m_meshID;												/**< Identifier of the most recently created mesh */
+		std::unordered_map<std::string, std::shared_ptr<Mesh>> m_meshes;	/**< Container storing all managed meshes */
 	};
 } // namespace pwg
 

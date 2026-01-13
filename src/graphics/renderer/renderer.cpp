@@ -45,7 +45,7 @@ void pwg::Renderer::DrawAll()
 {
 	for (auto& r : m_renderQueue)
 	{
-		m_lightingUploader->Upload(r->GetMaterial(), m_light);
+		m_lightingUploader->Upload(r->GetMaterial(), m_light, m_cameraPosition);
 		r->GetMaterial()->Apply();
 
 		r->GetMaterial()->SetUniformMat4("u_view", m_viewMatrix);
@@ -75,6 +75,7 @@ void pwg::Renderer::SetCamera(std::shared_ptr<ICamera> camera)
 {
 	m_viewMatrix = camera->GetViewMatrix();
 	m_projectionMatrix = camera->GetProjectionMatrix();
+	m_cameraPosition = camera->GetCameraPosition();
 }
 
 

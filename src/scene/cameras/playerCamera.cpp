@@ -42,6 +42,11 @@ void pwg::PlayerCamera::SetSpawned(bool spawned)
 	m_spawned = spawned;
 }
 
+glm::vec3 pwg::PlayerCamera::GetCameraPosition()
+{
+	return m_transform.position;
+}
+
 void pwg::PlayerCamera::HandleKeyboardInput(pwg::KeyboardInput& keyboardInput, float dt)
 {
 	glm::vec3 cameraRight = glm::normalize(glm::cross(m_cameraProperties.forward, m_cameraProperties.up));

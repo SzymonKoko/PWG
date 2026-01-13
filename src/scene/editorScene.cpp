@@ -1,8 +1,6 @@
 #include <glad/glad.h>
 #include "imgui.h"
 #include "editorScene.h"
-#include "scene/systems/editorCameraControllerSystem.h"
-#include "scene/components/tagComponent.h"
 #include "controls/noiseControls.h"
 #include "controls/terrainLayerControls.h"
 
@@ -40,7 +38,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     std::vector<std::string> texturesPaths;
 
     texturesPaths.push_back(terrainTexturesPath + "grass2.png");
-    texturesPaths.push_back(terrainTexturesPath + "dirt.png");
+    texturesPaths.push_back(terrainTexturesPath + "sediment.png");
     texturesPaths.push_back(terrainTexturesPath + "stone.png");
     texturesPaths.push_back(terrainTexturesPath + "snow.png");
 

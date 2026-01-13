@@ -7,8 +7,8 @@ pwg::TextureArray::TextureArray(int width, int height, int numberOfLayers, GLTex
 	  m_format(format)
 {
 	
-	m_wrapS = ToGL(TextureWrapMode::REPEAT);
-	m_wrapT = ToGL(TextureWrapMode::REPEAT);
+	m_wrapS = ToGL(TextureWrapMode::MIRRORED_REPEAT);
+	m_wrapT = ToGL(TextureWrapMode::MIRRORED_REPEAT);
 
 	m_minFilter = ToGL(TextureFilterMode::MIPMAP_NEAREST_NEAREST);
 	m_magFilter = ToGL(TextureFilterMode::MIPMAP_NEAREST_NEAREST);

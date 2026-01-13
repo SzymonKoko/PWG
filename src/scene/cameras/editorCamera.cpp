@@ -48,6 +48,11 @@ glm::mat4& pwg::EditorCamera::GetProjectionMatrix()
     return m_cameraProperties.projectionMatrix;
 }
 
+glm::vec3 pwg::EditorCamera::GetCameraPosition()
+{
+    return m_transform.position;
+}
+
 void pwg::EditorCamera::HandleKeyboardInput(pwg::KeyboardInput& keyboardInput, float dt)
 {
 }

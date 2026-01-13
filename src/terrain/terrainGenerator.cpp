@@ -27,6 +27,10 @@ namespace pwg
 		m_heightmapComputeShader->SetUniformInt("octaves", noiseSettings.octaves);
 		m_heightmapComputeShader->SetUniformInt("seed", noiseSettings.seed);
 		m_heightmapComputeShader->SetUniformInt("size", m_size);
+		m_heightmapComputeShader->SetUniformInt("domainWarpType", noiseSettings.domainWarpType);
+		m_heightmapComputeShader->SetUniformInt("fractalType", noiseSettings.fractalType);
+		m_heightmapComputeShader->SetUniformBool("domainWarp", noiseSettings.domainWarp);
+		m_heightmapComputeShader->SetUniformFloat("domainWarpAmplitude", noiseSettings.domainWarpAmplitude);
 
 		//Bind textures to slots
 		m_heightmapComputeShader->BindImage(0, m_heightmapID, GL_WRITE_ONLY, GL_R32F);

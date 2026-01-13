@@ -7,50 +7,55 @@ layout (r32f, binding = 0) uniform image2D heightmap;
 uniform int noiseType;
 uniform float amplitude;
 uniform float frequency;
-uniform int octaves;
-uniform float persistance;
-uniform float lacunarity;
+uniform float scale;
 uniform int seed;
 uniform int size;
-uniform float scale;
 uniform vec2 offset;
+
+uniform int fractalType;
+uniform float persistance;
+uniform float lacunarity;
+uniform int octaves;
+
+uniform bool domainWarp;
+uniform int domainWarpType;
+uniform float domainWarpAmplitude;
 
 void main()
 {
 	fnl_state noise = fnlCreateState(seed);
 	noise.noise_type = noiseType;
-	//noise.fractal_type = 1;
+	noise.fractal_type = fractalType;
+	noise.octaves = octaves;
+	noise.lacunarity = lacunarity;
+	noise.gain = persistance;
+
+	if(domainWarp)
+	{
+		noise.domain_warp_type = domainWarpType;
+		noise.domain_warp_amp = domainWarpAmplitude;
+	}
 
 
 	vec4 noiseValue = vec4(0.0, 0.0, 0.0, 1.0);
 	ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-	float amp = 1.0;
-	float freq = frequency;
-
-	float result = 0;
-	float totalAmp = 0;
-
 	float newX = float(texelCoord.x) / float(size);
 	float newY = float(texelCoord.y) / float(size);
 
-	for (int i = 0; i < octaves; i++)
+	float scaledX = (newX * scale * frequency) + offset.x;
+	float scaledY = (newY * scale * frequency) + offset.y;
+
+	vec2 p = vec2(scaledX, scaledY);
+
+	if(domainWarp)
 	{
-		totalAmp += amp;
-		float scaledX = (newX * scale * freq) + offset.x;
-		float scaledY = (newY * scale * freq) + offset.y;
-
-		float n = fnlGetNoise2D(noise, scaledX, scaledY);
-		n = (n + 1.0) * 0.5;
-
-		result += n * amp;
-
-		amp *= persistance;
-		freq *= lacunarity;
+		fnlDomainWarp2D(noise, p.x, p.y);
 	}
 
-	result /= totalAmp; 
+	float n = fnlGetNoise2D(noise, p.x, p.y);
+	n = (n + 1.0) * 0.5;
 
-	imageStore(heightmap, texelCoord,vec4(result, 0.0, 0.0, 1.0));
+	imageStore(heightmap, texelCoord,vec4(n, 0.0, 0.0, 1.0));
 
 }

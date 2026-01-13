@@ -1,5 +1,7 @@
-#version 450 core
+#engine_include "FastNoiseLite.glsl"
+
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
 
 struct TerrainLayer
 {
@@ -26,36 +28,95 @@ uniform int u_layersCount;
 uniform float u_amplitude;
 uniform float u_slope;
 
-float ComputeWeight(TerrainLayer layer, float height, float slope)
+float GetLayerNoise(vec2 coord, int layerIndex)
 {
-	float hIn  = smoothstep(layer.minHeight, layer.minHeight + layer.blendStrength, height);
-    float hOut = 1.0 - smoothstep(layer.maxHeight - layer.blendStrength, layer.maxHeight, height);
+    int seed = 1 + layerIndex * 1000;
+    
+	fnl_state noiseLarge = fnlCreateState(seed);
+    noiseLarge.noise_type = 0;
+    noiseLarge.frequency = 0.003; // Very low frequency for large patches
+    noiseLarge.fractal_type = 1;
+    noiseLarge.octaves = 3;
+    noiseLarge.lacunarity = 2.0;
+    noiseLarge.gain = 0.5;
+    float largePatch = fnlGetNoise2D(noiseLarge, coord.x, coord.y);
+    
+    // Small-scale detail
+    fnl_state noiseSmall = fnlCreateState(seed + 500);
+    noiseSmall.noise_type = 0;
+    noiseSmall.frequency = 0.02; // Higher frequency for details
+    noiseSmall.fractal_type = 1;
+    noiseSmall.octaves = 2;
+    noiseSmall.lacunarity = 2.0;
+    noiseSmall.gain = 0.5;
+    float smallDetail = fnlGetNoise2D(noiseSmall, coord.x, coord.y);
+    
+    return largePatch * 0.7 + smallDetail * 0.3;
+}
 
+float ComputeWeight(TerrainLayer layer, float height, float slope, vec2 coord, float noise)
+{
+
+	float u_noiseStrength = 0.15;
+    float heightVariation = noise * u_noiseStrength;
+    float slopeVariation = noise * u_noiseStrength * 0.5;
+    
+    float hIn  = smoothstep(layer.minHeight + heightVariation, 
+                           layer.minHeight + layer.blendStrength + heightVariation, 
+                           height);
+
+    float hOut = 1.0 - smoothstep(layer.maxHeight - layer.blendStrength + heightVariation, 
+                                  layer.maxHeight + heightVariation, 
+                                  height);
     float heightWeight = hIn * hOut;
+    
+    float sIn  = smoothstep(layer.minSlope + slopeVariation, 
+                           layer.minSlope + layer.blendStrength + slopeVariation, 
+                           slope);
 
-    float sIn  = smoothstep(layer.minSlope, layer.minSlope + layer.blendStrength, slope);
-    float sOut = 1.0 - smoothstep(layer.maxSlope - layer.blendStrength, layer.maxSlope, slope);
+    float sOut = 1.0 - smoothstep(layer.maxSlope - layer.blendStrength + slopeVariation, 
+                                  layer.maxSlope + slopeVariation, 
+                                  slope);
+    float slopeWeight = sIn * sOut;
+    
+    float weight = heightWeight * slopeWeight;
+    
+    weight = pow(weight, 1.0);
 
+	/*float sIn  = smoothstep(layer.minSlope + slopeVariation, 
+                           layer.minSlope + layer.blendStrength + slopeVariation, 
+                           slope);
+    float sOut = 1.0 - smoothstep(layer.maxSlope - layer.blendStrength + slopeVariation, 
+                                  layer.maxSlope + slopeVariation, 
+                                  slope);
     float slopeWeight = sIn * sOut;
 
-    return heightWeight * slopeWeight;
+    float weight = slopeWeight;*/
+    
+    return weight;
 }
 
 void main()
 {
 	ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+	vec2 coordF = vec2(coord);
 
 	float height = imageLoad(heightmap, coord).r;
 	vec3 normal = normalize(imageLoad(normalmap, coord).xyz * 2.0 - 1.0);
 
 	float slope = 1.0 - clamp(dot(normal, vec3(0,1,0)), 0.0, 1.0);
 
+	float noise0 = GetLayerNoise(coordF, 0);
+    float noise1 = GetLayerNoise(coordF, 1);
+    float noise2 = GetLayerNoise(coordF, 2);
+    float noise3 = GetLayerNoise(coordF, 3);
+
 	vec4 weights = vec4(0.0);
 
-	weights.r = ComputeWeight(layers[0], height, slope);
-	weights.g = ComputeWeight(layers[1], height, slope);
-	weights.b = ComputeWeight(layers[2], height, slope);
-	weights.a = ComputeWeight(layers[3], height, slope);
+	weights.r = ComputeWeight(layers[0], height, slope, coordF, noise0);
+	weights.g = ComputeWeight(layers[1], height, slope, coordF, noise1);
+	weights.b = ComputeWeight(layers[2], height, slope, coordF, noise2);
+	weights.a = ComputeWeight(layers[3], height, slope, coordF, noise3);
 
 	float sum = dot(weights, vec4(1.0));
 	float maxWeight = max(max(weights.r, weights.g), max(weights.b, weights.a));

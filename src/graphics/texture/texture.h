@@ -11,108 +11,121 @@
 
 namespace pwg
 {
-
+	/**
+	* @brief Enum representing different types of textures.
+	*/
 	enum class TextureType
 	{
-		Texture2D,
-		CubeMap,
-		NoiseTexture
+		Texture2D,      /**< Standard 2D texture. */
+		CubeMap,        /**< Cubemap texture for environment mapping. */
+		NoiseTexture    /**< Procedural noise texture. */
 	};
 
 	/**
-	 * @brief Class responsible for creating, binding, and deleting textures.
-	 * Supports loading from image files or creating empty textures with specified dimensions.
-	 */
+	* @brief Class responsible for creating, managing, and using OpenGL textures.
+	* Supports loading from image files, creating empty textures, and configuring filtering/wrapping.
+	*/
 	class Texture
 	{
 	public:
 
 		/**
-		 * @brief Default constructor. Creates an empty texture.
-		 */
+		* @brief Default constructor. Creates an empty texture object.
+		*/
 		Texture();
 
 		/**
-		 * @brief Constructs a texture from an image file.
-		 * @param imagePath Path to the image file to load.
-		 */
+		* @brief Loads a texture from an image file.
+		* @param imagePath Path to the image file.
+		*/
 		Texture(const std::string& imagePath);
 
 		/**
-		 * @brief Constructs an empty texture with specified width and height.
-		 * @param width Width of the texture in pixels.
-		 * @param height Height of the texture in pixels.
-		 */
+		* @brief Creates an empty texture with specified dimensions and format.
+		* @param width Texture width in pixels.
+		* @param height Texture height in pixels.
+		* @param format OpenGL texture format specification.
+		*/
 		Texture(int width, int height, GLTextureFormats format);
 
 		/**
-		 * @brief Destructor. Frees image memory and deletes the OpenGL texture.
-		 */
+		* @brief Destructor. Frees image memory and deletes the OpenGL texture.
+		*/
 		~Texture();
 
 		/**
-		 * @brief Binds the texture as the current active texture in OpenGL.
-		 */
+		* @brief Binds the texture to a specific texture slot for rendering.
+		* @param slot Texture slot to bind to.
+		*/
 		void Bind(int slot);
 
 		/**
-		 * @brief Unbinds the texture, setting the active texture to 0.
-		 */
+		* @brief Unbinds the texture, setting the active texture slot to 0.
+		*/
 		void Unbind();
 
+		/**
+		* @brief Sets the texture wrapping mode for S and T coordinates.
+		* @param wrapS Wrapping mode for S axis.
+		* @param wrapT Wrapping mode for T axis.
+		*/
 		void SetTextureWrapping(int wrapS, int wrapT);
 
+		/**
+		* @brief Sets the texture filtering parameters.
+		* @param minFilter Minification filter.
+		* @param magFilter Magnification filter.
+		*/
 		void SetTextureFiltering(int minFilter, int magFilter);
 
+		/**
+		* @brief Updates the texture data with new pixel information.
+		* @param data Pointer to raw image data.
+		* @param width Texture width in pixels.
+		* @param height Texture height in pixels.
+		* @param nrChannels Number of color channels (e.g., RGB=3, RGBA=4).
+		*/
 		void UpdateData(unsigned char* data, int width, int height, int nrChannels);
 
 		/**
-		 * @brief Getter for OpenGL texture ID.
-		 * @return OpenGL texture ID.
-		 */
+		* @brief Returns the OpenGL texture ID.
+		* @return Texture ID.
+		*/
 		unsigned int GetTextureID();
 
 		/**
-		 * @brief Getter for texture width.
-		 * @return Width of the texture in pixels.
-		 */
+		* @brief Returns the width of the texture.
+		* @return Width in pixels.
+		*/
 		int GetWidth();
 
 		/**
-		 * @brief Getter for texture height.
-		 * @return Height of the texture in pixels.
-		 */
+		* @brief Returns the height of the texture.
+		* @return Height in pixels.
+		*/
 		int GetHeight();
 
 	private:
-		unsigned char* m_image{ nullptr }; /**< Raw image data loaded from file. */
-		int m_width{ 0 };                  /**< Texture width in pixels. */
-		int m_height{ 0 };                 /**< Texture height in pixels. */
-		int m_nrChannels{ 0 };             /**< Number of channels in the texture (RGB, RGBA, etc.). */
+		unsigned char* m_image{ nullptr };							/**< Raw image data loaded from file. */
+		int m_width{ 0 };											/**< Texture width in pixels. */
+		int m_height{ 0 };											/**< Texture height in pixels. */
+		int m_nrChannels{ 0 };										/**< Number of color channels. */
 
-		unsigned int m_textureID{ 0 };     /**< OpenGL texture ID. */
+		unsigned int m_textureID{ 0 };								/**< OpenGL texture ID. */
 
-		int m_slot{ 0 };
+		int m_slot{ 0 };											/**< Texture slot binding index. */
 
-		int m_wrapS;
-		int m_wrapT;
+		int m_wrapS;												/**< Wrapping mode for S coordinate. */
+		int m_wrapT;												/**< Wrapping mode for T coordinate. */
 
-		int m_minFilter;
-		int m_magFilter;
+		int m_minFilter;											/**< Minification filter mode. */
+		int m_magFilter;											/**< Magnification filter mode. */
 
-		bool m_hasMipmap{ true };
+		bool m_hasMipmap{ true };									/**< Whether mipmaps are generated for the texture. */
 
-		TextureType m_textureType{ TextureType::Texture2D };
-		GLTextureFormats m_format;
-
+		TextureType m_textureType{ TextureType::Texture2D };		/**< Type of texture (2D, cubemap, noise). */
+		GLTextureFormats m_format;									/**< OpenGL internal format, format, and type. */
 	};
 } // namespace pwg
 
 #endif // !SRC_GRAPHICS_TEXTURE_TEXTURE_H_
-
-
-//Filtering
-//Wrapping
-//Slot
-//Texture type
-
