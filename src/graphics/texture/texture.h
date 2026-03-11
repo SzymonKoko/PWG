@@ -4,8 +4,11 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <stb_image.h>
+#include <stb/stb_image.h>
+#include <stb/stb_image_write.h>
+#include <glm/glm.hpp>
 #include "graphics/common/GL_Types.h"
+#include <filesystem>
 
 #include "core/logger/logger.h"
 
@@ -63,6 +66,11 @@ namespace pwg
 		* @brief Unbinds the texture, setting the active texture slot to 0.
 		*/
 		void Unbind();
+
+		/**
+		* @brief Clears the texture.
+		*/
+		void ClearTexture();
 
 		/**
 		* @brief Sets the texture wrapping mode for S and T coordinates.

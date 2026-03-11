@@ -1,0 +1,57 @@
+struct TerrainPass - interface
+	every pass contains its parameters
+	execute()
+	
+	Compute shader*
+	Textures - if needed
+	vector<string> inputTextures
+	vector<string> outputTextures
+
+class TerrainGraph
+	addPass()
+	execute()
+	
+	queue of passes
+
+
+TerrainComputePipeline
+
+	Constructor (vector of compute shaders)
+	
+	Execute();
+	
+	unordered_map<<string, ref_Texture> masks
+
+Pipeline:
+1. Compute pipeline zawiera graph
+2. Graph zawiera passy
+3. Każdy pass odpala compute shader, który generuje i zapisuje maske
+
+TODO
+Editorscene
+- Load all shaders DONE
+- Add them to pipeline DONE
+
+Terrain
+- change TerrainComputeShaders struct
+
+ComputePipeline
+- create passes PARTIAL
+- add passes to graph PARTIAL
+- execute graph DONE
+
+Passes
+- add input and output textures DONE
+- find them in a map DONE
+
+Texture 
+- save texture function
+
+TODO:
+1. MountainMask done
+2. MountainHeight
+3. NormalPass
+4. SplatPass
+5. SlopePass
+6. FinalMaskPass
+7. FinalHeightPass

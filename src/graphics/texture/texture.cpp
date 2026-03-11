@@ -68,9 +68,7 @@ pwg::Texture::Texture(int width, int height, pwg::GLTextureFormats format)
 	m_minFilter = ToGL(TextureFilterMode::LINEAR);
 	m_magFilter = ToGL(TextureFilterMode::LINEAR);
 
-	m_format = format;/*format.format;
-	m_format.internalFormat = format.internalFormat;
-	m_format.type = format.type;*/
+	m_format = format;
 
 	glGenTextures(1, &m_textureID);
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
@@ -112,6 +110,10 @@ void pwg::Texture::Unbind()
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void pwg::Texture::ClearTexture()
+{
+	glClearTexImage(m_textureID, 0, m_format.format, m_format.type, nullptr);
+}
 
 void pwg::Texture::SetTextureWrapping(int wrapS, int wrapT)
 {

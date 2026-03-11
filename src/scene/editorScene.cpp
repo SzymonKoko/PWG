@@ -16,6 +16,8 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     m_cameraManager = std::make_unique<CameraManager>(m_mouseInput, m_keyboardInput);
 
+    m_terrainComputePipeline = std::make_shared<TerrainComputePipeline>(2000);
+
     /*== CREATING MESH ==*/
     m_resourceManager->GetMeshManager().CreatePlaneMesh(2000, "PlaneMesh");
     m_resourceManager->GetMeshManager().CreateSphereMesh(128.0f, 36, 72, "SunMesh");
@@ -29,9 +31,38 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     shaderManager.Load("terrainShader", terrainShadersPath + "terrain.vert", terrainShadersPath + "terrain.frag");
     shaderManager.Load("unlitShader", unlitShadersPath + "unlit.vert", unlitShadersPath + "unlit.frag");
+
+    //Passes
+    shaderManager.LoadCompute("elevationMaskShader", terrainShadersPath + "masks/elevationMask.comp");
+    shaderManager.LoadCompute("mountainMaskShader", terrainShadersPath + "masks/mountainMask.comp");
+    shaderManager.LoadCompute("mountainHeightShader", terrainShadersPath + "masks/mountainHeight.comp");
+    shaderManager.LoadCompute("finalMaskShader", terrainShadersPath + "masks/finalMask.comp");
+    shaderManager.LoadCompute("finalHeightShader", terrainShadersPath + "masks/finalHeight.comp");
+    shaderManager.LoadCompute("normalMaskShader", terrainShadersPath + "masks/normalMask.comp");
+    shaderManager.LoadCompute("slopeMaskShader", terrainShadersPath + "masks/slopeMask.comp");
+
+    //Computes
     shaderManager.LoadCompute("heightmapComputeShader", terrainShadersPath + "terrain_height.comp");
     shaderManager.LoadCompute("normalmapComputeShader", terrainShadersPath + "terrain_normal.comp");
     shaderManager.LoadCompute("splatmapComputeShader", terrainShadersPath + "terrain_splat.comp");
+
+    auto elevationShader = shaderManager.GetShader<pwg::ComputeShader>("elevationMaskShader");
+    auto mountainMaskShader = shaderManager.GetShader<pwg::ComputeShader>("mountainMaskShader");
+    auto mountainHeightShader = shaderManager.GetShader<pwg::ComputeShader>("mountainHeightShader");
+    auto finalMaskShader = shaderManager.GetShader<pwg::ComputeShader>("finalMaskShader");
+    auto finalHeightShader = shaderManager.GetShader<pwg::ComputeShader>("finalHeightShader");
+    auto normalMaskShader = shaderManager.GetShader<pwg::ComputeShader>("normalMaskShader");
+    auto slopeMaskShader = shaderManager.GetShader<pwg::ComputeShader>("slopeMaskShader");
+
+    m_terrainComputePipeline->AddComputeShader("Elevation", elevationShader);
+    m_terrainComputePipeline->AddComputeShader("MountainMask", mountainMaskShader);
+    m_terrainComputePipeline->AddComputeShader("MountainHeight", mountainHeightShader);
+    m_terrainComputePipeline->AddComputeShader("FinalMask", finalMaskShader);
+    m_terrainComputePipeline->AddComputeShader("FinalHeight", finalHeightShader);
+    m_terrainComputePipeline->AddComputeShader("NormalMask", normalMaskShader);
+    m_terrainComputePipeline->AddComputeShader("SlopeMask", slopeMaskShader);
+
+    m_terrainComputePipeline->BuildGraph();
 
     /*== TEXTURE LOADING ==*/
     std::string terrainTexturesPath = "../assets/textures/";
@@ -65,7 +96,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     terrainMaterial->SetTextureArray("u_Textures", textureArray);
 
-    m_terrain = std::make_shared<Terrain>(terrainMesh, terrainMaterial, terrainComputeShaders);
+    m_terrain = std::make_shared<Terrain>(terrainMesh, terrainMaterial);
     m_sunObject = std::make_shared<SunObject>(sunMesh, unlitMaterial);
 
     m_cameraManager->SetCamera(CameraType::EDITOR);
@@ -76,12 +107,14 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     m_cameraManager->SetCamera(CameraType::EDITOR);
 
+    m_terrainComputePipeline->Execute();
     PWG_INFO("Editor scene initialized");
 }
 
 void pwg::EditorScene::Update(const float& dt)
 {
     HandleKeyboardInputs();
+    m_terrain->SetTerrainTextures(m_terrainComputePipeline->GetFinalTerrainMasks());
     auto cameraType = m_cameraManager->GetActiveCameraType();
     if (cameraType == CameraType::EDITOR)
     {
@@ -147,9 +180,9 @@ void pwg::EditorScene::Draw()
 
     if (ImGui::BeginTabBar("MainTabs"))
     {
-        auto& settings = m_terrain->GetNoiseSettings();
+        auto graph = m_terrainComputePipeline->GetGraph();
         auto size = m_terrain->GetSize();
-        controls::NoiseControls::ShowControl(settings, size);
+        controls::NoiseControls::ShowControl(m_terrainComputePipeline, size);
         controls::TerrainLayerControls::ShowControl(m_terrain->GetTerrainLayers());
     } 
     ImGui::EndTabBar(); // MainTabs 

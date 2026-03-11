@@ -20,8 +20,6 @@ namespace pwg
 		std::vector<Vertex> vertices;
 		std::vector<unsigned int> indices;
 
-		// 1000000
-		// 5988006
 		vertices.resize(size * size);
 		indices.resize(((size - 1) * (size - 1) * 6));
 

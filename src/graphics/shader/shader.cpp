@@ -150,10 +150,22 @@ namespace pwg
         glUniform1i(location, value);
     }
 
+    void Shader::SetUniformVectorInt(const std::string& name, std::vector<int> value) const
+    {
+        int location = const_cast<Shader*>(this)->GetUniformLocation(name);
+        glUniform1iv(location, value.size(), value.data());
+    }
+
     void Shader::SetUniformFloat(const std::string& name, float value) const
     {
         int location = const_cast<Shader*>(this)->GetUniformLocation(name);
         glUniform1f(location, value);
+    }
+
+    void Shader::SetUniformVectorFloat(const std::string& name, std::vector<float> value) const
+    {
+        int location = const_cast<Shader*>(this)->GetUniformLocation(name);
+        glUniform1fv(location, value.size(), value.data());
     }
 
     void Shader::SetUniformMat4(const std::string& name, glm::mat4 value) const

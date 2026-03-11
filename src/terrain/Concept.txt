@@ -65,11 +65,11 @@ TODO
 
 1. Generator DONE
 2. Terrain DONE
-3. ComputeShader
+3. ComputeShader DONE
 4. Renderable DONE
 5. Renderer DONE
 6. terrainMaterial
-7, terrainShader
+7, terrainShader DONE
 8. Editor scene
 
 	

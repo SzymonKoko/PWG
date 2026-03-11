@@ -35,6 +35,10 @@ file(GLOB_RECURSE ALL_SOURCES
 	"${PROJECT_SOURCE_DIR}/src/*.inl"
 )
 
+file(GLOB_RECURSE ASSETS_SOURCES
+	"${PROJECT_SOURCE_DIR}/assets/shaders/*.*"
+)
+
 # Set all imgui sources
 set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -62,12 +66,11 @@ target_include_directories(glad PUBLIC
 	"${PROJECT_SOURCE_DIR}/libs/glad/include" # Path to GLAD Header files
 )  
 
-# Add stb_image to project
-add_library(stb_image STATIC libs/stb/stb_image.cpp)
-
-target_include_directories(stb_image PUBLIC 
-    "${PROJECT_SOURCE_DIR}/libs/stb" # Path to stb_image Header file
-)
+#Add stb to project
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE 
+    "${PROJECT_SOURCE_DIR}/libs/stb" # Path to entt Header file
+) 
 
 #Add entt to project
 add_library(entt INTERFACE)
@@ -103,8 +106,8 @@ target_link_libraries(${PROJECT_NAME}
 		glad
 		glfw
 		glm
-		stb_image
 		entt
+		stb
 		OpenGL::GL
 		spdlog::spdlog
 		FastNoiseLite

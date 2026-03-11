@@ -19,7 +19,7 @@ void main()
 {
 	float h = texture(u_Heightmap, a_TextureCoordinates).r;
 	vec3 pos = a_Pos;
-	pos.y = h * u_amplitude;
+	pos.y = h;
 
 	f_Pos = pos;
 	f_TextureCoordinates = a_TextureCoordinates;

@@ -10,10 +10,10 @@
 #include "terrain/terrainGenerator.h"
 #include "terrain/terrainLayersManager.h"
 #include "graphics/shader/computeShader.h"
+#include "gpu/terrainComputePipeline.h"
 
 namespace pwg
 {
-	struct TerrainTextures;
 
 	/**
 	 * @brief Struct containing terrain noise parameters for procedural generation.
@@ -21,7 +21,7 @@ namespace pwg
 	struct TerrainNoiseSettings
 	{
 		int noiseType = 0;
-		float amplitude = 0.01f;
+		float amplitude = 200.0f;
 		float frequency = 0.01f;
 		float scale = 200.0f;
 		int seed = 1000;
@@ -65,7 +65,7 @@ namespace pwg
 		 * @param material Shared pointer to the terrain material.
 		 * @param computeShaders Reference to compute shaders used for terrain generation.
 		 */
-		Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, TerrainComputeShaders& computeShaders);
+		Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material);
 
 		/**
 		 * @brief Destructor. Cleans up terrain resources.
@@ -111,20 +111,28 @@ namespace pwg
 		 */
 		std::vector<TerrainLayer>& GetTerrainLayers();
 
+		void SetTerrainTextures(std::unordered_map<std::string, std::shared_ptr<Texture>>& textures);
+
 		/**
 		 * @brief Returns the terrain height at a given (x, z) coordinate.
 		 */
 		float GetTerrainHeightAt(int x, int z);
 
 	private:
+
+		struct TerrainTextures
+		{
+			std::shared_ptr<Texture> heightmap;
+			std::shared_ptr<Texture> normalmap;
+			std::shared_ptr<Texture> splatmap;
+		};
+
 		int m_size;														/**< Terrain size (width/height). */
 		std::shared_ptr<Mesh> m_mesh;									/**< Mesh representing terrain surface. */
 		std::shared_ptr<Material> m_material;							/**< Terrain material (shader + textures). */
-		std::shared_ptr<TerrainTextures> m_terrainTextures;				/**< Textures used by terrain. */
-		std::unique_ptr<TerrainGenerator> m_terrainGenerator;			/**< Procedural terrain generator. */
 		std::unique_ptr<TerrainLayersManager> m_terrainLayersManager;	/**< Manages terrain layers and splat maps. */
 		TerrainNoiseSettings m_terrainNoiseSettings;					/**< Noise settings for procedural generation. */
-		TerrainComputeShaders& m_terrainComputeShaders;					/**< Compute shaders for heightmap, normalmap, splatmap. */
+		TerrainTextures m_terrainTextures;
 	};
 } // namespace pwg
 

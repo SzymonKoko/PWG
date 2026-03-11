@@ -1,0 +1,58 @@
+#engine_include "../FastNoiseLite.glsl"
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (r32f, binding = 0) uniform image2D mountainHeight;
+layout (r32f, binding = 1) readonly uniform image2D mountainMask;
+
+uniform int u_noiseType;
+uniform float u_amplitude;
+uniform float u_frequency;
+uniform float u_scale;
+uniform int u_seed;
+uniform int u_size;
+uniform vec2 u_offset;
+
+uniform int u_fractalType;
+uniform float u_persistance;
+uniform float u_lacunarity;
+uniform int u_octaves;
+
+uniform float u_ridgeStrength;
+
+uniform bool u_falloff;
+uniform float u_falloffStrength;
+
+void main()
+{
+	fnl_state noise = fnlCreateState(u_seed);
+	noise.noise_type = u_noiseType;
+	noise.fractal_type = u_fractalType;
+	noise.octaves = u_octaves;
+	noise.lacunarity = u_lacunarity;
+	noise.gain = u_persistance;
+    noise.weighted_strength = u_ridgeStrength;
+
+	ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+	float newX = float(texelCoord.x) / float(u_size);
+	float newY = float(texelCoord.y) / float(u_size);
+
+	float scaledX = (newX * u_scale * u_frequency) + u_offset.x;
+	float scaledY = (newY * u_scale * u_frequency) + u_offset.y;
+
+	vec2 p = vec2(scaledX, scaledY);
+
+	float n = fnlGetNoise2D(noise, p.x, p.y);
+	n = (n + 1.0) * 0.5;
+
+    float mask = imageLoad(mountainMask, texelCoord).r;
+    float height = mask * n;
+
+    if (u_falloff)
+    {
+        height = pow(height, u_falloffStrength);
+    }
+
+	imageStore(mountainHeight, texelCoord, vec4(height));
+
+}

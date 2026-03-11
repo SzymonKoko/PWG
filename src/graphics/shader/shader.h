@@ -73,11 +73,26 @@ namespace pwg
 		void SetUniformInt(const std::string& name, int value) const override;
 
 		/**
+		* @brief Sets an vector of integers uniform.
+		* @param name Uniform variable name.
+		* @param value Vector of integers to assign.
+		*/
+		void SetUniformVectorInt(const std::string& name, std::vector<int> value) const override;
+
+
+		/**
 		* @brief Sets a float uniform variable in the shader.
 		* @param name Uniform variable name.
 		* @param value Float value to assign.
 		*/
 		void SetUniformFloat(const std::string& name, float value) const override;
+
+		/**
+		* @brief Sets an vector of floats uniform.
+		* @param name Uniform variable name.
+		* @param value Vector of floats to assign.
+		*/
+		void SetUniformVectorFloat(const std::string& name, std::vector<float> value) const override;
 
 		/**
 		* @brief Sets a mat4 uniform variable in the shader.

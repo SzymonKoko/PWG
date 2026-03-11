@@ -1,0 +1,7 @@
+Winter Holy To Do
+1. Terrain generation via masks
+2. Skybox cube map
+3. Chunk system
+4. PBR Lighting
+5. Slope based texturing
+6. Tesselation LOD

@@ -23,11 +23,14 @@ vec3 ApplyLighting(vec3 normal, vec3 albedo, vec3 fragPos)
 {
 	vec3 ambient = u_light.color * u_material.ambient;
 
-	float diff = max(dot(normal, u_light.direction), 0.0);
+	vec3 lightDir = normalize(-u_light.direction);
+
+	float diff = max(dot(normal, lightDir), 0.0);
 	vec3 diffuse = u_light.color * (diff * u_material.diffuse);
 
 	vec3 viewDir = normalize(u_cameraPosition - fragPos);
-	vec3 reflectDir = reflect(u_light.direction, normal);
+	vec3 reflectDir = reflect(-lightDir, normal);
+
 	float spec = pow(max(dot(viewDir, reflectDir), 0.0), u_material.shininess);
 	vec3 specular = u_light.color * (spec * u_material.specular);
 
