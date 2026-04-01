@@ -5,7 +5,6 @@ layout (r32f, binding = 0) uniform image2D elevationMask;
 
 uniform int u_noiseType;
 uniform float u_frequency;
-uniform float u_amplitude;
 uniform float u_scale;
 uniform int u_seed;
 uniform int u_size;
@@ -13,24 +12,20 @@ uniform vec2 u_offset;
 
 void main()
 {
-	fnl_state noise = fnlCreateState(u_seed);
-	noise.noise_type = u_noiseType;
+    fnl_state noise = fnlCreateState(u_seed);
+    noise.noise_type = u_noiseType;
 
-	ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    // ===== PADDED COORD =====
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-	float newX = float(texelCoord.x) / float(u_size);
-	float newY = float(texelCoord.y) / float(u_size);
+    vec2 newTexelCoord = vec2(texelCoord) / vec2(u_size); 
 
-	float scaledX = (newX * u_scale * u_frequency) + u_offset.x;
-	float scaledY = (newY * u_scale * u_frequency) + u_offset.y;
+    vec2 worldPos = vec2(newTexelCoord * u_scale * u_frequency) + u_offset;
 
-	vec2 p = vec2(scaledX, scaledY);
+    vec2 p = worldPos;
 
-	float n = fnlGetNoise2D(noise, p.x, p.y);
-	n = (n + 1.0) * 0.5;
+    float n = fnlGetNoise2D(noise, p.x, p.y);
+    n = (n + 1.0) * 0.5;
 
-	float height = n;
-
-	imageStore(elevationMask, texelCoord, vec4(height, height, height, 1.0));
-
+    imageStore(elevationMask, texelCoord, vec4(n));
 }

@@ -86,6 +86,8 @@ namespace pwg
 		*/
 		glm::vec3 GetPosition();
 
+		int GetVertexCount();
+
 		/**
 		* @brief Sets the world-space position of the mesh.
 		* @param position New mesh position.

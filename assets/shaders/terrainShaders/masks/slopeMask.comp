@@ -8,9 +8,30 @@ void main()
 
 	ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
 
-    vec3 normal = normalize(imageLoad(normalMask, coord).xyz * 2.0 - 1.0);
+    //vec3 normal = normalize(imageLoad(normalMask, coord).xyz * 2.0 - 1.0);
+
+    //float slope = 1.0 - clamp(dot(normal, vec3(0,1,0)), 0.0, 1.0);
+    
+    //imageStore(slopeMask, coord, vec4(slope));
+    ivec2 size = imageSize(normalMask);
+
+    ivec2 cL = coord + ivec2(-1, 0);
+    ivec2 cR = coord + ivec2(1, 0);
+    ivec2 cD = coord + ivec2(0, -1);
+    ivec2 cU = coord + ivec2(0, 1);
+
+    vec3 nC = normalize(imageLoad(normalMask, coord).xyz * 2.0 - 1.0);
+
+    // fallback na krawędzi (jak przy normalach)
+    vec3 nL = (coord.x > 0) ? normalize(imageLoad(normalMask, cL).xyz * 2.0 - 1.0) : nC;
+    vec3 nR = (coord.x < size.x - 1) ? normalize(imageLoad(normalMask, cR).xyz * 2.0 - 1.0) : nC;
+    vec3 nD = (coord.y > 0) ? normalize(imageLoad(normalMask, cD).xyz * 2.0 - 1.0) : nC;
+    vec3 nU = (coord.y < size.y - 1) ? normalize(imageLoad(normalMask, cU).xyz * 2.0 - 1.0) : nC;
+
+    // uśrednienie (usuwa seamy)
+    vec3 normal = normalize((nC + nL + nR + nD + nU) * 0.2);
 
     float slope = 1.0 - clamp(dot(normal, vec3(0,1,0)), 0.0, 1.0);
-    
+
     imageStore(slopeMask, coord, vec4(slope));
 }

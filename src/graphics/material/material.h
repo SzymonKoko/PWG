@@ -118,6 +118,13 @@ namespace pwg
 		void SetUniformInt(const std::string& name, int value);
 
 		/**
+		* @brief Sets a vec2 uniform value.
+		* @param name Uniform name.
+		* @param value glm::vec2 value to assign.
+		*/
+		void SetUniformVec2(const std::string& name, const glm::vec2& value);
+
+		/**
 		* @brief Sets a vec3 uniform value.
 		* @param name Uniform name.
 		* @param value glm::vec3 value to assign.
@@ -159,6 +166,7 @@ namespace pwg
 		std::unordered_map<std::string, float> m_floatUniforms;								/**< Stored float uniforms */
 		std::unordered_map<std::string, TextureData> m_textureUniforms;						/**< Stored texture uniforms */
 		std::unordered_map<std::string, int> m_intUniforms;									/**< Stored integer uniforms */
+		std::unordered_map<std::string, glm::vec2> m_vec2Uniforms;							/**< Stored vec2 uniforms */
 		std::unordered_map<std::string, glm::vec3> m_vec3Uniforms;							/**< Stored vec3 uniforms */
 		std::unordered_map<std::string, glm::mat4> m_mat4Uniforms;							/**< Stored mat4 uniforms */
 		std::unordered_map<std::string, std::shared_ptr<TextureArray>> m_textureArrays;		/**< Stored texture arrays */

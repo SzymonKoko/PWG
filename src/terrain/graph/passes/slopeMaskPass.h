@@ -11,7 +11,7 @@ namespace pwg
 		SlopeMaskPass(std::shared_ptr<ComputeShader> computeShader, int terrainSize);
 		~SlopeMaskPass() = default;
 
-		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks) override;
+		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx) override;
 		std::vector<UIParameters> GetParameters() override;
 		std::string GetName() override;
 

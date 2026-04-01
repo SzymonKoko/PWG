@@ -13,7 +13,7 @@ namespace pwg
 	struct SunObjectProperties
 	{
 		float orbitRadius{ 2000.f };				/**< Radius of the sun's orbital path. */
-		float orbitSpeed{ 0.1f };					/**< Speed at which the sun orbits. */
+		float orbitSpeed{ 0.01f };					/**< Speed at which the sun orbits. */
 		float time{ 0.0f };							/**< Current time value used for orbit calculation. */
 
 		glm::vec3 color{ 1.0f, 1.0f, 0.3f };		/**< Color of the sun. */
@@ -43,7 +43,7 @@ namespace pwg
 		 * @brief Updates the sun's position based on orbit speed and elapsed time.
 		 * @param dt Delta time since last frame.
 		 */
-		void Update(float dt) override;
+		void Update(float dt, std::shared_ptr<ICamera> camera) override;
 
 		/**
 		 * @brief Draws the sun object using the provided renderer.

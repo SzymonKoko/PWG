@@ -10,7 +10,7 @@ namespace pwg
 		m_outputTextures = { "MountainMask" };
 	}
 
-	void MountainMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void MountainMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
 		auto elevationTexture = masks.at("Elevation");
 		auto mountainMaskTexture = masks.at("MountainMask");

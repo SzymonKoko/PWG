@@ -16,7 +16,7 @@ namespace pwg
 		* @brief Updates the renderable object state.
 		* @param dt Delta time since last update (in seconds).
 		*/
-		virtual void Update(float dt) = 0;
+		virtual void Update(float dt, std::shared_ptr<ICamera> camera) = 0;
 
 		/**
 		* @brief Draws the renderable object using the provided renderer.

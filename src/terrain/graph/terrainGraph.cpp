@@ -16,11 +16,11 @@ namespace pwg
 		m_passes.push_back(pass);
 	}
 
-	void TerrainGraph::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void TerrainGraph::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
 		for (const auto& pass : m_passes)
 		{
-			pass->Execute(masks);
+			pass->Execute(masks, ctx);
 		}
 	}
 	std::vector<std::shared_ptr<TerrainPass>>& TerrainGraph::GetPasses()

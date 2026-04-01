@@ -14,14 +14,19 @@ void main()
 	ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
 	float outputValue = 0.0f;
+	float weightSum = 0.0;
 
 	for (int i = 0; i < u_inputsCount; i++)
 	{
 		float tex = texelFetch(u_inputTextures[i], texelCoord, 0).r;
 		float weight = u_inputWeights[i];
 
-		outputValue += (tex * weight);
+		outputValue += tex * weight;
+		weightSum += weight;
 	}
+	if (weightSum > 0.0)
+    outputValue /= weightSum;
+	outputValue = pow(outputValue, 1.5);
 
 	imageStore(finalMask, texelCoord, vec4(outputValue));
 

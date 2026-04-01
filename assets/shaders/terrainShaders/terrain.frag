@@ -6,6 +6,7 @@ out vec4 FragColor;
 
 in vec2 f_TextureCoordinates;
 in vec3 f_Pos;
+in vec3 f_Normal;
 
 uniform sampler2D u_Normalmap;
 uniform sampler2DArray u_Textures;
@@ -54,64 +55,30 @@ vec3 StochasticSample(sampler2DArray tex, vec2 uv, int layer)
 	vec3 s2 = texture(tex, vec3(rotate(uv + o2, o2.x * 6.28), layer)).rgb;
 	vec3 s3 = texture(tex, vec3(rotate(uv + o3, o3.x * 6.28), layer)).rgb;
 
+    //return s1*0.6 + s2*0.25 + s3*0.15;
     return s1*w1 + s2*w2 + s3*w3;
 }
 
 void main()
 {
-    vec3 normal = normalize(texture(u_Normalmap, f_TextureCoordinates).rgb * 2.0 - 1.0);
+    vec3 normal = normalize(f_Normal);
 
-    vec2 worldUV = f_Pos.xz;
+    // proste UV (jednolita skala na cały teren)
+    vec2 uv = f_Pos.xz * 0.02;
 
-    // ===== TERRAIN SCALE =====
+    // slope (0 = płasko, 1 = stromo)
+    float slope = 1.0 - clamp(normal.y, 0.0, 1.0);
 
-    vec2 grassUV = worldUV * 0.005;
-    vec2 rockUV  = worldUV * 0.03;
+    // blend między trawą a skałą
+    float rock = smoothstep(0.15, 0.7, slope);
+    float grass = 1.0 - rock;
 
-    // ===== DETAIL SCALE =====
+    // próbki tekstur (bez żadnych cudów)
+    vec3 grassColor = texture(u_Textures, vec3(uv, 0)).rgb;
+    vec3 rockColor  = texture(u_Textures, vec3(uv, 2)).rgb;
 
-    vec2 grassDetailUV = worldUV * 0.15;
-    vec2 rockDetailUV  = worldUV * 0.2;
-
-    // ===== UV DISTORTION =====
-
-    vec2 noise = texture(u_Normalmap, worldUV * 0.002).rg;
-    noise = noise * 2.0 - 1.0;
-
-    grassUV += noise * 0.3;
-    rockUV  += noise * 0.3;
-
-    // ===== SLOPE BLENDING =====
-
-    float slope = texture(u_Normalmap, f_TextureCoordinates).a;
-
-    float stone = smoothstep(0.3, 0.6, slope);
-    float grass = 1.0 - stone;
-
-    // ===== STOCHASTIC MACRO TEXTURE =====
-
-    vec3 grassMacro = StochasticSample(u_Textures, grassUV, 0);
-    vec3 rockMacro  = StochasticSample(u_Textures, rockUV, 2);
-
-    // ===== DETAIL TEXTURE =====
-
-    vec3 grassDetail = texture(u_Textures, vec3(grassDetailUV, 0)).rgb;
-    vec3 rockDetail  = texture(u_Textures, vec3(rockDetailUV, 2)).rgb;
-
-    // ===== MACRO COLOR VARIATION =====
-
-    float macro = texture(u_Normalmap, worldUV * 0.001).r;
-    macro = 0.7 + macro * 0.6;
-
-    // ===== FINAL MATERIAL COLORS =====
-
-    vec3 grassColor = grassMacro * macro * (0.7 + grassDetail * 0.3);
-    vec3 rockColor  = rockMacro  * macro * (0.7 + rockDetail  * 0.3);
-
-    vec3 color = vec3(0.0);
-
-    color += grassColor * grass;
-    color += rockColor * stone;
+    // miks
+    vec3 color = grassColor * grass + rockColor * rock;
 
     vec3 finalColor = ApplyLighting(normal, color, f_Pos);
 

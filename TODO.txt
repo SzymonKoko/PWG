@@ -1,0 +1,1 @@
+Zmienić w editorscene glfw window na window

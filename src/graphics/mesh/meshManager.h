@@ -37,6 +37,13 @@ namespace pwg
 		std::string CreatePlaneMesh(int size, std::string name);
 
 		/**
+		* @brief Creates a plane mesh and returns it.
+		* @param size Number of vertices defining the plane resolution.
+		* @return Shared pointer of the created mesh.
+		*/
+		static std::shared_ptr<Mesh> CreatePlaneMesh(int size, int lod = 0);
+
+		/**
 		* @brief Creates a sphere mesh and stores it in the manager.
 		* @param radius Radius of the sphere.
 		* @param sectorCount Number of longitudinal segments.

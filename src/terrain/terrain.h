@@ -10,7 +10,7 @@
 #include "terrain/terrainGenerator.h"
 #include "terrain/terrainLayersManager.h"
 #include "graphics/shader/computeShader.h"
-#include "gpu/terrainComputePipeline.h"
+#include "terrain/chunk/chunkManager.h"
 
 namespace pwg
 {
@@ -65,7 +65,7 @@ namespace pwg
 		 * @param material Shared pointer to the terrain material.
 		 * @param computeShaders Reference to compute shaders used for terrain generation.
 		 */
-		Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material);
+		Terrain(std::shared_ptr<ResourceManager> resourceManager);
 
 		/**
 		 * @brief Destructor. Cleans up terrain resources.
@@ -76,7 +76,7 @@ namespace pwg
 		 * @brief Updates the terrain per frame.
 		 * @param dt Delta time since last frame.
 		 */
-		void Update(float dt) override;
+		void Update(float dt, std::shared_ptr<ICamera> camera) override;
 
 		/**
 		 * @brief Draws the terrain using the provided renderer.
@@ -95,6 +95,8 @@ namespace pwg
 		 * @return Shared pointer to the Material instance.
 		 */
 		std::shared_ptr<Material> GetMaterial() override;
+
+		std::shared_ptr<ChunkManager> GetChunkManager();
 
 		/**
 		 * @brief Returns the terrain size (number of vertices per side).
@@ -133,6 +135,8 @@ namespace pwg
 		std::unique_ptr<TerrainLayersManager> m_terrainLayersManager;	/**< Manages terrain layers and splat maps. */
 		TerrainNoiseSettings m_terrainNoiseSettings;					/**< Noise settings for procedural generation. */
 		TerrainTextures m_terrainTextures;
+		TerrainSettings m_terrainSettings;
+		std::shared_ptr<ChunkManager> m_chunkManager;
 	};
 } // namespace pwg
 

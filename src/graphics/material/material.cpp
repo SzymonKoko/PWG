@@ -32,6 +32,11 @@ namespace pwg
 			m_shader->SetUniformInt(name, value);
 		}
 
+		for (auto& [name, value] : m_vec2Uniforms)
+		{
+			m_shader->SetUniformVec2(name, value);
+		}
+
 		for (auto& [name, value] : m_vec3Uniforms)
 		{
 			m_shader->SetUniformVec3(name, value);
@@ -107,6 +112,11 @@ namespace pwg
 	void Material::SetUniformInt(const std::string& name, int value)
 	{
 		m_intUniforms[name] = value;
+	}
+
+	void Material::SetUniformVec2(const std::string& name, const glm::vec2& value)
+	{
+		m_vec2Uniforms[name] = value;
 	}
 
 	void Material::SetUniformVec3(const std::string& name, const glm::vec3& value)

@@ -15,7 +15,7 @@ namespace pwg
 	{
 	}
 
-	void SunObject::Update(float dt)
+	void SunObject::Update(float dt, std::shared_ptr<ICamera> camera)
 	{
 		m_sunObjectProperties.time += dt;
 		float offsetY = 1000.0f;

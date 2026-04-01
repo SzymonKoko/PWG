@@ -5,6 +5,7 @@
 #include "graphics/shader/computeShader.h"
 #include "graphics/texture/texture.h"
 #include "terrain/masks/mask.h"
+#include "terrain/graph/terrainPassContext.h"
 
 namespace pwg
 {
@@ -40,7 +41,7 @@ namespace pwg
 	class TerrainPass
 	{
 	public:
-		virtual void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks) = 0;
+		virtual void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx) = 0;
 		virtual std::vector<UIParameters> GetParameters() = 0;
 		virtual std::string GetName() = 0;
 	};

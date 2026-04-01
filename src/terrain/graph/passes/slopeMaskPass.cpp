@@ -9,7 +9,7 @@ namespace pwg
 		m_inputTextures = { "NormalMask" };
 		m_outputTextures = { "SlopeMask" };
 	}
-	void SlopeMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void SlopeMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
 		auto normalMask = masks.at("NormalMask");
 		auto slopeMask = masks.at("SlopeMask");

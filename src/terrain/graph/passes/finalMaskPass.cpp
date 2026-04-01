@@ -10,7 +10,7 @@ namespace pwg
 
 	}
 
-	void FinalMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void FinalMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
 		m_inputHeightTextures.clear();
 		m_inputHeightTexturesWeights.clear();

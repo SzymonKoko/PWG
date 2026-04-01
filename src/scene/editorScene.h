@@ -68,7 +68,7 @@ namespace pwg
 
 		std::unique_ptr<FrameBuffer> m_frameBuffer;				/**< Framebuffer used for editor rendering. */
 		std::shared_ptr<Terrain> m_terrain;						/**< Terrain instance in the scene. */
-		std::shared_ptr<TerrainComputePipeline> m_terrainComputePipeline;
+		//std::shared_ptr<TerrainComputePipeline> m_terrainComputePipeline;
 		std::unique_ptr<MeshManager> m_meshManager;				/**< Manages procedural and loaded meshes. */
 		std::unique_ptr<CameraManager> m_cameraManager;			/**< Handles active camera and switching between cameras. */
 		std::shared_ptr<SunObject> m_sunObject;					/**< Sun object providing lighting. */

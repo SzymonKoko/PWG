@@ -10,9 +10,11 @@ void main()
 {
 	ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-	float outputValue = imageLoad(finalMask, texelCoord).r;
+	float outputValue = 0.0f;
+	outputValue = imageLoad(finalMask, texelCoord).r;
 
-    outputValue *= u_amplitude;
+	//outputValue = outputValue / (1.0 + outputValue);
+	outputValue *= u_amplitude;
 
 	imageStore(finalHeight, texelCoord, vec4(outputValue));
 

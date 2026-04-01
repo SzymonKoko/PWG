@@ -2,21 +2,49 @@
 
 namespace pwg
 {
-	TerrainComputePipeline::TerrainComputePipeline(int terrainSize)
-		: m_size(terrainSize)
+	TerrainComputePipeline::TerrainComputePipeline(int terrainSize, std::shared_ptr<ShaderManager> shaderManager)
+		: m_size(terrainSize),
+		  m_shaderManager(shaderManager)
 	{
+		m_size = terrainSize;
+		m_terrainPassContext.chunkSize = terrainSize;
 		m_graph = std::make_shared<TerrainGraph>();
 
+		std::string terrainShadersPath = "../assets/shaders/terrainShaders/";
+
+		m_shaderManager->LoadCompute("elevationMaskShader", terrainShadersPath + "masks/elevationMask.comp");
+		m_shaderManager->LoadCompute("mountainMaskShader", terrainShadersPath + "masks/mountainMask.comp");
+		m_shaderManager->LoadCompute("mountainHeightShader", terrainShadersPath + "masks/mountainHeight.comp");
+		m_shaderManager->LoadCompute("finalMaskShader", terrainShadersPath + "masks/finalMask.comp");
+		m_shaderManager->LoadCompute("finalHeightShader", terrainShadersPath + "masks/finalHeight.comp");
+		m_shaderManager->LoadCompute("normalMaskShader", terrainShadersPath + "masks/normalMask.comp");
+		m_shaderManager->LoadCompute("slopeMaskShader", terrainShadersPath + "masks/slopeMask.comp");
+
+		auto elevationShader = m_shaderManager->GetShader<pwg::ComputeShader>("elevationMaskShader");
+		auto mountainMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("mountainMaskShader");
+		auto mountainHeightShader = m_shaderManager->GetShader<pwg::ComputeShader>("mountainHeightShader");
+		auto finalMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("finalMaskShader");
+		auto finalHeightShader = m_shaderManager->GetShader<pwg::ComputeShader>("finalHeightShader");
+		auto normalMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("normalMaskShader");
+		auto slopeMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("slopeMaskShader");
+
+		AddComputeShader("Elevation", elevationShader);
+		AddComputeShader("MountainMask", mountainMaskShader);
+		AddComputeShader("MountainHeight", mountainHeightShader);
+		AddComputeShader("FinalMask", finalMaskShader);
+		AddComputeShader("FinalHeight", finalHeightShader);
+		AddComputeShader("NormalMask", normalMaskShader);
+		AddComputeShader("SlopeMask", slopeMaskShader);
 	}
 
 	TerrainComputePipeline::~TerrainComputePipeline()
 	{
 	}
 
-	void TerrainComputePipeline::Execute()
+	void TerrainComputePipeline::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
-		ClearTextures();
-		m_graph->Execute(m_terrainMasks);
+		m_terrainPassContext.offset = glm::vec2(0,0);
+		m_graph->Execute(masks, m_terrainPassContext);
 	}
 
 	void TerrainComputePipeline::BuildGraph()
@@ -37,20 +65,6 @@ namespace pwg
 		m_graph->AddPass(normalMaskPass);
 		m_graph->AddPass(slopeMaskPass);
 
-		m_terrainMasks["Elevation"] = std::make_shared<TerrainMask>("Elevation", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
-		m_terrainMasks["MountainMask"] = std::make_shared<TerrainMask>("MountainMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::WEIGHTS, 1.0f);		
-		m_terrainMasks["MountainHeight"] = std::make_shared<TerrainMask>("MountainHeight", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);		
-		m_terrainMasks["FinalMask"] = std::make_shared<TerrainMask>("FinalMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
-		m_terrainMasks["FinalHeight"] = std::make_shared<TerrainMask>("FinalHeight", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
-		m_terrainMasks["NormalMask"] = std::make_shared<TerrainMask>("NormalMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::RGBA16F)), MaskUsage::WEIGHTS, 1.0f);
-		m_terrainMasks["SlopeMask"] = std::make_shared<TerrainMask>("SlopeMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::WEIGHTS, 1.0f);
-		
-
-		for (const auto& mask : m_terrainMasks)
-		{
-			mask.second->texture->SetTextureWrapping(ToGL(TextureWrapMode::CLAMP_TO_EDGE), ToGL(TextureWrapMode::CLAMP_TO_EDGE));
-		}
-
 		PWG_INFO("Graph builded successfully");
 	}
 
@@ -65,6 +79,25 @@ namespace pwg
 		{
 			PWG_ERROR("Compute shader '{0}' exists in a pipeline map", name);
 		}
+	}
+	std::unordered_map<std::string, std::shared_ptr<TerrainMask>> TerrainComputePipeline::CreateMasks()
+	{
+		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> terrainMasks;
+
+		terrainMasks["Elevation"] = std::make_shared<TerrainMask>("Elevation", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["MountainMask"] = std::make_shared<TerrainMask>("MountainMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["MountainHeight"] = std::make_shared<TerrainMask>("MountainHeight", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["FinalMask"] = std::make_shared<TerrainMask>("FinalMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["FinalHeight"] = std::make_shared<TerrainMask>("FinalHeight", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["NormalMask"] = std::make_shared<TerrainMask>("NormalMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::RGBA16F)), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["SlopeMask"] = std::make_shared<TerrainMask>("SlopeMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::WEIGHTS, 1.0f);
+
+		for (const auto& mask : terrainMasks)
+		{
+			mask.second->texture->SetTextureWrapping(ToGL(TextureWrapMode::CLAMP_TO_EDGE), ToGL(TextureWrapMode::CLAMP_TO_EDGE));
+		}
+
+		return terrainMasks;
 	}
 	void TerrainComputePipeline::ClearTextures()
 	{

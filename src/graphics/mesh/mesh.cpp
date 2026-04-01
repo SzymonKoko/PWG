@@ -55,9 +55,16 @@ namespace pwg
 		return m_transform.position;
 	}
 
+	int Mesh::GetVertexCount()
+	{
+		return m_vertices.size();
+	}
+
 	void Mesh::SetPosition(glm::vec3 position)
 	{
 		m_transform.position = position;
+		m_model = glm::mat4(1.0f);
+		m_model = glm::translate(m_model, m_transform.position);
 	}
 
 	void Mesh::SetVertices(std::vector<Vertex>& vertices)

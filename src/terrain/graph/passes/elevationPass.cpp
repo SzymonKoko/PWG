@@ -10,7 +10,7 @@ namespace pwg
 		m_outputTextures = { "Elevation" };
 	}
 
-	void ElevationPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void ElevationPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
 		auto elevationTexture = masks.at("Elevation");
 
@@ -21,7 +21,7 @@ namespace pwg
 		m_computeShader->SetUniformInt("u_size", m_terrainSize);
 		m_computeShader->SetUniformFloat("u_frequency", m_parameters.frequency);
 		m_computeShader->SetUniformFloat("u_scale", m_parameters.scale);
-		m_computeShader->SetUniformVec2("u_offset", m_parameters.offset);
+		m_computeShader->SetUniformVec2("u_offset", ctx.offset);
 
 		m_computeShader->BindImage(0, elevationTexture->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
 		m_computeShader->DispatchForTexture(m_terrainSize, m_terrainSize);

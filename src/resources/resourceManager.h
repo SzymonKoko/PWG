@@ -32,25 +32,25 @@ namespace pwg
 		 * @brief Returns reference to the ShaderManager.
 		 * @return Reference to ShaderManager instance.
 		 */
-		ShaderManager& GetShaderManager() { return *m_shaderManager; }
+		std::shared_ptr<ShaderManager> GetShaderManager() { return m_shaderManager; }
 
 		/**
 		 * @brief Returns reference to the TextureManager.
 		 * @return Reference to TextureManager instance.
 		 */
-		TextureManager& GetTextureManager() { return *m_textureManager; }
+		std::shared_ptr<TextureManager> GetTextureManager() { return m_textureManager; }
 
 		/**
 		 * @brief Returns reference to the MeshManager.
 		 * @return Reference to MeshManager instance.
 		 */
-		MeshManager& GetMeshManager() { return *m_meshManager; }
+		std::shared_ptr<MeshManager> GetMeshManager() { return m_meshManager; }
 
 		/**
 		 * @brief Returns reference to the MaterialManager.
 		 * @return Reference to MaterialManager instance.
 		 */
-		MaterialManager& GetMaterialManager() { return *m_materialManager; }
+		std::shared_ptr<MaterialManager> GetMaterialManager() { return m_materialManager; }
 
 		/**
 		 * @brief Unloads all resources from all managers.

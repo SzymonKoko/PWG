@@ -10,12 +10,15 @@ namespace pwg::controls
 	{
 	public:
 
-		static void ShowControl(std::shared_ptr<TerrainComputePipeline> terrainComputePipeline, int terrainSize)
+		static void ShowControl(std::shared_ptr<ChunkManager> chunkManager)
 		{
 
             static const char* noiseTypes[] = { "OpenSimplex2", "OpenSimplex2S", "Cellular", "Perlin", "Value Cubic", "Value" };
             static const char* fractalTypes[] = { "None", "FBm", "Ridged", "Ping Pong" };
             bool updated = false;
+            
+            auto terrainComputePipeline = chunkManager->GetTerrainComputePipeline();
+
 
             if (ImGui::BeginTabItem("Noise"))
             {
@@ -75,10 +78,12 @@ namespace pwg::controls
                                 }
                                 break;
                             }
+                            break;
                             
                         }
                         default:
                         {
+                            PWG_ERROR("Wrong control type");
                             break;
                         }
                         }
@@ -88,7 +93,7 @@ namespace pwg::controls
 
                 if (updated)
                 {
-                    terrainComputePipeline->Execute();
+                    chunkManager->SetNeedRegenerate(true);
                 }
 
                 ImGui::EndTabItem();
@@ -98,7 +103,7 @@ namespace pwg::controls
             {
                 auto& masks = terrainComputePipeline->GetMasks();
 
-                for (auto& mask : masks)
+                for (auto& mask : chunkManager->GetMasks())
                 {
                     if (mask.first == "FinalHeight")
                     {

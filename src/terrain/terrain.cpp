@@ -3,20 +3,22 @@
 namespace pwg
 {
 
-    Terrain::Terrain(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material)
-        : m_mesh(mesh),
-        m_material(material)
+    Terrain::Terrain(std::shared_ptr<ResourceManager> resourceManager)
     {
-        m_size = 2000;
 
+        m_material = resourceManager->GetMaterialManager()->GetMaterial("TerrainMaterial");
         m_terrainLayersManager = std::make_unique<TerrainLayersManager>();
+        m_chunkManager = std::make_shared<ChunkManager>(resourceManager, m_terrainSettings, m_material);
+
+        m_size = CHUNKS * m_terrainSettings.chunkSize;
+
 
         auto materialProps = m_material->GetMaterialProperties();
 
         materialProps.ambient = glm::vec3(0.2f);//{ 1.0f, 0.5f, 0.31f };
         materialProps.diffuse = glm::vec3(1.0f);//{ 1.0f, 0.5f, 0.31f };
         materialProps.specular = { 0.5f, 0.5f, 0.5f };
-        materialProps.shininess = 12.0f;
+        materialProps.shininess = 2.0f;
 
         m_material->SetMaterialProperties(materialProps);
 
@@ -26,7 +28,7 @@ namespace pwg
     {
     }
 
-    void Terrain::Update(float dt)
+    void Terrain::Update(float dt, std::shared_ptr<ICamera> camera)
     {
         bool regenerateLayers = false;
 
@@ -38,38 +40,14 @@ namespace pwg
             }
         }
 
-        m_mesh->Update();
+        m_chunkManager->Update(camera);
 
 
     }
 
     void Terrain::Draw(Renderer& renderer)
     {
-
-        m_material->Apply();
-
-        auto modelMatrix = m_mesh->GetModelMatrix();
-
-        m_material->SetUniformMat4("u_model", modelMatrix);
-
-        m_material->SetUniformFloat("u_amplitude", m_terrainNoiseSettings.amplitude);
-
-
-
-        m_material->SetUniformTexture("u_Heightmap", m_terrainTextures.heightmap, 0);
-
-
-        if (m_terrainTextures.normalmap)
-        {
-            m_material->SetUniformTexture("u_Normalmap", m_terrainTextures.normalmap, 1);
-        }
-         /*
-         if (m_terrainTextures && m_terrainTextures->splatmap)
-         {
-             m_material->SetUniformTexture("u_Splatmap", m_terrainTextures->splatmap, 2);
-         }*/
-
-        m_mesh->Draw();
+        m_chunkManager->Draw();
     }
 
     std::shared_ptr<Mesh> Terrain::GetMesh()
@@ -80,6 +58,11 @@ namespace pwg
     std::shared_ptr<Material> Terrain::GetMaterial()
     {
         return m_material;
+    }
+
+    std::shared_ptr<ChunkManager> Terrain::GetChunkManager()
+    {
+        return m_chunkManager;
     }
 
     int Terrain::GetSize()

@@ -32,7 +32,7 @@ namespace pwg
 		MountainHeightPass(std::shared_ptr<ComputeShader> computeShader, int terrainSize);
 		~MountainHeightPass() = default;
 
-		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks) override;
+		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx) override;
 		std::vector<UIParameters> GetParameters() override;
 		std::string GetName() override;
 

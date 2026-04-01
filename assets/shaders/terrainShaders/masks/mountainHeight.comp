@@ -34,25 +34,20 @@ void main()
 
 	ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-	float newX = float(texelCoord.x) / float(u_size);
-	float newY = float(texelCoord.y) / float(u_size);
-
-	float scaledX = (newX * u_scale * u_frequency) + u_offset.x;
-	float scaledY = (newY * u_scale * u_frequency) + u_offset.y;
-
-	vec2 p = vec2(scaledX, scaledY);
+	vec2 worldPos = vec2(texelCoord) + u_offset;
+	vec2 p = worldPos * u_frequency;
 
 	float n = fnlGetNoise2D(noise, p.x, p.y);
 	n = (n + 1.0) * 0.5;
 
-    float mask = imageLoad(mountainMask, texelCoord).r;
-    float height = mask * n;
+	float mask = imageLoad(mountainMask, texelCoord).r;
+	float height = mask * n;
 
     if (u_falloff)
     {
         height = pow(height, u_falloffStrength);
     }
-
+		
 	imageStore(mountainHeight, texelCoord, vec4(height));
 
 }

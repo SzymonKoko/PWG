@@ -10,7 +10,7 @@ namespace pwg
 		m_outputTextures = { "MountainHeight" };
 	}
 
-	void MountainHeightPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void MountainHeightPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
 		auto mountainHeight = masks.at("MountainHeight");
 		auto mountainMask = masks.at("MountainMask");
@@ -21,7 +21,7 @@ namespace pwg
 		m_computeShader->SetUniformFloat("u_amplitude", m_parameters.amplitude);
 		m_computeShader->SetUniformFloat("u_frequency", m_parameters.frequency);
 		m_computeShader->SetUniformFloat("u_scale", m_parameters.scale);
-		m_computeShader->SetUniformVec2("u_offset", m_parameters.offset);
+		m_computeShader->SetUniformVec2("u_offset", ctx.offset);
 		m_computeShader->SetUniformInt("u_seed", m_parameters.seed);
 
 		m_computeShader->SetUniformInt("u_fractalType", m_parameters.fractalType);

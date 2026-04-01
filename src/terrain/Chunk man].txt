@@ -1,0 +1,36 @@
+Chunk managenment system
+
+struct TerrainChunk
+{
+
+
+}
+
+class Chunk manager
+{
+
+
+}
+
+class LODManager
+{
+	GenerateLODMeshes() - generuje meshe przy starcie silnika
+	SelectLOD() - wybiera poziom LOD dla chunka
+	
+	Przechowuje meshe
+	
+}
+
+struct LODDistances
+{
+	
+}
+
+
+1. Wygenerować meshe pod LOD - LODManager
+2. PIPELINE - Zmienić pipeline z terrain na chunka
+3. PIPELINE - zmienić terrainsize na chunksize
+4. PASSES - dodać offset DONE
+5. PASSES - dodać shadery zależne od offsetu (tylko tam gdzie noise)
+6. CHUNK MANAGER - chunk generator
+7. TERRAIN - change Update and Draw 

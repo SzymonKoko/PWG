@@ -10,7 +10,7 @@ namespace pwg
 		m_outputTextures = { "FinalHeight" };
 	}
 
-	void FinalHeightPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void FinalHeightPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
 		auto finalHeight = masks.at("FinalHeight");
 		auto finalMask = masks.at("FinalMask");
@@ -28,7 +28,7 @@ namespace pwg
 	std::vector<UIParameters> FinalHeightPass::GetParameters()
 	{
 		return {
-			{"Amplitude", ParameterType::Float, &m_amplitude, 0.1, 2000.0}
+			{"Amplitude", ParameterType::Float, &m_amplitude, 0.1, 20000.0}
 		};
 	}
 

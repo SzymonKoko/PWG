@@ -10,7 +10,7 @@ namespace pwg
 		m_outputTextures = { "NormalMask" };
 	}
 
-	void NormalMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void NormalMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
 		auto finalHeight = masks.at("FinalHeight");
 		auto normalMask = masks.at("NormalMask");

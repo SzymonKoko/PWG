@@ -1,4 +1,4 @@
-#define _USE_MATH_DEFINES
+﻿#define _USE_MATH_DEFINES
 
 #include "meshManager.h"
 #include "core/logger/logger.h"
@@ -64,6 +64,66 @@ namespace pwg
 
 		PWG_INFO("Created mesh \"{0}\" ({1}x{1})", name, size);
 		return name;
+	}
+
+	std::shared_ptr<Mesh> MeshManager::CreatePlaneMesh(int size, int lod)
+	{
+		std::vector<Vertex> vertices;
+		std::vector<unsigned int> indices;
+
+		int step = 1 << lod;
+		int lodSize = (size - 1) / step + 1;
+
+		vertices.resize(lodSize * lodSize);
+		indices.resize((lodSize - 1) * (lodSize - 1) * 6);
+
+		uint16_t width = size;
+		uint16_t height = size;
+
+		float topLeftX = (width - 1) / -2.0f;
+		float topLeftZ = (height - 1) / 2.0f;
+
+		for (int y = 0; y < lodSize; y++)
+		{
+			for (int x = 0; x < lodSize; x++)
+			{
+				int idx = y * lodSize + x;
+
+				int sampleX = std::min(x * step, size - 1);
+				int sampleY = std::min(y * step, size - 1);
+
+				float u = float(sampleX) / float(size - 1);
+				float v = float(sampleY) / float(size - 1);
+
+				vertices[idx].position = glm::vec3(sampleX, 0, sampleY);
+				vertices[idx].uv = glm::vec2(u, v);
+			}
+		}
+
+		for (uint32_t y = 0; y < lodSize - 1; y++)
+		{
+			for (uint32_t x = 0; x < lodSize - 1; x++)
+			{
+				uint32_t idx = (y * (lodSize - 1) + x) * 6;
+
+				uint32_t i0 = y * lodSize + x;
+				uint32_t i1 = i0 + 1;
+				uint32_t i2 = i0 + lodSize;
+				uint32_t i3 = i2 + 1;
+
+				indices[idx] = i0;
+				indices[idx + 1] = i1;
+				indices[idx + 2] = i2;
+
+				indices[idx + 3] = i1;
+				indices[idx + 4] = i3;
+				indices[idx + 5] = i2;
+			}
+		}
+
+		PWG_INFO("{0}x{0} Mesh created!", size);
+
+		return std::make_shared<Mesh>(vertices, indices, (float)size);
 	}
 
 	std::string MeshManager::CreateSphereMesh(float radius, int sectorCount, int sliceCount, std::string name)
