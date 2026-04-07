@@ -70,7 +70,7 @@ void main()
     float slope = 1.0 - clamp(normal.y, 0.0, 1.0);
 
     // blend między trawą a skałą
-    float rock = smoothstep(0.15, 0.7, slope);
+    float rock = smoothstep(0.15, 0.85, slope);
     float grass = 1.0 - rock;
 
     // próbki tekstur (bez żadnych cudów)

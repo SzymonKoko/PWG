@@ -26,12 +26,15 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     /*== SHADER LOADING ==*/
     std::string terrainShadersPath = "../assets/shaders/terrainShaders/";
     std::string unlitShadersPath = "../assets/shaders/unlit/";
+    std::string skyboxShadersPath = "../assets/shaders/skybox/";
 
     shaderManager->Load("terrainShader", terrainShadersPath + "terrain.vert", terrainShadersPath + "terrain.frag");
     shaderManager->Load("unlitShader", unlitShadersPath + "unlit.vert", unlitShadersPath + "unlit.frag");
+    shaderManager->Load("skyboxShader", skyboxShadersPath + "skybox.vert", skyboxShadersPath + "skybox.frag");
 
     auto terrainShader = shaderManager->GetShader<pwg::Shader>("terrainShader");
     auto unlitShader = shaderManager->GetShader<pwg::Shader>("unlitShader");
+    auto skyboxShader = shaderManager->GetShader<pwg::Shader>("skyboxShader");
 
     /*== MESH LOADING ==*/
     auto sunMesh = m_resourceManager->GetMeshManager()->GetMesh("SunMesh");
@@ -48,14 +51,29 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     textureManager->LoadTextureArray("terrainTextures", texturesPaths);
     auto textureArray = textureManager->GetTextureArray("terrainTextures");
 
+    std::vector<std::string> skyboxPaths = {
+        terrainTexturesPath + "skybox/miramar_rt.tga",
+        terrainTexturesPath + "skybox/miramar_lf.tga",
+        terrainTexturesPath + "skybox/miramar_up.tga",
+        terrainTexturesPath + "skybox/miramar_dn.tga",
+        terrainTexturesPath + "skybox/miramar_bk.tga",
+        terrainTexturesPath + "skybox/miramar_ft.tga",
+    };
+
+    textureManager->LoadCubeMapTexture("Skybox", skyboxPaths);
+
+
     /*== CREATING MATERIALS ==*/
     auto terrainMaterial = materialManager->CreateMaterial("TerrainMaterial", terrainShader);
     auto unlitMaterial = m_resourceManager->GetMaterialManager()->CreateMaterial("UnlitMaterial", unlitShader);
+    auto skyboxMaterial = materialManager->CreateMaterial("SkyboxMaterial", skyboxShader);
 
     terrainMaterial->SetTextureArray("u_Textures", textureArray);
+    auto skybox = textureManager->GetCubeMapTexture("Skybox");
 
     m_terrain = std::make_shared<Terrain>(m_resourceManager);
     m_sunObject = std::make_shared<SunObject>(sunMesh, unlitMaterial);
+    m_skybox = std::make_shared<SkyBox>(skybox, skyboxMaterial);
 
     m_cameraManager->SetCamera(CameraType::EDITOR);
     m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
@@ -117,6 +135,7 @@ void pwg::EditorScene::Draw()
     m_renderer.BeginFrame();
     m_renderer.SetCamera(m_cameraManager->GetActiveCamera());
     m_renderer.AddLight(m_sunObject->GetLight());
+    m_renderer.AddSkyBox(m_skybox);
     m_renderer.AddToQueue(m_terrain.get());
     m_renderer.AddToQueue(m_sunObject.get());
     m_renderer.DrawAll();

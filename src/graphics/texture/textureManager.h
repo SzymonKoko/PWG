@@ -3,6 +3,7 @@
 
 #include "texture.h"
 #include "textureArray.h"
+#include "cubeMapTexture.h"
 #include <string>
 #include <memory>
 #include <unordered_map>
@@ -41,6 +42,8 @@ namespace pwg
 		*/
 		void LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths);
 
+		void LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths);
+
 		/**
 		* @brief Unloads a texture by its ID and deletes it from GPU memory.
 		* @param textureID ID of the texture to remove.
@@ -66,9 +69,12 @@ namespace pwg
 		*/
 		std::shared_ptr<TextureArray> GetTextureArray(const std::string& textureArrayID);
 
+		std::shared_ptr<CubeMapTexture> GetCubeMapTexture(const std::string& cubemapTextureID);
+
 	private:
 		std::unordered_map<std::string, std::shared_ptr<Texture>> m_textures;			/**< Container storing all loaded 2D textures. */
 		std::unordered_map<std::string, std::shared_ptr<TextureArray>> m_textureArrays; /**< Container storing all loaded texture arrays. */
+		std::unordered_map<std::string, std::shared_ptr<CubeMapTexture>> m_cubeMapTextures; /**< Container storing all loaded texture arrays. */
 	};
 } // namespace pwg
 

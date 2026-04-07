@@ -29,6 +29,8 @@ namespace pwg
 	{
 	public:
 
+		Mesh(const std::vector<pwg::Vertex>& vertices);
+
 		/**
 		* @brief Constructs a mesh from given vertices and indices.
 		* @param vertices Vector containing vertex data.

@@ -5,7 +5,7 @@ namespace pwg
 {
 	struct TerrainSettings
 	{
-		int chunkSize{ 257 };
+		int chunkSize{ 129 };
 	};
 }
 #endif // !SRC_TERRAIN_CONFIG_TERRAIN_SETTINGS_H_

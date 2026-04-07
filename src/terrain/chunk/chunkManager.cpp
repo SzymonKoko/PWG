@@ -39,11 +39,13 @@ namespace pwg
 			{
 				auto& chunk = m_chunks[i][j];
 
+				float worldHalfSize = (m_worldSize - 1) * 0.5f;
+
 				float worldX = chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1);
 				float worldZ = chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1);
 
-				float centerX = worldX + (m_terrainSettings.chunkSize - 1) * 0.5f;
-				float centerZ = worldZ + (m_terrainSettings.chunkSize - 1) * 0.5f;
+				float centerX = worldX + (m_terrainSettings.chunkSize - 1) * 0.5f - worldHalfSize;
+				float centerZ = worldZ + (m_terrainSettings.chunkSize - 1) * 0.5f - worldHalfSize;
 
 				glm::vec2 camXZ = glm::vec2(camera->GetCameraPosition().x, camera->GetCameraPosition().z);
 				glm::vec2 chunkXZ = glm::vec2(centerX, centerZ);

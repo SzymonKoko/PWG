@@ -28,6 +28,18 @@ void pwg::TextureManager::LoadTextureArray(const std::string& name, std::vector<
 
 }
 
+void pwg::TextureManager::LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths)
+{
+    if (m_cubeMapTextures.contains(name))
+    {
+        return;
+    }
+
+    auto cubeMapTexture = std::make_shared<CubeMapTexture>(cubemapPaths);
+
+    m_cubeMapTextures[name] = cubeMapTexture;
+}
+
 void pwg::TextureManager::Unload(std::string& textureID)
 {
     m_textures.erase(textureID);
@@ -53,4 +65,9 @@ std::shared_ptr<pwg::Texture> pwg::TextureManager::GetTexture(const std::string&
 std::shared_ptr<pwg::TextureArray> pwg::TextureManager::GetTextureArray(const std::string& textureArrayID)
 {
     return m_textureArrays[textureArrayID];
+}
+
+std::shared_ptr<pwg::CubeMapTexture> pwg::TextureManager::GetCubeMapTexture(const std::string& cubemapTextureID)
+{
+    return m_cubeMapTextures[cubemapTextureID];
 }

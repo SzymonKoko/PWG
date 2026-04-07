@@ -52,8 +52,16 @@ namespace pwg
 			texData.texture->Bind(texData.slot);
 			m_shader->SetUniformInt(name, texData.slot);
 		}
-
 		int slot = 0;
+
+		for (auto& [name, cubemap] : m_cubeMapTextures)
+		{
+			cubemap->Bind(slot);
+			m_shader->SetUniformInt(name, slot);
+			slot++;
+		}
+
+		slot = 0;
 		for (auto& [name, texArray] : m_textureArrays)
 		{
 			texArray->Bind(slot);
@@ -132,6 +140,11 @@ namespace pwg
 	void Material::SetTextureArray(const std::string& name, std::shared_ptr<TextureArray> textureArray)
 	{
 		m_textureArrays[name] = textureArray;
+	}
+
+	void Material::SetCubeMapTexture(const std::string& name, std::shared_ptr<CubeMapTexture> cubeMapTexture)
+	{
+		m_cubeMapTextures[name] = cubeMapTexture;
 	}
 
 	void Material::SetMaterialProperties(MaterialProperties& materialProperties)

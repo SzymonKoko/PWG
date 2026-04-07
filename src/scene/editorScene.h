@@ -72,6 +72,7 @@ namespace pwg
 		std::unique_ptr<MeshManager> m_meshManager;				/**< Manages procedural and loaded meshes. */
 		std::unique_ptr<CameraManager> m_cameraManager;			/**< Handles active camera and switching between cameras. */
 		std::shared_ptr<SunObject> m_sunObject;					/**< Sun object providing lighting. */
+		std::shared_ptr<SkyBox> m_skybox;
 
 
 		float m_aspectRatio = 16.0f / 9.0f;						/**< Aspect ratio of the viewport. */

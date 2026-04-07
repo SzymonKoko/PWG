@@ -7,6 +7,7 @@
 #include "graphics/shader/shader.h"
 #include "graphics/texture/texture.h"
 #include "graphics/texture/textureArray.h"
+#include "graphics/texture/cubeMapTexture.h"
 
 namespace pwg
 {
@@ -145,6 +146,8 @@ namespace pwg
 		*/
 		void SetTextureArray(const std::string& name, std::shared_ptr<TextureArray> textureArray);
 
+		void SetCubeMapTexture(const std::string& name, std::shared_ptr<CubeMapTexture> cubeMapTexture);
+
 		/**
 		* @brief Updates the material lighting properties.
 		* @param materialProperties New material properties.
@@ -170,6 +173,7 @@ namespace pwg
 		std::unordered_map<std::string, glm::vec3> m_vec3Uniforms;							/**< Stored vec3 uniforms */
 		std::unordered_map<std::string, glm::mat4> m_mat4Uniforms;							/**< Stored mat4 uniforms */
 		std::unordered_map<std::string, std::shared_ptr<TextureArray>> m_textureArrays;		/**< Stored texture arrays */
+		std::unordered_map<std::string, std::shared_ptr<CubeMapTexture>> m_cubeMapTextures;	/**< Stored cube map textures */
 
 		std::shared_ptr<Shader> m_shader;													/**< Shader used by the material */
 		MaterialProperties m_materialProperties;											/**< Material lighting properties */

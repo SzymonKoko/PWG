@@ -7,6 +7,8 @@
 #include "resources/resourceManager.h"
 #include "lightingUploader.h"
 #include "scene/cameras/icamera.h"
+#include "scene/skybox/skybox.h"
+//#include <main.cpp>
 
 namespace pwg
 {
@@ -55,6 +57,8 @@ namespace pwg
 		*/
 		void DrawAll();
 
+		void DrawSkyBox();
+
 		/**
 		* @brief Adds a renderable object to the render queue.
 		* @param renderable Pointer to the renderable object.
@@ -66,6 +70,8 @@ namespace pwg
 		* @param light Reference to the light to add.
 		*/
 		void AddLight(Light& light);
+
+		void AddSkyBox(std::shared_ptr<SkyBox> skybox);
 
 		/**
 		* @brief Clears the current render queue.
@@ -88,6 +94,7 @@ namespace pwg
 		glm::vec3 m_cameraPosition{ 0.0f };						/**< World-space position of the camera */
 
 		Light m_light;											/**< Single scene light (extendable for multiple lights) */
+		std::shared_ptr<SkyBox> m_skybox;
 	};
 } // namespace pwg
 

@@ -1,4 +1,4 @@
-#include <glad/glad.h>
+﻿#include <glad/glad.h>
 #include "renderer.h"
 #include "core/logger/logger.h"
 #include "graphics/renderer/irenderable.h"
@@ -43,17 +43,40 @@ void pwg::Renderer::Draw(IRenderable* renderable)
 
 void pwg::Renderer::DrawAll()
 {
+	DrawSkyBox();
+
 	for (auto& r : m_renderQueue)
 	{
 		m_lightingUploader->Upload(r->GetMaterial(), m_light, m_cameraPosition);
-		r->GetMaterial()->Apply();
 
 		r->GetMaterial()->SetUniformMat4("u_view", m_viewMatrix);
 		r->GetMaterial()->SetUniformMat4("u_projection", m_projectionMatrix);
 
+		r->GetMaterial()->Apply();
 
 		r->Draw(*this);
 	}
+}
+
+void pwg::Renderer::DrawSkyBox()
+{
+	glDepthFunc(GL_LEQUAL);
+	glDepthMask(GL_FALSE);
+
+	float time = glfwGetTime();
+	glm::mat4 view = glm::mat4(glm::mat3(m_viewMatrix));
+
+	view = glm::rotate(view, time * 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
+
+	m_skybox->GetMaterial()->SetUniformMat4("u_view", view);
+	m_skybox->GetMaterial()->SetUniformMat4("u_projection", m_projectionMatrix);
+
+	m_skybox->GetMaterial()->Apply();
+
+	m_skybox->Draw();
+
+	glDepthMask(GL_TRUE);
+	glDepthFunc(GL_LESS); 
 }
 
 void pwg::Renderer::AddToQueue(IRenderable* renderable)
@@ -64,6 +87,11 @@ void pwg::Renderer::AddToQueue(IRenderable* renderable)
 void pwg::Renderer::AddLight(Light& light)
 {
 	m_light = light;
+}
+
+void pwg::Renderer::AddSkyBox(std::shared_ptr<SkyBox> skybox)
+{
+	m_skybox = skybox;
 }
 
 void pwg::Renderer::ClearQueue()

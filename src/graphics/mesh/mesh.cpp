@@ -8,6 +8,12 @@
 
 namespace pwg
 {
+	Mesh::Mesh(const std::vector<pwg::Vertex>& vertices)
+		: m_vertices(vertices)
+	{
+		SetupMesh();
+	}
+
 	Mesh::Mesh(const std::vector<pwg::Vertex>& vertices, const std::vector<unsigned int>& indices, float size)
 		:m_vertices(vertices),
 		 m_indices(indices),
@@ -36,7 +42,16 @@ namespace pwg
 	{
 		glBindVertexArray(m_vaoID);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, 0);
+
+		if (!m_indices.empty())
+		{
+			glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
+		}
+		else
+		{
+			glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());
+		}
+
 		glBindVertexArray(0);
 	}
 
