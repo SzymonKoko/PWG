@@ -17,11 +17,6 @@ namespace pwg
 
 		m_shader->ActivateShader();
 
-		m_shader->SetUniformVec3("u_material.ambient", m_materialProperties.ambient);
-		m_shader->SetUniformVec3("u_material.diffuse", m_materialProperties.diffuse);
-		m_shader->SetUniformVec3("u_material.specular", m_materialProperties.specular);
-		m_shader->SetUniformFloat("u_material.shininess", m_materialProperties.shininess);
-
 		for (auto& [name, value] : m_floatUniforms)
 		{
 			m_shader->SetUniformFloat(name, value);
@@ -149,10 +144,12 @@ namespace pwg
 
 	void Material::SetMaterialProperties(MaterialProperties& materialProperties)
 	{
-		m_materialProperties.ambient = materialProperties.ambient;
-		m_materialProperties.diffuse = materialProperties.diffuse;
-		m_materialProperties.specular = materialProperties.specular;
-		m_materialProperties.shininess = materialProperties.shininess;
+		m_materialProperties.albedo = materialProperties.albedo;
+		m_materialProperties.ao = materialProperties.ao;
+		m_materialProperties.rougness = materialProperties.rougness;
+		m_materialProperties.metallic = materialProperties.metallic;
+		m_materialProperties.heightmap = materialProperties.heightmap;
+		m_materialProperties.normalmap = materialProperties.normalmap;
 	}
 
 }

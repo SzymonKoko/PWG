@@ -56,6 +56,8 @@ namespace pwg
 			}
 		}
 
+		m_cameraPosition = camera->GetCameraPosition();
+
 		if (m_needRegenerate)
 		{
 			Regenerate();
@@ -90,6 +92,7 @@ namespace pwg
 				chunk.material->SetUniformTexture("u_Normalmap", m_globalMasks["NormalMask"]->texture, 1);
 				chunk.material->SetUniformVec2("u_uvOffset", uvOffset);
 				chunk.material->SetUniformVec2("u_uvScale", uvScale);
+				chunk.material->SetUniformVec2("u_cameraPosition", m_cameraPosition);
 				chunk.material->Apply();
 
 				mesh->Draw();

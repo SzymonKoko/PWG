@@ -11,6 +11,7 @@ namespace pwg
 	 */
 	struct Light
 	{
+		glm::vec3 position{ 0.0f };
 		glm::vec3 direction{ 0.0f }; /**< Direction the light is pointing to. */
 		glm::vec3 color{ 0.0f };     /**< RGB color of the light. */
 		float intensivity{ 0.0f };   /**< Strength or intensity of the light. */

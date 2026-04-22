@@ -34,7 +34,7 @@ namespace pwg
 		return {
 			{"Noise Type", ParameterType::List, &m_parameters.noiseType, 0, 3},
 			{"Seed", ParameterType::Int, &m_parameters.seed, 1, 200},
-			{"Frequency", ParameterType::Float, &m_parameters.frequency, 0.01, 1.0},
+			{"Frequency", ParameterType::Float, &m_parameters.frequency, 0.01, 5.0},
 			{"Scale", ParameterType::Float, &m_parameters.scale, 0.01, 200.0f}
 		};
 	}

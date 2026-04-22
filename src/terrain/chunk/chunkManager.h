@@ -40,6 +40,7 @@ namespace pwg
 		bool m_needRegenerate{ true };
 		float m_amplitude{ 0 };
 		int m_worldSize{ 0 };
+		glm::vec3 m_cameraPosition{ 0 };
 
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> m_globalMasks;
 	

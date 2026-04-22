@@ -6,8 +6,10 @@ namespace pwg
 		: m_mesh(mesh),
 		  m_material(material)
 	{
-		m_light.color = glm::vec3{ 1.0f };
-		m_light.intensivity = 0.7f;
+		m_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+		m_light.intensivity = 1.0f;
+		m_sunObjectProperties.orbitSpeed = 0.05f;
+		m_sunObjectProperties.orbitRadius = 5000.0;
 		
 	}
 
@@ -17,12 +19,16 @@ namespace pwg
 
 	void SunObject::Update(float dt, std::shared_ptr<ICamera> camera)
 	{
-		m_sunObjectProperties.time += dt;
-		float offsetY = 1000.0f;
+		if (!m_sunObjectProperties.stopTime)
+		{
+			m_sunObjectProperties.time += dt;
+		}
 
 		m_sunObjectProperties.position.x = cos(m_sunObjectProperties.time * m_sunObjectProperties.orbitSpeed) * m_sunObjectProperties.orbitRadius;
-		m_sunObjectProperties.position.y = sin(m_sunObjectProperties.time * m_sunObjectProperties.orbitSpeed) * m_sunObjectProperties.orbitRadius + offsetY;
-		m_sunObjectProperties.position.z = 0.0f;// sin(m_time * m_orbitSpeed * 0.5f)* m_orbitRadius;
+		m_sunObjectProperties.position.y = sin(m_sunObjectProperties.time * m_sunObjectProperties.orbitSpeed) * m_sunObjectProperties.orbitRadius;
+		m_sunObjectProperties.position.z = sin(m_sunObjectProperties.time * m_sunObjectProperties.orbitSpeed) * m_sunObjectProperties.orbitRadius;
+
+		m_light.position = m_sunObjectProperties.position;
 
 		m_light.direction = -glm::normalize(m_sunObjectProperties.position);
 		m_mesh->SetPosition(m_sunObjectProperties.position);
@@ -66,9 +72,18 @@ namespace pwg
 		return m_light;
 	}
 
+	void SunObject::SetLight(Light& light)
+	{
+		m_light = light;
+	}
+
 	SunObjectProperties& SunObject::GetSunObjectProperties()
 	{
 		return m_sunObjectProperties;
+	}
+	void SunObject::SetSunObjectProperties(SunObjectProperties& properties)
+	{
+		m_sunObjectProperties = properties;
 	}
 }
 

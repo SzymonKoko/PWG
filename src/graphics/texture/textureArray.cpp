@@ -1,3 +1,4 @@
+#include <glad/glad.h>
 #include "textureArray.h"
 
 pwg::TextureArray::TextureArray(int width, int height, int numberOfLayers, GLTextureFormats format)
@@ -7,11 +8,11 @@ pwg::TextureArray::TextureArray(int width, int height, int numberOfLayers, GLTex
 	  m_format(format)
 {
 	
-	m_wrapS = ToGL(TextureWrapMode::MIRRORED_REPEAT);
-	m_wrapT = ToGL(TextureWrapMode::MIRRORED_REPEAT);
+	m_wrapS = ToGL(TextureWrapMode::REPEAT);
+	m_wrapT = ToGL(TextureWrapMode::REPEAT);
 
-	m_minFilter = ToGL(TextureFilterMode::MIPMAP_NEAREST_NEAREST);
-	m_magFilter = ToGL(TextureFilterMode::MIPMAP_NEAREST_NEAREST);
+	m_minFilter = ToGL(TextureFilterMode::MIPMAP_LINEAR_LINEAR);
+	m_magFilter = ToGL(TextureFilterMode::LINEAR);
 
 	glGenTextures(1, &m_textureArrayID);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, m_textureArrayID);
@@ -23,7 +24,7 @@ pwg::TextureArray::TextureArray(int width, int height, int numberOfLayers, GLTex
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, m_wrapT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, m_minFilter);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, m_magFilter);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY, 16);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY, 16.0f);
 
 	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }

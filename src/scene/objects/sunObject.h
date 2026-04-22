@@ -18,6 +18,8 @@ namespace pwg
 
 		glm::vec3 color{ 1.0f, 1.0f, 0.3f };		/**< Color of the sun. */
 		glm::vec3 position{ 0.0f, 0.0f, 0.0f };		/**< Current position of the sun in world space. */
+
+		bool stopTime{ false };
 	};
 
 	/**
@@ -81,11 +83,15 @@ namespace pwg
 		 */
 		Light& GetLight();
 
+		void SetLight(Light& light);
+
 		/**
 		 * @brief Returns the properties of the sun object.
 		 * @return Reference to the SunObjectProperties struct.
 		 */
 		SunObjectProperties& GetSunObjectProperties();
+
+		void SetSunObjectProperties(SunObjectProperties& properties);
 
 	private:
 		std::shared_ptr<Mesh> m_mesh;              /**< Mesh representing the sun. */

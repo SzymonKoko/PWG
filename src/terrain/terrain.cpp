@@ -12,16 +12,6 @@ namespace pwg
 
         m_size = CHUNKS * m_terrainSettings.chunkSize;
 
-
-        auto materialProps = m_material->GetMaterialProperties();
-
-        materialProps.ambient = glm::vec3(0.2f);//{ 1.0f, 0.5f, 0.31f };
-        materialProps.diffuse = glm::vec3(1.0f);//{ 1.0f, 0.5f, 0.31f };
-        materialProps.specular = { 0.5f, 0.5f, 0.5f };
-        materialProps.shininess = 2.0f;
-
-        m_material->SetMaterialProperties(materialProps);
-
     }
 
     Terrain::~Terrain()

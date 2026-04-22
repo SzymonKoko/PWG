@@ -1,6 +1,6 @@
 #version 450 core
 
-#engine_include "../common/lighting.glsl"
+#engine_include "../common/pbr.glsl"
 
 out vec4 FragColor;
 
@@ -8,8 +8,15 @@ in vec2 f_TextureCoordinates;
 in vec3 f_Pos;
 in vec3 f_Normal;
 
-uniform sampler2D u_Normalmap;
 uniform sampler2DArray u_Textures;
+uniform vec3 u_cameraPosition;
+
+vec2 ParallaxMapping(float height, vec2 texCoords, vec3 viewDirection)
+{
+    float denom = max(viewDirection.z, 0.001);
+    vec2 p = viewDirection.xy / denom * (height);
+    return texCoords - p;
+}
 
 float hash(vec2 p)
 {
@@ -63,24 +70,52 @@ void main()
 {
     vec3 normal = normalize(f_Normal);
 
-    // proste UV (jednolita skala na cały teren)
-    vec2 uv = f_Pos.xz * 0.02;
+    vec2 uv = f_Pos.xz * 0.01;
 
-    // slope (0 = płasko, 1 = stromo)
     float slope = 1.0 - clamp(normal.y, 0.0, 1.0);
+    float rock = smoothstep(0.05, 0.95, slope);
 
-    // blend między trawą a skałą
-    float rock = smoothstep(0.15, 0.85, slope);
-    float grass = 1.0 - rock;
+    mat3 TBN = ComputeTBN(normal, uv, f_Pos);
+    vec3 V = normalize(u_cameraPosition - f_Pos);
+    vec3 viewDirTS = normalize(transpose(TBN) * V);
 
-    // próbki tekstur (bez żadnych cudów)
-    vec3 grassColor = texture(u_Textures, vec3(uv, 0)).rgb;
-    vec3 rockColor  = texture(u_Textures, vec3(uv, 2)).rgb;
+    float gH = texture(u_Textures, vec3(uv, 5)).r;
+    float rH = texture(u_Textures, vec3(uv, 10)).r;
+    float height = mix(gH, rH, rock);
 
-    // miks
-    vec3 color = grassColor * grass + rockColor * rock;
+    float dist = length(u_cameraPosition - f_Pos);
+    float fade = clamp(1.0 - dist / 50.0, 0.0, 1.0);
 
-    vec3 finalColor = ApplyLighting(normal, color, f_Pos);
+    vec2 parallaxUV = ParallaxMapping(height, uv, viewDirTS);
+    uv = mix(uv, parallaxUV, fade);
+    
+    // GRASS
+    vec3 gA = texture(u_Textures, vec3(uv, 0)).rgb;
+    vec3 gN = texture(u_Textures, vec3(uv, 1)).rgb * 2.0 - 1.0;
+    float gR = texture(u_Textures, vec3(uv, 2)).r;
+    float gM = texture(u_Textures, vec3(uv, 3)).r;
+    float gAO = texture(u_Textures, vec3(uv, 4)).r;
+    
+
+    // ROCK
+    vec3 rA = texture(u_Textures, vec3(uv, 5)).rgb;
+    vec3 rN = texture(u_Textures, vec3(uv, 6)).rgb * 2.0 - 1.0;
+    float rR = texture(u_Textures, vec3(uv, 7)).r;
+    float rM = texture(u_Textures, vec3(uv, 8)).r;
+    float rAO = texture(u_Textures, vec3(uv, 9)).r;
+    
+
+    // BLEND
+    vec3 albedo = mix(gA, rA, rock);
+    vec3 normalTex = normalize(mix(gN, rN, rock));
+    float roughness = mix(gR, rR, rock);
+    float metallic = mix(gM, rM, rock);
+    float ao = mix(gAO, rAO, rock);
+    
+
+    vec3 N = normal;//normalize(TBN * normalTex);    
+
+    vec3 finalColor = ApplyLighting(N, V, albedo, metallic, roughness, ao, f_Pos);
 
     FragColor = vec4(finalColor, 1.0);
 }

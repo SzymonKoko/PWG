@@ -21,6 +21,13 @@ namespace pwg
 		glm::vec3 ambient{ 0.0f };	/**< Ambient color component */
 		glm::vec3 specular{ 0.0f };	/**< Specular color component */
 		float shininess{ 0.0f };	/**< Specular shininess factor */
+
+		std::shared_ptr<Texture> albedo;
+		std::shared_ptr<Texture> heightmap;
+		std::shared_ptr<Texture> normalmap;
+		std::shared_ptr<Texture> ao;
+		std::shared_ptr<Texture> rougness;
+		std::shared_ptr<Texture> metallic;
 	};
 
 	/**

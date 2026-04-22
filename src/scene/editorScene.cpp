@@ -3,6 +3,7 @@
 #include "editorScene.h"
 #include "controls/noiseControls.h"
 #include "controls/terrainLayerControls.h"
+#include "controls/lightControls.h"
 
 
 pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput, std::shared_ptr<ResourceManager> resourceManager, Renderer& renderer)
@@ -43,10 +44,19 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     std::string terrainTexturesPath = "../assets/textures/";
     std::vector<std::string> texturesPaths;
 
-    texturesPaths.push_back(terrainTexturesPath + "grasschat3.png");
-    texturesPaths.push_back(terrainTexturesPath + "sediment.png");
-    texturesPaths.push_back(terrainTexturesPath + "stonechat.png");
-    texturesPaths.push_back(terrainTexturesPath + "snow.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/albedo.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/normal.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/roughness.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/metallic.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/ao.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/height.png");
+
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/albedo.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/normal.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/roughness.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/metallic.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/ao.png");
+    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/height.png");
 
     textureManager->LoadTextureArray("terrainTextures", texturesPaths);
     auto textureArray = textureManager->GetTextureArray("terrainTextures");
@@ -153,9 +163,9 @@ void pwg::EditorScene::Draw()
 
     ImGui::End();
 
-    ImGui::Begin("Controls");
+    ImGui::Begin("Terrain Controls");
 
-    if (ImGui::BeginTabBar("MainTabs"))
+    if (ImGui::BeginTabBar("Terrain"));
     {
         controls::NoiseControls::ShowControl(m_terrain->GetChunkManager());
         controls::TerrainLayerControls::ShowControl(m_terrain->GetTerrainLayers());
@@ -163,7 +173,18 @@ void pwg::EditorScene::Draw()
     ImGui::EndTabBar();
 
     ImGui::End();
+
+    ImGui::Begin("Light Controls");
+
+    if (ImGui::BeginTabBar("Light"))
+    {
+        controls::LightControls::ShowControl(m_sunObject);
+    }
+    ImGui::EndTabBar();
+
+    ImGui::End();
 }
+
 
 void pwg::EditorScene::HandleKeyboardInputs()
 {
