@@ -8,6 +8,7 @@
 #include "lightingUploader.h"
 #include "scene/cameras/icamera.h"
 #include "scene/skybox/skybox.h"
+#include "terrain/debug/terrainDebug.h"
 //#include <main.cpp>
 
 namespace pwg
@@ -85,6 +86,8 @@ namespace pwg
 		*/
 		void SetCamera(std::shared_ptr<ICamera> camera);
 
+		void SetDebugSettings(DebugSettings& settings);
+
 	private:
 		std::vector<IRenderable*> m_renderQueue;				/**< Container storing pointers to all renderable objects for the current frame */
 		std::unique_ptr<LightingUploader> m_lightingUploader;	/**< Utility for uploading lighting information to materials */
@@ -95,6 +98,7 @@ namespace pwg
 
 		Light m_light;											/**< Single scene light (extendable for multiple lights) */
 		std::shared_ptr<SkyBox> m_skybox;
+		DebugSettings m_debugSettings;
 	};
 } // namespace pwg
 

@@ -5,15 +5,6 @@
 
 pwg::Renderer::Renderer()
 {
-	/*auto& shaderManager = m_resourceManager->GetShaderManager();
-	shaderManager.Load("default", "../assets/shaders/default.vert", "../assets/shaders/default.frag");
-	shaderManager.LoadComputeWithInclude("noise", "../assets/shaders/noise.comp", "../assets/shaders/FastNoiseLite.glsl");
-
-	auto& textureManager = m_resourceManager->GetTextureManager();
-	textureManager.Load("dirt", "../assets/textures/dirt.png");
-	m_currentShader = m_resourceManager->GetShaderManager().GetShader<pwg::Shader>("default");*/
-	
-
 	PWG_INFO("Renderer initialized");
 }
 
@@ -44,11 +35,20 @@ void pwg::Renderer::Draw(IRenderable* renderable)
 
 void pwg::Renderer::DrawAll()
 {
+	if (m_debugSettings.wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	}
+	else
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
+
 	DrawSkyBox();
 
 	for (auto& r : m_renderQueue)
 	{
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		
 		m_lightingUploader->Upload(r->GetMaterial(), m_light, m_cameraPosition);
 
 		r->GetMaterial()->SetUniformMat4("u_view", m_viewMatrix);
@@ -106,6 +106,11 @@ void pwg::Renderer::SetCamera(std::shared_ptr<ICamera> camera)
 	m_viewMatrix = camera->GetViewMatrix();
 	m_projectionMatrix = camera->GetProjectionMatrix();
 	m_cameraPosition = camera->GetCameraPosition();
+}
+
+void pwg::Renderer::SetDebugSettings(DebugSettings& settings)
+{
+	m_debugSettings = settings;
 }
 
 

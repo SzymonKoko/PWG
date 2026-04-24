@@ -13,14 +13,14 @@ void pwg::TextureManager::Load(const std::string& textureID, const std::string& 
     PWG_DEBUG("Texture has been loaded ({0}, id={1}, {2}x{3})", textureID, texture->GetTextureID(), texture->GetWidth(), texture->GetHeight());
 }
 
-void pwg::TextureManager::LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths)
+void pwg::TextureManager::LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureFormats format)
 {
     if (m_textureArrays.contains(name))
     {
         return;
     }
 
-    auto textureArray = std::make_shared<TextureArray>(1024, 1024, (int)texturePaths.size(), ToGL(TextureFormats::RGBA8));
+    auto textureArray = std::make_shared<TextureArray>(1024, 1024, (int)texturePaths.size(), ToGL(format));
 
     textureArray->LoadTexturesIntoArray(texturePaths);
 

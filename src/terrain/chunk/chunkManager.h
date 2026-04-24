@@ -16,7 +16,7 @@ namespace pwg
 	class ChunkManager
 	{
 	public:
-		ChunkManager(std::shared_ptr<ResourceManager> resourceManager, TerrainSettings& settings, std::shared_ptr<Material> terrainMaterial);
+		ChunkManager(std::shared_ptr<ResourceManager> resourceManager, TerrainSettings& settings, std::shared_ptr<Material> terrainMaterial, std::shared_ptr<TerrainDebug> debug);
 		~ChunkManager() = default;
 
 		void Update(std::shared_ptr<ICamera> camera);
@@ -41,6 +41,7 @@ namespace pwg
 		float m_amplitude{ 0 };
 		int m_worldSize{ 0 };
 		glm::vec3 m_cameraPosition{ 0 };
+		std::shared_ptr<TerrainDebug> m_terrainDebug;
 
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> m_globalMasks;
 	

@@ -2,7 +2,7 @@
 
 namespace pwg
 {
-	TerrainComputePipeline::TerrainComputePipeline(int terrainSize, std::shared_ptr<ShaderManager> shaderManager)
+	TerrainComputePipeline::TerrainComputePipeline(int terrainSize, std::shared_ptr<ShaderManager> shaderManager, std::shared_ptr<TerrainDebug> debug)
 		: m_size(terrainSize),
 		  m_shaderManager(shaderManager)
 	{
@@ -43,8 +43,13 @@ namespace pwg
 
 	void TerrainComputePipeline::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
+
+		//m_terrainDebug->Clear();
+
 		m_terrainPassContext.offset = glm::vec2(0,0);
+
 		m_graph->Execute(masks, m_terrainPassContext);
+
 	}
 
 	void TerrainComputePipeline::BuildGraph()

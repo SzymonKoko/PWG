@@ -39,6 +39,7 @@ namespace pwg
 		R8,			/**< Single-channel 8-bit normalized texture */
 		R32F,		/**< Single-channel 32-bit floating-point texture */
 		RGBA8,		/**< Four-channel 8-bit normalized texture */
+		SRGBA8,
 		RGBA16F,	/**< Four-channel 16-bit floating-point texture */
 		RGBA32F		/**< Four-channel 32-bit floating-point texture */
 	};

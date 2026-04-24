@@ -3,16 +3,23 @@
 
 namespace pwg
 {
-	ChunkManager::ChunkManager(std::shared_ptr<ResourceManager> resourceManager, TerrainSettings& settings, std::shared_ptr<Material> terrainMaterial)
-		: m_terrainSettings(settings)
+	ChunkManager::ChunkManager(std::shared_ptr<ResourceManager> resourceManager, TerrainSettings& settings, std::shared_ptr<Material> terrainMaterial, std::shared_ptr<TerrainDebug> debug)
+		: m_terrainSettings(settings),
+		  m_terrainDebug(debug)
 	{
 		m_worldSize = settings.chunkSize * CHUNKS;
 
-		m_terrainComputePipeline = std::make_shared<TerrainComputePipeline>(m_worldSize, resourceManager->GetShaderManager());
+		m_terrainComputePipeline = std::make_shared<TerrainComputePipeline>(m_worldSize, resourceManager->GetShaderManager(), debug);
 		m_lodManager = std::make_unique<LODManager>(m_terrainSettings.chunkSize);
 		m_lodManager->GenerateLODMeshes();
 
 		m_globalMasks = m_terrainComputePipeline->CreateMasks();
+
+
+		m_terrainDebug->RegisterTexture("NONE", DebugMode::DEBUG_NONE, nullptr, false);		
+		m_terrainDebug->RegisterTexture("Height", DebugMode::DEBUG_HEIGHT, m_globalMasks["Elevation"]->texture, true);		
+		m_terrainDebug->RegisterTexture("Normal", DebugMode::DEBUG_NORMAL, nullptr, false);		
+		m_terrainDebug->RegisterTexture("Slope", DebugMode::DEBUG_SLOPE, nullptr, false);
 
 		for (int i = 0; i < CHUNKS; i++)
 		{
@@ -92,7 +99,19 @@ namespace pwg
 				chunk.material->SetUniformTexture("u_Normalmap", m_globalMasks["NormalMask"]->texture, 1);
 				chunk.material->SetUniformVec2("u_uvOffset", uvOffset);
 				chunk.material->SetUniformVec2("u_uvScale", uvScale);
+				chunk.material->SetUniformInt("u_worldSize", m_worldSize);
 				chunk.material->SetUniformVec2("u_cameraPosition", m_cameraPosition);
+
+				auto& entries = m_terrainDebug->GetEntries();
+				auto entry = entries[m_terrainDebug->GetDebugMode()];
+				
+				chunk.material->SetUniformInt("u_debugMode", (int)entry.mode);
+				chunk.material->SetUniformInt("u_debugEnabled", m_terrainDebug->GetStatus());
+
+				auto tex = entry.texture ? entry.texture : m_globalMasks["Elevation"]->texture;
+				chunk.material->SetUniformTexture("u_debugTexture", tex, 2);
+				
+
 				chunk.material->Apply();
 
 				mesh->Draw();

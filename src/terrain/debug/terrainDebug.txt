@@ -1,0 +1,20 @@
+TerrainDebug
+{
+	RegisterTexture()
+	Draw()
+	
+	GetMode()
+	GetSelectedTExture()
+	
+	
+	int debugMode
+	map<Textures> tex
+}
+
+enum class DebugModes
+
+1. Zrobić debug class
+2. Rejestrować tekstury w pipeline
+3. Uzupełnić shader
+4. Zrobić ImGui
+5. Dwa tryby: mask, visualisation

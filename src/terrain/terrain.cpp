@@ -8,7 +8,8 @@ namespace pwg
 
         m_material = resourceManager->GetMaterialManager()->GetMaterial("TerrainMaterial");
         m_terrainLayersManager = std::make_unique<TerrainLayersManager>();
-        m_chunkManager = std::make_shared<ChunkManager>(resourceManager, m_terrainSettings, m_material);
+        m_terrainDebug = std::make_shared<TerrainDebug>();
+        m_chunkManager = std::make_shared<ChunkManager>(resourceManager, m_terrainSettings, m_material, m_terrainDebug);
 
         m_size = CHUNKS * m_terrainSettings.chunkSize;
 
@@ -82,5 +83,9 @@ namespace pwg
         x = (x - 0.0) / m_size;
         z = (z - 0.0) / m_size;
         return 0;// heightmapSample[z * m_size + x] * m_terrainNoiseSettings.amplitude;
+    }
+    std::shared_ptr<TerrainDebug> Terrain::GetTerrainDebug()
+    {
+        return m_terrainDebug;
     }
 }

@@ -11,6 +11,7 @@
 #include "terrain/terrainLayersManager.h"
 #include "graphics/shader/computeShader.h"
 #include "terrain/chunk/chunkManager.h"
+#include "terrain/debug/terrainDebug.h"
 
 namespace pwg
 {
@@ -120,6 +121,8 @@ namespace pwg
 		 */
 		float GetTerrainHeightAt(int x, int z);
 
+		std::shared_ptr<TerrainDebug> GetTerrainDebug();
+
 	private:
 
 		struct TerrainTextures
@@ -137,6 +140,7 @@ namespace pwg
 		TerrainTextures m_terrainTextures;
 		TerrainSettings m_terrainSettings;
 		std::shared_ptr<ChunkManager> m_chunkManager;
+		std::shared_ptr<TerrainDebug> m_terrainDebug;
 	};
 } // namespace pwg
 

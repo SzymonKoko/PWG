@@ -58,7 +58,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/ao.png");
     texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/height.png");
 
-    textureManager->LoadTextureArray("terrainTextures", texturesPaths);
+    textureManager->LoadTextureArray("terrainTextures", texturesPaths, TextureFormats::RGBA8);
     auto textureArray = textureManager->GetTextureArray("terrainTextures");
 
     std::vector<std::string> skyboxPaths = {
@@ -141,6 +141,8 @@ void pwg::EditorScene::Draw()
         m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     }
 
+    m_renderer.SetDebugSettings(m_terrain->GetTerrainDebug()->GetDebugSettings());
+
     m_frameBuffer->Bind();
     m_renderer.BeginFrame();
     m_renderer.SetCamera(m_cameraManager->GetActiveCamera());
@@ -179,6 +181,16 @@ void pwg::EditorScene::Draw()
     if (ImGui::BeginTabBar("Light"))
     {
         controls::LightControls::ShowControl(m_sunObject);
+    }
+    ImGui::EndTabBar();
+
+    ImGui::End();
+
+    ImGui::Begin("Debug");
+
+    if (ImGui::BeginTabBar("TerrainDebug"))
+    {
+        m_terrain->GetTerrainDebug()->ShowGUI();
     }
     ImGui::EndTabBar();
 

@@ -14,12 +14,14 @@
 #include "terrain/graph/passes/slopeMaskPass.h"
 #include "terrain/chunk/terrainChunk.h"
 
+#include "terrain/debug/terrainDebug.h"
+
 namespace pwg
 {
 	class TerrainComputePipeline
 	{
 	public:
-		TerrainComputePipeline(int terrainSize, std::shared_ptr<ShaderManager> shaderManager);
+		TerrainComputePipeline(int terrainSize, std::shared_ptr<ShaderManager> shaderManager, std::shared_ptr<TerrainDebug> debug);
 		~TerrainComputePipeline();
 
 		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
@@ -40,6 +42,7 @@ namespace pwg
 		std::unordered_map<std::string, std::shared_ptr<Texture>> m_finalTerrainMasks;
 		std::shared_ptr<TerrainGraph> m_graph;
 		std::shared_ptr<ShaderManager> m_shaderManager;
+		std::shared_ptr<TerrainDebug> m_terrainDebug;
 
 		TerrainPassContext m_terrainPassContext;
 		int m_size{ 0 };
