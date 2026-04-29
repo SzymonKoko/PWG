@@ -45,6 +45,17 @@ namespace pwg
 	};
 
 	/**
+	* @brief Enum representing different types of textures.
+	*/
+	enum class TextureType : uint8_t
+	{
+		ALBEDO,
+		NORMAL,
+		DATA,
+		HEIGHT
+	};
+
+	/**
 	* @brief Structure describing OpenGL texture format parameters.
 	* Stores internal format, base format, and data type used for texture creation.
 	*/
@@ -75,6 +86,8 @@ namespace pwg
 	* @return Structure containing OpenGL texture format parameters.
 	*/
 	constexpr GLTextureFormats ToGL(TextureFormats format);
+
+	constexpr GLTextureFormats GetFormatForType(TextureType type);
 }
 
 #include "GL_Types.inl"

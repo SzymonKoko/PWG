@@ -1,26 +1,29 @@
 #include "textureManager.h"
 
-void pwg::TextureManager::Load(const std::string& textureID, const std::string& texturePath)
+void pwg::TextureManager::Load(const std::string& textureID, const std::string& texturePath, TextureType type)
 {
     if (m_textures.contains(textureID))
     {
         return;
     }
 
-    auto texture = std::make_shared<Texture>(texturePath);
+    auto texture = std::make_shared<Texture>(texturePath, type);
     m_textures[textureID] = texture;
     
     PWG_DEBUG("Texture has been loaded ({0}, id={1}, {2}x{3})", textureID, texture->GetTextureID(), texture->GetWidth(), texture->GetHeight());
 }
 
-void pwg::TextureManager::LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureFormats format)
+void pwg::TextureManager::LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureType type)
 {
     if (m_textureArrays.contains(name))
     {
         return;
     }
 
-    auto textureArray = std::make_shared<TextureArray>(1024, 1024, (int)texturePaths.size(), ToGL(format));
+    int width, height, ch;
+    stbi_info(texturePaths[0].c_str(), &width, &height, &ch);
+
+    auto textureArray = std::make_shared<TextureArray>(width, height, (int)texturePaths.size(), type);
 
     textureArray->LoadTexturesIntoArray(texturePaths);
 
@@ -28,14 +31,14 @@ void pwg::TextureManager::LoadTextureArray(const std::string& name, std::vector<
 
 }
 
-void pwg::TextureManager::LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths)
+void pwg::TextureManager::LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths, TextureType type)
 {
     if (m_cubeMapTextures.contains(name))
     {
         return;
     }
 
-    auto cubeMapTexture = std::make_shared<CubeMapTexture>(cubemapPaths);
+    auto cubeMapTexture = std::make_shared<CubeMapTexture>(cubemapPaths, type);
 
     m_cubeMapTextures[name] = cubeMapTexture;
 }

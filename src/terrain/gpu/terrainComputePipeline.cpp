@@ -89,13 +89,13 @@ namespace pwg
 	{
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> terrainMasks;
 
-		terrainMasks["Elevation"] = std::make_shared<TerrainMask>("Elevation", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
-		terrainMasks["MountainMask"] = std::make_shared<TerrainMask>("MountainMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::WEIGHTS, 1.0f);
-		terrainMasks["MountainHeight"] = std::make_shared<TerrainMask>("MountainHeight", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
-		terrainMasks["FinalMask"] = std::make_shared<TerrainMask>("FinalMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
-		terrainMasks["FinalHeight"] = std::make_shared<TerrainMask>("FinalHeight", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::HEIGHT, 1.0f);
-		terrainMasks["NormalMask"] = std::make_shared<TerrainMask>("NormalMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::RGBA16F)), MaskUsage::WEIGHTS, 1.0f);
-		terrainMasks["SlopeMask"] = std::make_shared<TerrainMask>("SlopeMask", std::make_shared<Texture>(m_size, m_size, ToGL(TextureFormats::R32F)), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["Elevation"] = std::make_shared<TerrainMask>("Elevation", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["MountainMask"] = std::make_shared<TerrainMask>("MountainMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["MountainHeight"] = std::make_shared<TerrainMask>("MountainHeight", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["FinalMask"] = std::make_shared<TerrainMask>("FinalMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["FinalHeight"] = std::make_shared<TerrainMask>("FinalHeight", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["NormalMask"] = std::make_shared<TerrainMask>("NormalMask", std::make_shared<Texture>(m_size, m_size, TextureType::NORMAL), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["SlopeMask"] = std::make_shared<TerrainMask>("SlopeMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 
 		for (const auto& mask : terrainMasks)
 		{

@@ -17,6 +17,7 @@ void pwg::Renderer::BeginFrame()
 {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_MULTISAMPLE);
+	glEnable(GL_FRAMEBUFFER_SRGB);
 
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -26,6 +27,7 @@ void pwg::Renderer::BeginFrame()
 
 void pwg::Renderer::EndFrame()
 {
+	glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
 void pwg::Renderer::Draw(IRenderable* renderable)
@@ -110,6 +112,7 @@ void pwg::Renderer::SetCamera(std::shared_ptr<ICamera> camera)
 
 void pwg::Renderer::SetDebugSettings(DebugSettings& settings)
 {
+	
 	m_debugSettings = settings;
 }
 

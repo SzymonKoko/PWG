@@ -45,6 +45,18 @@ namespace pwg
 		return { GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE };
 	}
 
+	constexpr GLTextureFormats GetFormatForType(TextureType type)
+	{
+		switch (type)
+		{
+			case TextureType::ALBEDO:	return { GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE };
+			case TextureType::NORMAL:	return { GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE };
+			case TextureType::DATA:		return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
+			case TextureType::HEIGHT:	return { GL_R32F, GL_RED, GL_FLOAT };
+		}
+		return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
+	}
+
 }
 
 #endif // !SRC_GRAPHICS_COMMON_GL_TYPES_INL_

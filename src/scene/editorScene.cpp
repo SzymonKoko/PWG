@@ -42,24 +42,41 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     /*== TEXTURE LOADING ==*/
     std::string terrainTexturesPath = "../assets/textures/";
-    std::vector<std::string> texturesPaths;
+    std::vector<std::string> texturesPathsAlbedo;
+    std::vector<std::string> texturesPathsNormal;
+    std::vector<std::string> texturesPathsData;
 
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/albedo.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/normal.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/roughness.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/metallic.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/ao.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_grass/height.png");
+    //Albedo
+    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_grass/albedo.png");
+    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_stone/albedo.png");
 
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/albedo.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/normal.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/roughness.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/metallic.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/ao.png");
-    texturesPaths.push_back(terrainTexturesPath + "pbr/pbr_stone/height.png");
+    //Normal
+    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_grass/normal.png");
+    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_stone/normal.png");
 
-    textureManager->LoadTextureArray("terrainTextures", texturesPaths, TextureFormats::RGBA8);
-    auto textureArray = textureManager->GetTextureArray("terrainTextures");
+    //Roughness
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass/roughness.png");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone/roughness.png");
+
+    //Metallic
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass/metallic.png");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone/metallic.png");
+
+    //AO
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass/ao.png");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone/ao.png");
+
+    //Height
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass/height.png");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone/height.png");
+
+
+    textureManager->LoadTextureArray("terrainTexturesAlbedo", texturesPathsAlbedo, TextureType::ALBEDO);
+    textureManager->LoadTextureArray("terrainTexturesNormal", texturesPathsNormal, TextureType::NORMAL);
+    textureManager->LoadTextureArray("terrainTexturesData", texturesPathsData, TextureType::NORMAL);
+    auto textureArrayAlbedo = textureManager->GetTextureArray("terrainTexturesAlbedo");
+    auto textureArrayNormal = textureManager->GetTextureArray("terrainTexturesNormal");
+    auto textureArrayData = textureManager->GetTextureArray("terrainTexturesData");
 
     std::vector<std::string> skyboxPaths = {
         terrainTexturesPath + "skybox/miramar_rt.tga",
@@ -70,15 +87,17 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
         terrainTexturesPath + "skybox/miramar_ft.tga",
     };
 
-    textureManager->LoadCubeMapTexture("Skybox", skyboxPaths);
+    textureManager->LoadCubeMapTexture("Skybox", skyboxPaths, TextureType::ALBEDO);
 
 
     /*== CREATING MATERIALS ==*/
     auto terrainMaterial = materialManager->CreateMaterial("TerrainMaterial", terrainShader);
-    auto unlitMaterial = m_resourceManager->GetMaterialManager()->CreateMaterial("UnlitMaterial", unlitShader);
+    auto unlitMaterial = materialManager->CreateMaterial("UnlitMaterial", unlitShader);
     auto skyboxMaterial = materialManager->CreateMaterial("SkyboxMaterial", skyboxShader);
 
-    terrainMaterial->SetTextureArray("u_Textures", textureArray);
+    terrainMaterial->SetTextureArray("u_TexturesAlbedo", textureArrayAlbedo);
+    terrainMaterial->SetTextureArray("u_TexturesNormal", textureArrayNormal);
+    terrainMaterial->SetTextureArray("u_TexturesData", textureArrayData);
     auto skybox = textureManager->GetCubeMapTexture("Skybox");
 
     m_terrain = std::make_shared<Terrain>(m_resourceManager);

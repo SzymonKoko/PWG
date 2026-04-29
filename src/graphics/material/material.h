@@ -116,7 +116,7 @@ namespace pwg
 		* @param texture Texture to bind.
 		* @param slot Texture slot index.
 		*/
-		void SetUniformTexture(const std::string& name, std::shared_ptr<Texture> texture, int slot);
+		void SetUniformTexture(const std::string& name, std::shared_ptr<Texture> texture);
 
 		/**
 		* @brief Sets an integer uniform value.
@@ -163,18 +163,8 @@ namespace pwg
 
 	private:
 
-		/**
-		* @brief Internal structure storing texture uniform data.
-		* Contains texture reference and assigned texture slot.
-		*/
-		struct TextureData
-		{
-			std::shared_ptr<Texture> texture{ nullptr };									/**< Texture reference */
-			int slot{ 0 };																	/**< Assigned texture slot */
-		};
-
 		std::unordered_map<std::string, float> m_floatUniforms;								/**< Stored float uniforms */
-		std::unordered_map<std::string, TextureData> m_textureUniforms;						/**< Stored texture uniforms */
+		std::unordered_map<std::string, std::shared_ptr<Texture>> m_textureUniforms;		/**< Stored texture uniforms */
 		std::unordered_map<std::string, int> m_intUniforms;									/**< Stored integer uniforms */
 		std::unordered_map<std::string, glm::vec2> m_vec2Uniforms;							/**< Stored vec2 uniforms */
 		std::unordered_map<std::string, glm::vec3> m_vec3Uniforms;							/**< Stored vec3 uniforms */

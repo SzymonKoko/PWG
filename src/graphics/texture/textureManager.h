@@ -33,16 +33,16 @@ namespace pwg
 		* @param textureID Unique identifier for the texture.
 		* @param texturePath Path to the texture image file.
 		*/
-		void Load(const std::string& textureID, const std::string& texturePath);
+		void Load(const std::string& textureID, const std::string& texturePath, TextureType type);
 
 		/**
 		* @brief Loads a texture array from multiple image files and stores it with the given name.
 		* @param name Unique identifier for the texture array.
 		* @param texturePaths Vector of file paths for the individual layers.
 		*/
-		void LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureFormats format);
+		void LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureType type);
 
-		void LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths);
+		void LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths, TextureType type);
 
 		/**
 		* @brief Unloads a texture by its ID and deletes it from GPU memory.

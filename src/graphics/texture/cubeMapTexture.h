@@ -7,13 +7,14 @@
 #include <stb/stb_image_write.h>
 #include <iostream>
 #include "core/logger/logger.h"
+#include "graphics/common/GL_Types.h"
 
 namespace pwg
 {
 	class CubeMapTexture
 	{
 	public:
-		CubeMapTexture(std::vector<std::string> facesPaths);
+		CubeMapTexture(std::vector<std::string> facesPaths, TextureType type);
 		~CubeMapTexture() = default;
 
 		void Bind(int slot);
@@ -28,6 +29,9 @@ namespace pwg
 		int m_width{ 0 };											/**< Texture width in pixels. */
 		int m_height{ 0 };											/**< Texture height in pixels. */
 		int m_nrChannels{ 0 };										/**< Number of color channels. */
+
+		TextureType m_textureType{ TextureType::ALBEDO };			/**< Type of texture (2D, cubemap, noise). */
+		GLTextureFormats m_format;
 	};
 }
 #endif // !SRC_GRAPHICS_TEXTURE_CUBE_MAP_TEXTURE_H_

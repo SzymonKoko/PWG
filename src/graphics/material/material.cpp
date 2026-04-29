@@ -42,12 +42,13 @@ namespace pwg
 			m_shader->SetUniformMat4(name, value);
 		}
 
-		for (auto& [name, texData] : m_textureUniforms)
-		{
-			texData.texture->Bind(texData.slot);
-			m_shader->SetUniformInt(name, texData.slot);
-		}
 		int slot = 0;
+		for (auto& [name, tex] : m_textureUniforms)
+		{
+			tex->Bind(slot);
+			m_shader->SetUniformInt(name, slot);
+			slot++;
+		}
 
 		for (auto& [name, cubemap] : m_cubeMapTextures)
 		{
@@ -56,7 +57,6 @@ namespace pwg
 			slot++;
 		}
 
-		slot = 0;
 		for (auto& [name, texArray] : m_textureArrays)
 		{
 			texArray->Bind(slot);
@@ -74,7 +74,7 @@ namespace pwg
 
 	std::shared_ptr<Texture> Material::GetUniformTexture(const std::string& name)
 	{
-		return m_textureUniforms[name].texture;
+		return m_textureUniforms[name];
 	}
 
 	int Material::GetUniformInt(const std::string& name)
@@ -107,9 +107,9 @@ namespace pwg
 		m_floatUniforms[name] = value;
 	}
 
-	void Material::SetUniformTexture(const std::string& name, std::shared_ptr<Texture> texture, int slot)
+	void Material::SetUniformTexture(const std::string& name, std::shared_ptr<Texture> texture)
 	{
-		m_textureUniforms[name] = TextureData(texture, slot);
+		m_textureUniforms[name] = texture;
 	}
 
 	void Material::SetUniformInt(const std::string& name, int value)

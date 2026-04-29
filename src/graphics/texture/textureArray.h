@@ -26,7 +26,7 @@ namespace pwg
 		* @param numberOfLayers Total number of layers in the texture array.
 		* @param format OpenGL internal texture format specification.
 		*/
-		TextureArray(int width, int height, int numberOfLayers, GLTextureFormats format);
+		TextureArray(int width, int height, int numberOfLayers, TextureType type);
 
 		/**
 		* @brief Destructor. Deletes the OpenGL texture array.
@@ -65,6 +65,7 @@ namespace pwg
 		int m_height{ 0 };             /**< Height of each layer in pixels. */
 		int m_numberOfLayers{ 0 };     /**< Total number of layers in the array. */
 
+		TextureType m_textureType{ TextureType::ALBEDO };		/**< Type of texture (2D, cubemap, noise). */
 		GLTextureFormats m_format;     /**< Format specification for all layers. */
 
 		int m_wrapS;                   /**< Wrapping mode for S coordinate. */

@@ -13,7 +13,9 @@ uniform int u_debugMode;
 uniform bool u_debugEnabled;
 uniform int u_worldSize;
 
-uniform sampler2DArray u_Textures;
+uniform sampler2DArray u_TexturesAlbedo;
+uniform sampler2DArray u_TexturesNormal;
+uniform sampler2DArray u_TexturesData;
 uniform vec3 u_cameraPosition;
 
 // =========================
@@ -21,8 +23,8 @@ uniform vec3 u_cameraPosition;
 // =========================
 float SampleHeight(vec2 uv, float rock)
 {
-    float gH = texture(u_Textures, vec3(uv, 5)).r;
-    float rH = texture(u_Textures, vec3(uv, 10)).r;
+    float gH = texture(u_TexturesData, vec3(uv, 6)).r;
+    float rH = texture(u_TexturesData, vec3(uv, 7)).r;
     return mix(gH, rH, rock);
 }
 
@@ -102,20 +104,20 @@ void main()
     // =========================
     // GRASS
     // =========================
-    vec3 gA = texture(u_Textures, vec3(uv, 0)).rgb;
-    vec3 gN = texture(u_Textures, vec3(uv, 1)).rgb * 2.0 - 1.0;
-    float gR = texture(u_Textures, vec3(uv, 2)).r;
-    float gM = texture(u_Textures, vec3(uv, 3)).r;
-    float gAO = texture(u_Textures, vec3(uv, 4)).r;
+    vec3 gA = texture(u_TexturesAlbedo, vec3(uv, 0)).rgb;
+    vec3 gN = texture(u_TexturesNormal, vec3(uv, 0)).rgb * 2.0 - 1.0;
+    float gR = texture(u_TexturesData, vec3(uv, 0)).r;
+    float gM = texture(u_TexturesData, vec3(uv, 2)).r;
+    float gAO = texture(u_TexturesData, vec3(uv, 4)).r;
 
     // =========================
     // ROCK
     // =========================
-    vec3 rA = texture(u_Textures, vec3(uv, 5)).rgb;
-    vec3 rN = texture(u_Textures, vec3(uv, 6)).rgb * 2.0 - 1.0;
-    float rR = texture(u_Textures, vec3(uv, 7)).r;
-    float rM = texture(u_Textures, vec3(uv, 8)).r;
-    float rAO = texture(u_Textures, vec3(uv, 9)).r;
+    vec3 rA = texture(u_TexturesAlbedo, vec3(uv, 1)).rgb;
+    vec3 rN = texture(u_TexturesNormal, vec3(uv, 1)).rgb * 2.0 - 1.0;
+    float rR = texture(u_TexturesData, vec3(uv, 1)).r;
+    float rM = texture(u_TexturesData, vec3(uv, 3)).r;
+    float rAO = texture(u_TexturesData, vec3(uv, 5)).r;
 
     // =========================
     // BLEND

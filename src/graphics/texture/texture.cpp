@@ -2,7 +2,7 @@
 #include "texture.h"
 
 
-pwg::Texture::Texture()
+pwg::Texture::Texture(TextureType type)
 {
 	m_wrapS = ToGL(TextureWrapMode::REPEAT);
 	m_wrapT = ToGL(TextureWrapMode::REPEAT);
@@ -10,10 +10,11 @@ pwg::Texture::Texture()
 	m_minFilter = ToGL(TextureFilterMode::MIPMAP_LINEAR_LINEAR);
 	m_magFilter = ToGL(TextureFilterMode::LINEAR);
 
-	m_format = ToGL(TextureFormats::RGBA8);
+	m_textureType = type;
+	m_format = GetFormatForType(type);
 }
 
-pwg::Texture::Texture(const std::string& imagePath)
+pwg::Texture::Texture(const std::string& imagePath, TextureType type)
 {
 	m_wrapS = ToGL(TextureWrapMode::REPEAT);
 	m_wrapT = ToGL(TextureWrapMode::REPEAT);
@@ -21,19 +22,20 @@ pwg::Texture::Texture(const std::string& imagePath)
 	m_minFilter = ToGL(TextureFilterMode::MIPMAP_LINEAR_LINEAR);
 	m_magFilter = ToGL(TextureFilterMode::LINEAR);
 
-	//m_format = ToGL(TextureFormats::RGBA8);
+	m_textureType = type;
+	m_format = GetFormatForType(type);
 
 	glGenTextures(1, &m_textureID);
 	glBindTexture(GL_TEXTURE_2D, m_textureID);
 
-	m_image = stbi_load(imagePath.c_str(), &m_width, &m_height, &m_nrChannels, 0);
+	m_image = stbi_load(imagePath.c_str(), &m_width, &m_height, &m_nrChannels, STBI_rgb_alpha);
 
 	if (m_image)
 	{
 
 		GLenum format = (m_nrChannels == 4 ? GL_RGBA : GL_RGB);
 
-		glTexImage2D(GL_TEXTURE_2D, 0, format, m_width, m_height, 0, format, GL_UNSIGNED_BYTE, m_image);
+		glTexImage2D(GL_TEXTURE_2D, 0, m_format.internalFormat, m_width, m_height, 0, m_format.format, m_format.type, m_image);
 
 		if (m_hasMipmap)
 		{
@@ -60,7 +62,7 @@ pwg::Texture::Texture(const std::string& imagePath)
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-pwg::Texture::Texture(int width, int height, pwg::GLTextureFormats format)
+pwg::Texture::Texture(int width, int height, TextureType type)
 {
 	m_wrapS = ToGL(TextureWrapMode::REPEAT);
 	m_wrapT = ToGL(TextureWrapMode::REPEAT);
@@ -68,7 +70,8 @@ pwg::Texture::Texture(int width, int height, pwg::GLTextureFormats format)
 	m_minFilter = ToGL(TextureFilterMode::LINEAR);
 	m_magFilter = ToGL(TextureFilterMode::LINEAR);
 
-	m_format = format;
+	m_textureType = type;
+	m_format = GetFormatForType(type);
 
 	glGenTextures(1, &m_textureID);
 	glBindTexture(GL_TEXTURE_2D, m_textureID);

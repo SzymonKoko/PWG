@@ -95,12 +95,12 @@ namespace pwg
 
 				chunk.material->SetUniformMat4("u_model", modelMatrix);
 				chunk.material->SetUniformFloat("u_amplitude", m_amplitude);
-				chunk.material->SetUniformTexture("u_Heightmap", m_globalMasks["FinalHeight"]->texture, 0);
-				chunk.material->SetUniformTexture("u_Normalmap", m_globalMasks["NormalMask"]->texture, 1);
+				chunk.material->SetUniformTexture("u_Heightmap", m_globalMasks["FinalHeight"]->texture);
+				chunk.material->SetUniformTexture("u_Normalmap", m_globalMasks["NormalMask"]->texture);
 				chunk.material->SetUniformVec2("u_uvOffset", uvOffset);
 				chunk.material->SetUniformVec2("u_uvScale", uvScale);
 				chunk.material->SetUniformInt("u_worldSize", m_worldSize);
-				chunk.material->SetUniformVec2("u_cameraPosition", m_cameraPosition);
+				chunk.material->SetUniformVec3("u_cameraPosition", m_cameraPosition);
 
 				auto& entries = m_terrainDebug->GetEntries();
 				auto entry = entries[m_terrainDebug->GetDebugMode()];
@@ -109,7 +109,7 @@ namespace pwg
 				chunk.material->SetUniformInt("u_debugEnabled", m_terrainDebug->GetStatus());
 
 				auto tex = entry.texture ? entry.texture : m_globalMasks["Elevation"]->texture;
-				chunk.material->SetUniformTexture("u_debugTexture", tex, 2);
+				chunk.material->SetUniformTexture("u_debugTexture", tex);
 				
 
 				chunk.material->Apply();

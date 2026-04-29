@@ -14,15 +14,7 @@
 
 namespace pwg
 {
-	/**
-	* @brief Enum representing different types of textures.
-	*/
-	enum class TextureType
-	{
-		Texture2D,      /**< Standard 2D texture. */
-		CubeMap,        /**< Cubemap texture for environment mapping. */
-		NoiseTexture    /**< Procedural noise texture. */
-	};
+	
 
 	/**
 	* @brief Class responsible for creating, managing, and using OpenGL textures.
@@ -35,13 +27,13 @@ namespace pwg
 		/**
 		* @brief Default constructor. Creates an empty texture object.
 		*/
-		Texture();
+		Texture(TextureType type);
 
 		/**
 		* @brief Loads a texture from an image file.
 		* @param imagePath Path to the image file.
 		*/
-		Texture(const std::string& imagePath);
+		Texture(const std::string& imagePath, TextureType type);
 
 		/**
 		* @brief Creates an empty texture with specified dimensions and format.
@@ -49,7 +41,7 @@ namespace pwg
 		* @param height Texture height in pixels.
 		* @param format OpenGL texture format specification.
 		*/
-		Texture(int width, int height, GLTextureFormats format);
+		Texture(int width, int height, TextureType type);
 
 		/**
 		* @brief Destructor. Frees image memory and deletes the OpenGL texture.
@@ -131,7 +123,7 @@ namespace pwg
 
 		bool m_hasMipmap{ true };									/**< Whether mipmaps are generated for the texture. */
 
-		TextureType m_textureType{ TextureType::Texture2D };		/**< Type of texture (2D, cubemap, noise). */
+		TextureType m_textureType{ TextureType::ALBEDO };		/**< Type of texture (2D, cubemap, noise). */
 		GLTextureFormats m_format;									/**< OpenGL internal format, format, and type. */
 	};
 } // namespace pwg
