@@ -51,8 +51,11 @@ namespace pwg
 		{
 			case TextureType::ALBEDO:	return { GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE };
 			case TextureType::NORMAL:	return { GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE };
+			case TextureType::NORMAL16F:	return { GL_RGBA16F, GL_RGBA, GL_FLOAT };
 			case TextureType::DATA:		return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
 			case TextureType::HEIGHT:	return { GL_R32F, GL_RED, GL_FLOAT };
+			case TextureType::HEIGHT2:	return { GL_RG32F, GL_RG, GL_FLOAT };
+			case TextureType::HEIGHT4:	return { GL_RGBA32F, GL_RGBA, GL_FLOAT };
 		}
 		return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
 	}

@@ -15,6 +15,14 @@ namespace pwg
 		glm::vec3 direction{ 0.0f }; /**< Direction the light is pointing to. */
 		glm::vec3 color{ 0.0f };     /**< RGB color of the light. */
 		float intensivity{ 0.0f };   /**< Strength or intensity of the light. */
+		float exposure{ 1.0f };
+		float skyAmbient{ 0.08f };
+		float groundAmbient{ 0.025f };
+		float normalStrength{ 0.65f };
+		float snowHeight{ 1800.0f };
+		float snowSoftness{ 850.0f };
+		float wetnessStrength{ 0.65f };
+		float waterAlpha{ 0.55f };
 	};
 } // namespace pwg
 

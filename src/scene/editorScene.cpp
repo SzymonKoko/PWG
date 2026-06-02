@@ -47,33 +47,39 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     std::vector<std::string> texturesPathsData;
 
     //Albedo
-    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_grass/albedo.png");
-    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_stone/albedo.png");
+    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_Color.jpg");
+    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_Color.jpg");
+    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_Color.jpg");
 
     //Normal
-    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_grass/normal.png");
-    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_stone/normal.png");
+    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_NormalGL.jpg");
+    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_NormalGL.jpg");
+    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_NormalGL.jpg");
 
     //Roughness
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass/roughness.png");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone/roughness.png");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_Roughness.jpg");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_Roughness.jpg");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_Roughness.jpg");
 
     //Metallic
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass/metallic.png");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone/metallic.png");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_Roughness.jpg");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_Roughness.jpg");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_Roughness.jpg");
 
     //AO
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass/ao.png");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone/ao.png");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_AmbientOcclusion.jpg");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_AmbientOcclusion.jpg");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_AmbientOcclusion.jpg");
 
     //Height
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass/height.png");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone/height.png");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_Displacement.jpg");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_Displacement.jpg");
+    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_Displacement.jpg");
 
 
     textureManager->LoadTextureArray("terrainTexturesAlbedo", texturesPathsAlbedo, TextureType::ALBEDO);
     textureManager->LoadTextureArray("terrainTexturesNormal", texturesPathsNormal, TextureType::NORMAL);
-    textureManager->LoadTextureArray("terrainTexturesData", texturesPathsData, TextureType::NORMAL);
+    textureManager->LoadTextureArray("terrainTexturesData", texturesPathsData, TextureType::DATA);
     auto textureArrayAlbedo = textureManager->GetTextureArray("terrainTexturesAlbedo");
     auto textureArrayNormal = textureManager->GetTextureArray("terrainTexturesNormal");
     auto textureArrayData = textureManager->GetTextureArray("terrainTexturesData");
@@ -107,8 +113,15 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     m_cameraManager->SetCamera(CameraType::EDITOR);
     m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
 
+    m_cameraManager->SetCamera(CameraType::FLYOVER);
+    m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
+
     m_cameraManager->SetCamera(CameraType::PLAYER);
     m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
+    m_cameraManager->SetTerrainHeightProvider([this](float x, float z)
+    {
+        return m_terrain->GetTerrainHeightAt(x, z);
+    });
 
     m_cameraManager->SetCamera(CameraType::EDITOR);
 
@@ -124,7 +137,7 @@ void pwg::EditorScene::Update(const float& dt)
     {
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
-    else if (cameraType == CameraType::PLAYER)
+    else if (cameraType == CameraType::FLYOVER || cameraType == CameraType::PLAYER)
     {
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
@@ -222,6 +235,11 @@ void pwg::EditorScene::HandleKeyboardInputs()
     if (m_keyboardInput.IsPressed(Action::EditorCamera))
     {
         m_cameraManager->SetCamera(CameraType::EDITOR);
+    }
+
+    if (m_keyboardInput.IsPressed(Action::FlyoverCamera))
+    {
+        m_cameraManager->SetCamera(CameraType::FLYOVER);
     }
 
     if (m_keyboardInput.IsPressed(Action::PlayerCamera))

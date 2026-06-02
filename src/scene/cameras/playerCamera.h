@@ -3,6 +3,7 @@
 
 #include "icamera.h"
 #include "graphics/common/transform.h"
+#include <functional>
 
 namespace pwg
 {
@@ -13,11 +14,20 @@ namespace pwg
 	struct PlayerCameraProperties
 	{
 		float yaw{ -90.0f };						/**< Yaw rotation angle in degrees. */
-		float pitch{ 90.0f };						/**< Pitch rotation angle in degrees. */
+		float pitch{ 0.0f };						/**< Pitch rotation angle in degrees. */
 		glm::vec3 direction{ 0.0f, 0.0f, 0.0f };	/**< Forward direction vector for the camera. */
+		glm::vec3 velocity{ 0.0f, 0.0f, 0.0f };
 
 		float cameraSensitivity{ 0.1f };			/**< Mouse sensitivity for looking around. */
-		float cameraSpeed{ 2.0f };					/**< Movement speed for WASD/keyboard controls. */
+		float acceleration{ 75.0f };
+		float maxGroundSpeed{ 42.0f };
+		float groundDamping{ 12.0f };
+		float airDamping{ 1.2f };
+		float gravity{ 95.0f };
+		float jumpSpeed{ 32.0f };
+		float eyeHeight{ 6.0f };
+		float groundSnapDistance{ 2.5f };
+		bool grounded{ false };
 	};
 
 	/**
@@ -81,6 +91,7 @@ namespace pwg
 		* @param spawned True to mark as spawned, false otherwise.
 		*/
 		void SetSpawned(bool spawned);
+		void SetTerrainHeightProvider(std::function<float(float, float)> provider);
 
 	protected:
 		/**
@@ -103,10 +114,13 @@ namespace pwg
 		* Updates the PlayerCameraProperties::direction vector.
 		*/
 		void CalculateCameraForward();
+		void UpdateMatrices();
+		float GetGroundHeight() const;
 
 		Transform m_transform;								/**< Transform storing position, rotation, scale. */
 		CameraProperties m_cameraProperties;				/**< Common camera properties (projection, matrices, etc.). */
 		PlayerCameraProperties m_playerCameraProperties;	/**< Player-specific camera properties (orientation, speed). */
+		std::function<float(float, float)> m_terrainHeightProvider;
 
 		bool m_spawned{ false };							/**< Flag indicating whether the camera has spawned into the scene. */
 	};

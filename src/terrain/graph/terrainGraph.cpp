@@ -18,9 +18,18 @@ namespace pwg
 
 	void TerrainGraph::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
 	{
+		ExecutePasses(TerrainPassTypes::GENERATION, masks, ctx);
+		ExecutePasses(TerrainPassTypes::MASK, masks, ctx);
+	}
+
+	void TerrainGraph::ExecutePasses(TerrainPassTypes passType, std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
+	{
 		for (const auto& pass : m_passes)
 		{
-			pass->Execute(masks, ctx);
+			if (pass->GetPassType() == passType)
+			{
+				pass->Execute(masks, ctx);
+			}
 		}
 	}
 	std::vector<std::shared_ptr<TerrainPass>>& TerrainGraph::GetPasses()

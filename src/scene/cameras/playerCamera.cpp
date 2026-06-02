@@ -1,26 +1,32 @@
 #include "playerCamera.h"
+#include <algorithm>
 
 pwg::PlayerCamera::PlayerCamera()
 {
-	m_cameraProperties.up = { 0.0f, 1.7f, 0.0f };
+	CalculateCameraForward();
+	UpdateMatrices();
 }
 
 void pwg::PlayerCamera::Update(float dt, pwg::MouseInput& mouseInput, pwg::KeyboardInput& keyboardInput)
 {
+	dt = std::clamp(dt, 0.0f, 0.05f);
 	HandleMouseInput(mouseInput, dt);
 	HandleKeyboardInput(keyboardInput, dt);
-
-	m_cameraProperties.projectionMatrix = glm::perspective(glm::radians(m_cameraProperties.fov), m_cameraProperties.aspectRatio, m_cameraProperties.nearPlane, m_cameraProperties.farPlane);
+	UpdateMatrices();
 }
 
 void pwg::PlayerCamera::SetDefaultCameraPosition(int size)
 {
 	m_transform.position = { 0.0f, 500.0f, 0.0f };
+	m_playerCameraProperties.velocity = { 0.0f, 0.0f, 0.0f };
+	UpdateMatrices();
 }
 
 void pwg::PlayerCamera::SetCameraPosition(float x, float y, float z)
 {
 	m_transform.position = { x, y, z };
+	m_playerCameraProperties.velocity = { 0.0f, 0.0f, 0.0f };
+	UpdateMatrices();
 }
 
 glm::mat4& pwg::PlayerCamera::GetViewMatrix()
@@ -42,6 +48,11 @@ void pwg::PlayerCamera::SetSpawned(bool spawned)
 	m_spawned = spawned;
 }
 
+void pwg::PlayerCamera::SetTerrainHeightProvider(std::function<float(float, float)> provider)
+{
+	m_terrainHeightProvider = provider;
+}
+
 glm::vec3 pwg::PlayerCamera::GetCameraPosition()
 {
 	return m_transform.position;
@@ -49,26 +60,70 @@ glm::vec3 pwg::PlayerCamera::GetCameraPosition()
 
 void pwg::PlayerCamera::HandleKeyboardInput(pwg::KeyboardInput& keyboardInput, float dt)
 {
-	glm::vec3 cameraRight = glm::normalize(glm::cross(m_cameraProperties.forward, m_cameraProperties.up));
+	glm::vec3 planarForward = glm::normalize(glm::vec3(m_cameraProperties.forward.x, 0.0f, m_cameraProperties.forward.z));
+	glm::vec3 cameraRight = glm::normalize(glm::cross(planarForward, m_cameraProperties.up));
+	glm::vec3 desiredDirection{ 0.0f };
 
 	if (keyboardInput.IsHeld(Action::MoveForward))
-	{
-		m_transform.position += m_playerCameraProperties.cameraSpeed * m_cameraProperties.forward;
-	}
+		desiredDirection += planarForward;
 	if (keyboardInput.IsHeld(Action::MoveBackward))
-	{
-		m_transform.position -= m_playerCameraProperties.cameraSpeed * m_cameraProperties.forward;
-	}
+		desiredDirection -= planarForward;
 	if (keyboardInput.IsHeld(Action::MoveLeft))
-	{
-		m_transform.position -= m_playerCameraProperties.cameraSpeed * cameraRight;
-	}
+		desiredDirection -= cameraRight;
 	if (keyboardInput.IsHeld(Action::MoveRight))
+		desiredDirection += cameraRight;
+
+	if (glm::dot(desiredDirection, desiredDirection) > 0.0001f)
 	{
-		m_transform.position += m_playerCameraProperties.cameraSpeed * cameraRight;
+		desiredDirection = glm::normalize(desiredDirection);
+		m_playerCameraProperties.velocity += desiredDirection * m_playerCameraProperties.acceleration * dt;
 	}
 
-	m_cameraProperties.viewMatrix = glm::lookAt(m_transform.position, m_transform.position + m_cameraProperties.forward, m_cameraProperties.up);
+	glm::vec2 horizontalVelocity{ m_playerCameraProperties.velocity.x, m_playerCameraProperties.velocity.z };
+	float horizontalSpeed = glm::length(horizontalVelocity);
+	if (horizontalSpeed > m_playerCameraProperties.maxGroundSpeed)
+	{
+		horizontalVelocity = glm::normalize(horizontalVelocity) * m_playerCameraProperties.maxGroundSpeed;
+		m_playerCameraProperties.velocity.x = horizontalVelocity.x;
+		m_playerCameraProperties.velocity.z = horizontalVelocity.y;
+	}
+
+	float dampingStrength = m_playerCameraProperties.grounded ? m_playerCameraProperties.groundDamping : m_playerCameraProperties.airDamping;
+	float damping = std::clamp(1.0f - dampingStrength * dt, 0.0f, 1.0f);
+	m_playerCameraProperties.velocity.x *= damping;
+	m_playerCameraProperties.velocity.z *= damping;
+
+	float groundHeight = GetGroundHeight();
+	float feetY = m_transform.position.y - m_playerCameraProperties.eyeHeight;
+	bool closeToGround = feetY <= groundHeight + m_playerCameraProperties.groundSnapDistance;
+
+	if (closeToGround && m_playerCameraProperties.velocity.y <= 0.0f)
+	{
+		m_playerCameraProperties.grounded = true;
+		m_playerCameraProperties.velocity.y = 0.0f;
+		m_transform.position.y = groundHeight + m_playerCameraProperties.eyeHeight;
+	}
+	else
+	{
+		m_playerCameraProperties.grounded = false;
+	}
+
+	if (keyboardInput.IsPressed(Action::MoveUp) && m_playerCameraProperties.grounded)
+	{
+		m_playerCameraProperties.velocity.y = m_playerCameraProperties.jumpSpeed;
+		m_playerCameraProperties.grounded = false;
+	}
+
+	m_playerCameraProperties.velocity.y -= m_playerCameraProperties.gravity * dt;
+	m_transform.position += m_playerCameraProperties.velocity * dt;
+
+	groundHeight = GetGroundHeight();
+	if (m_transform.position.y - m_playerCameraProperties.eyeHeight < groundHeight)
+	{
+		m_transform.position.y = groundHeight + m_playerCameraProperties.eyeHeight;
+		m_playerCameraProperties.velocity.y = 0.0f;
+		m_playerCameraProperties.grounded = true;
+	}
 }
 
 void pwg::PlayerCamera::HandleMouseInput(pwg::MouseInput& mouseInput, float dt)
@@ -86,8 +141,6 @@ void pwg::PlayerCamera::HandleMouseInput(pwg::MouseInput& mouseInput, float dt)
 	m_playerCameraProperties.pitch = glm::clamp(m_playerCameraProperties.pitch, -89.0f, 89.0f);
 
 	CalculateCameraForward();
-
-	m_cameraProperties.viewMatrix = glm::lookAt(m_transform.position, m_transform.position + m_cameraProperties.forward, m_cameraProperties.up);
 }
 
 void pwg::PlayerCamera::CalculateCameraForward()
@@ -96,4 +149,20 @@ void pwg::PlayerCamera::CalculateCameraForward()
 	float pitchRad = glm::radians(m_playerCameraProperties.pitch);
 
 	m_cameraProperties.forward = glm::normalize(glm::vec3(cos(pitchRad) * cos(yawRad), sin(pitchRad), cos(pitchRad) * sin(yawRad)));
+}
+
+void pwg::PlayerCamera::UpdateMatrices()
+{
+	m_cameraProperties.viewMatrix = glm::lookAt(m_transform.position, m_transform.position + m_cameraProperties.forward, m_cameraProperties.up);
+	m_cameraProperties.projectionMatrix = glm::perspective(glm::radians(m_cameraProperties.fov), m_cameraProperties.aspectRatio, m_cameraProperties.nearPlane, m_cameraProperties.farPlane);
+}
+
+float pwg::PlayerCamera::GetGroundHeight() const
+{
+	if (!m_terrainHeightProvider)
+	{
+		return 0.0f;
+	}
+
+	return m_terrainHeightProvider(m_transform.position.x, m_transform.position.z);
 }

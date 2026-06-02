@@ -1,0 +1,163 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8) in;
+
+layout (rgba32f, binding = 0) writeonly uniform image2D u_flux;
+layout (rgba32f, binding = 1) writeonly uniform image2D u_diagonalFlux;
+
+uniform sampler2D u_height;
+uniform sampler2D u_water;
+uniform sampler2D u_previousFlux;
+uniform sampler2D u_previousDiagonalFlux;
+uniform sampler2D u_riverChannels;
+
+uniform int u_size;
+uniform float u_flowRate;
+uniform float u_flowInertia;
+uniform float u_rainRate;
+uniform float u_rainElevationBias;
+uniform float u_rainMinHeight;
+uniform float u_rainMaxHeight;
+uniform float u_boundaryDrain;
+uniform float u_maxWaterDepth;
+uniform float u_maxSurfaceDrop;
+uniform float u_riverChannelInfluence;
+uniform float u_riverChannelDepth;
+uniform bool u_useDiagonalFlow;
+
+ivec2 ClampCoord(ivec2 p)
+{
+    return clamp(p, ivec2(0), ivec2(u_size - 1));
+}
+
+float HeightOnlyAt(ivec2 p)
+{
+    return texelFetch(u_height, ClampCoord(p), 0).r;
+}
+
+float RidgeSourceAt(ivec2 p)
+{
+    p = ClampCoord(p);
+    float center = HeightOnlyAt(p);
+    float neighborAverage = 0.0;
+    float highestNeighbor = -1000000.0;
+
+    for (int y = -1; y <= 1; ++y)
+    {
+        for (int x = -1; x <= 1; ++x)
+        {
+            if (x == 0 && y == 0)
+                continue;
+
+            float h = HeightOnlyAt(p + ivec2(x, y));
+            neighborAverage += h;
+            highestNeighbor = max(highestNeighbor, h);
+        }
+    }
+
+    neighborAverage *= 0.125;
+    float localProminence = center - neighborAverage;
+    float peakFactor = smoothstep(0.005, max(u_maxSurfaceDrop * 0.75, 0.006), localProminence);
+    float nearTop = smoothstep(-u_maxSurfaceDrop * 0.35, u_maxSurfaceDrop * 0.15, center - highestNeighbor);
+    float heightGate = smoothstep(u_rainMinHeight, max(u_rainMinHeight + 0.0001, u_rainMaxHeight), center);
+    return peakFactor * nearTop * mix(1.0, heightGate, clamp(u_rainElevationBias, 0.0, 1.0));
+}
+
+float RainAt(ivec2 p)
+{
+    return u_rainRate * RidgeSourceAt(p);
+}
+
+float SurfaceAt(ivec2 p)
+{
+    p = ClampCoord(p);
+    float channelDepth = texelFetch(u_riverChannels, p, 0).r * u_riverChannelInfluence * u_riverChannelDepth;
+    float water = clamp(texelFetch(u_water, p, 0).r + RainAt(p), 0.0, u_maxWaterDepth);
+    return texelFetch(u_height, p, 0).r - channelDepth + water;
+}
+
+float AvailableWaterAt(ivec2 p)
+{
+    p = ClampCoord(p);
+    return clamp(texelFetch(u_water, p, 0).r + RainAt(p), 0.0, u_maxWaterDepth);
+}
+
+float StableDrop(float fromSurface, float toSurface)
+{
+    float drop = max(fromSurface - toSurface, 0.0);
+    return clamp(drop, 0.0, u_maxSurfaceDrop);
+}
+
+vec4 SafeFlux(vec4 value)
+{
+    if (any(isnan(value)) || any(isinf(value)))
+        return vec4(0.0);
+
+    return clamp(value, vec4(0.0), vec4(u_maxWaterDepth));
+}
+
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    if (id.x >= u_size || id.y >= u_size)
+        return;
+
+    float surface = SurfaceAt(id);
+    float water = AvailableWaterAt(id);
+    vec4 previousFlux = clamp(texelFetch(u_previousFlux, id, 0), vec4(0.0), vec4(u_maxWaterDepth));
+    vec4 previousDiagonalFlux = clamp(texelFetch(u_previousDiagonalFlux, id, 0), vec4(0.0), vec4(u_maxWaterDepth));
+
+    float leftDrop = (id.x == 0)
+        ? water * u_boundaryDrain
+        : StableDrop(surface, SurfaceAt(id + ivec2(-1, 0)));
+    float rightDrop = (id.x == u_size - 1)
+        ? water * u_boundaryDrain
+        : StableDrop(surface, SurfaceAt(id + ivec2(1, 0)));
+    float downDrop = (id.y == 0)
+        ? water * u_boundaryDrain
+        : StableDrop(surface, SurfaceAt(id + ivec2(0, -1)));
+    float upDrop = (id.y == u_size - 1)
+        ? water * u_boundaryDrain
+        : StableDrop(surface, SurfaceAt(id + ivec2(0, 1)));
+
+    float diagonalWeight = u_useDiagonalFlow ? 0.70710678 : 0.0;
+    float downLeftDrop = (id.x == 0 || id.y == 0)
+        ? water * u_boundaryDrain * diagonalWeight
+        : StableDrop(surface, SurfaceAt(id + ivec2(-1, -1))) * diagonalWeight;
+    float downRightDrop = (id.x == u_size - 1 || id.y == 0)
+        ? water * u_boundaryDrain * diagonalWeight
+        : StableDrop(surface, SurfaceAt(id + ivec2(1, -1))) * diagonalWeight;
+    float upLeftDrop = (id.x == 0 || id.y == u_size - 1)
+        ? water * u_boundaryDrain * diagonalWeight
+        : StableDrop(surface, SurfaceAt(id + ivec2(-1, 1))) * diagonalWeight;
+    float upRightDrop = (id.x == u_size - 1 || id.y == u_size - 1)
+        ? water * u_boundaryDrain * diagonalWeight
+        : StableDrop(surface, SurfaceAt(id + ivec2(1, 1))) * diagonalWeight;
+
+    vec4 pressure = vec4(leftDrop, rightDrop, downDrop, upDrop);
+    vec4 diagonalPressure = vec4(downLeftDrop, downRightDrop, upLeftDrop, upRightDrop);
+    vec4 supportedFlux = smoothstep(vec4(0.0), vec4(0.0001), pressure);
+    vec4 supportedDiagonalFlux = smoothstep(vec4(0.0), vec4(0.0001), diagonalPressure);
+
+    vec4 flux = SafeFlux(previousFlux * clamp(u_flowInertia, 0.0, 0.95) * supportedFlux + pressure * u_flowRate);
+    vec4 diagonalFlux = SafeFlux(previousDiagonalFlux * clamp(u_flowInertia, 0.0, 0.95) * supportedDiagonalFlux + diagonalPressure * u_flowRate);
+
+    float totalFlux = flux.x + flux.y + flux.z + flux.w
+        + diagonalFlux.x + diagonalFlux.y + diagonalFlux.z + diagonalFlux.w;
+
+    if (totalFlux > 0.000001 && water > 0.0)
+    {
+        float maxOutflow = water * clamp(u_flowRate, 0.0, 1.0);
+        float scale = min(1.0, maxOutflow / totalFlux);
+        flux *= scale;
+        diagonalFlux *= scale;
+    }
+    else
+    {
+        flux = vec4(0.0);
+        diagonalFlux = vec4(0.0);
+    }
+
+    imageStore(u_flux, id, SafeFlux(flux));
+    imageStore(u_diagonalFlux, id, SafeFlux(diagonalFlux));
+}

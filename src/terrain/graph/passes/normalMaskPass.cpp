@@ -28,6 +28,11 @@ namespace pwg
 		return {};
 	}
 
+	TerrainPassTypes NormalMaskPass::GetPassType()
+	{
+		return m_passType;
+	}
+
 	std::string NormalMaskPass::GetName()
 	{
 		return m_name;

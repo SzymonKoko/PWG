@@ -23,6 +23,7 @@ namespace pwg
 		m_computeShader->BindImage(1, finalMask->texture->GetTextureID(), GL_READ_ONLY, GL_R32F);
 		m_computeShader->DispatchForTexture(m_terrainSize, m_terrainSize);
 		m_computeShader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+
 	}
 
 	std::vector<UIParameters> FinalHeightPass::GetParameters()
@@ -30,6 +31,11 @@ namespace pwg
 		return {
 			{"Amplitude", ParameterType::Float, &m_amplitude, 0.1, 20000.0}
 		};
+	}
+
+	TerrainPassTypes FinalHeightPass::GetPassType()
+	{
+		return m_passType;
 	}
 
 	std::string FinalHeightPass::GetName()

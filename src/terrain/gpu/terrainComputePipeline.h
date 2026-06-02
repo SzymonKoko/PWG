@@ -12,6 +12,10 @@
 #include "terrain/graph/passes/finalHeightPass.h"
 #include "terrain/graph/passes/normalMaskPass.h"
 #include "terrain/graph/passes/slopeMaskPass.h"
+#include "terrain/graph/passes/hydraulicFluxPass.h"
+#include "terrain/graph/passes/hydraulicWaterPass.h"
+#include "terrain/graph/passes/erosionPass.h"
+#include "terrain/graph/passes/particleErosionPass.h"
 #include "terrain/chunk/terrainChunk.h"
 
 #include "terrain/debug/terrainDebug.h"
@@ -25,6 +29,13 @@ namespace pwg
 		~TerrainComputePipeline();
 
 		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void RegenerateTerrain(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void StepWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void StepErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void StepParticleBake(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool uploadPreview);
+		void BakeParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void ResetWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void ResetErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 
 		void BuildGraph();
 		void AddComputeShader(std::string name, std::shared_ptr<ComputeShader> computeShader);
@@ -32,6 +43,7 @@ namespace pwg
 		void ClearTextures();
 		std::shared_ptr<TerrainGraph> GetGraph();
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& GetMasks();
+		HydraulicSimulationSettings& GetHydraulicSettings();
 		int GetSize();
 
 		std::shared_ptr<Texture> GetFinalMaskTexture();

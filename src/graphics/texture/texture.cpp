@@ -64,6 +64,9 @@ pwg::Texture::Texture(const std::string& imagePath, TextureType type)
 
 pwg::Texture::Texture(int width, int height, TextureType type)
 {
+	m_width = width;
+	m_height = height;
+
 	m_wrapS = ToGL(TextureWrapMode::REPEAT);
 	m_wrapT = ToGL(TextureWrapMode::REPEAT);
 
@@ -116,6 +119,59 @@ void pwg::Texture::Unbind()
 void pwg::Texture::ClearTexture()
 {
 	glClearTexImage(m_textureID, 0, m_format.format, m_format.type, nullptr);
+	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+}
+
+void pwg::Texture::ClearTexture(float value)
+{
+	float color[4] = { value, value, value, value };
+	glClearTexImage(m_textureID, 0, m_format.format, m_format.type, color);
+	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+}
+
+void pwg::Texture::CopyFrom(const Texture& source)
+{
+	if (m_width != source.m_width || m_height != source.m_height)
+	{
+		PWG_ERROR("Cannot copy texture data: texture sizes do not match");
+		return;
+	}
+	if (m_textureType != source.m_textureType)
+	{
+		PWG_ERROR("Cannot copy texture data: texture formats do not match");
+		return;
+	}
+
+	glCopyImageSubData(
+		source.m_textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
+		m_textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
+		m_width, m_height, 1
+	);
+	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+}
+
+std::vector<float> pwg::Texture::ReadFloatData()
+{
+	int components = 1;
+	if (m_format.format == GL_RG)
+	{
+		components = 2;
+	}
+	else if (m_format.format == GL_RGB)
+	{
+		components = 3;
+	}
+	else if (m_format.format == GL_RGBA)
+	{
+		components = 4;
+	}
+
+	std::vector<float> pixels(static_cast<size_t>(m_width) * static_cast<size_t>(m_height) * components, 0.0f);
+	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	glBindTexture(GL_TEXTURE_2D, m_textureID);
+	glGetTexImage(GL_TEXTURE_2D, 0, m_format.format, GL_FLOAT, pixels.data());
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return pixels;
 }
 
 void pwg::Texture::SetTextureWrapping(int wrapS, int wrapT)
@@ -166,6 +222,30 @@ void pwg::Texture::UpdateData(unsigned char* data, int width, int height, int nr
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, m_wrapT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, m_minFilter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, m_magFilter);
+}
+
+void pwg::Texture::UpdateFloatData(const std::vector<float>& data, int width, int height)
+{
+	if (data.empty())
+	{
+		return;
+	}
+
+	glBindTexture(GL_TEXTURE_2D, m_textureID);
+
+	if (width != m_width || height != m_height)
+	{
+		m_width = width;
+		m_height = height;
+		glTexImage2D(GL_TEXTURE_2D, 0, m_format.internalFormat, m_width, m_height, 0, m_format.format, GL_FLOAT, data.data());
+	}
+	else
+	{
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_width, m_height, m_format.format, GL_FLOAT, data.data());
+	}
+
+	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 unsigned int pwg::Texture::GetTextureID()

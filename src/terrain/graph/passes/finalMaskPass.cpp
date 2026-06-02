@@ -7,7 +7,7 @@ namespace pwg
 		: m_computeShader(computeShader),
 		  m_terrainSize(terrainSize)
 	{
-
+		m_inputTextures = { "Elevation", "MountainHeight" };
 	}
 
 	void FinalMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)
@@ -17,12 +17,13 @@ namespace pwg
 
 		auto finalMask = masks.at("FinalMask");
 
-		for (const auto& mask : masks)
+		for (const auto& maskName : m_inputTextures)
 		{
-			if (mask.second->usage == MaskUsage::HEIGHT)
+			if (masks.contains(maskName))
 			{
-				m_inputHeightTextures.push_back(mask.second->texture);
-				m_inputHeightTexturesWeights.push_back(mask.second->weight);
+				auto mask = masks.at(maskName);
+				m_inputHeightTextures.push_back(mask->texture);
+				m_inputHeightTexturesWeights.push_back(mask->weight);
 			}
 		}
 
@@ -53,6 +54,11 @@ namespace pwg
 	std::vector<UIParameters> FinalMaskPass::GetParameters()
 	{
 		return {};
+	}
+
+	TerrainPassTypes FinalMaskPass::GetPassType()
+	{
+		return m_passType;
 	}
 
 	std::string FinalMaskPass::GetName()

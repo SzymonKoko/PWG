@@ -3,6 +3,9 @@ uniform vec3 u_lightPosition;
 uniform vec3 u_lightDirection;
 uniform vec3 u_lightColor;
 uniform float u_lightIntensity;
+uniform float u_exposure;
+uniform float u_skyAmbient;
+uniform float u_groundAmbient;
 
 const float PI = 3.14159265359;
 
@@ -22,6 +25,7 @@ mat3 ComputeTBN(vec3 normal, vec2 uv, vec3 fragPos)
 
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
+    roughness = clamp(roughness, 0.04, 1.0);
     float a = roughness*roughness;
     float a2 = a*a;
     float NdotH = max(dot(N, H), 0.0);
@@ -36,6 +40,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
+    roughness = clamp(roughness, 0.04, 1.0);
     float r = (roughness + 1.0);
     float k = (r*r) / 8.0;
 
@@ -62,55 +67,48 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 
 vec3 ApplyLighting(vec3 N, vec3 V, vec3 albedo, float metallic, float roughness, float ao, vec3 fragPos)
 {
+    N = normalize(N);
+    V = normalize(V);
+    albedo = max(albedo, vec3(0.0));
+    metallic = clamp(metallic, 0.0, 1.0);
+    roughness = clamp(roughness, 0.04, 1.0);
+    ao = clamp(ao, 0.0, 1.0);
+
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, albedo, metallic);
 
-    // reflectance equation
     vec3 Lo = vec3(0.0);
 
     vec3 L = normalize(-u_lightDirection);
     vec3 H = normalize(V + L);
-    float distance = length(u_lightPosition - fragPos);
-    float attenuation = 1.0 / (distance * distance);
     vec3 radiance = u_lightColor * u_lightIntensity;
 
-    // Cook-Torrance BRDF
     float NDF = DistributionGGX(N, H, roughness);   
     float G   = GeometrySmith(N, V, L, roughness);      
     vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
         
     vec3 numerator    = NDF * G * F; 
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
     vec3 specular = numerator / denominator;
     
-    // kS is equal to Fresnel
     vec3 kS = F;
-    // for energy conservation, the diffuse and specular light can't
-    // be above 1.0 (unless the surface emits light); to preserve this
-    // relationship the diffuse component (kD) should equal 1.0 - kS.
     vec3 kD = vec3(1.0) - kS;
-    // multiply kD by the inverse metalness such that only non-metals 
-    // have diffuse lighting, or a linear blend if partly metal (pure metals
-    // have no diffuse light).
     kD *= 1.0 - metallic;	  
 
-    // scale light by NdotL
     float NdotL = max(dot(N, L), 0.0);        
 
-    // add to outgoing radiance Lo
-    Lo += (kD * albedo / PI + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+    Lo += (kD * albedo / PI + specular) * radiance * NdotL;
 
-    
-    // ambient lighting (note that the next IBL tutorial will replace 
-    // this ambient lighting with environment lighting).
-    vec3 ambient = vec3(0.03) * albedo * ao;
+    float skyAmount = clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
+    vec3 skyColor = vec3(0.58, 0.68, 0.82) * u_skyAmbient;
+    vec3 groundColor = vec3(0.28, 0.24, 0.20) * u_groundAmbient;
+    vec3 ambientLight = mix(groundColor, skyColor, skyAmount);
+    vec3 ambient = ambientLight * albedo * ao;
     
     vec3 color = ambient + Lo;
 
-    // HDR tonemapping
+    color *= max(u_exposure, 0.01);
     color = color / (color + vec3(1.0));
-    // gamma correct
-    color = pow(color, vec3(1.0/2.2)); 
 
     return color;
 

@@ -25,6 +25,10 @@ namespace pwg
 	{
 		return { };
 	}
+	TerrainPassTypes SlopeMaskPass::GetPassType()
+	{
+		return m_passType;
+	}
 	std::string SlopeMaskPass::GetName()
 	{
 		return m_name;

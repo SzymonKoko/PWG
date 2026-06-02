@@ -52,9 +52,15 @@ namespace pwg
         int workGroupSize[3];
         glGetProgramiv(m_shaderID, GL_COMPUTE_WORK_GROUP_SIZE, workGroupSize);
 
-        m_localGroupSize.x = workGroupSize[0];
-        m_localGroupSize.y = workGroupSize[1];
-        m_localGroupSize.z = workGroupSize[2];
+		m_localGroupSize.x = workGroupSize[0];
+		m_localGroupSize.y = workGroupSize[1];
+		m_localGroupSize.z = workGroupSize[2];
+
+        if (m_localGroupSize.x == 0 || m_localGroupSize.y == 0 || m_localGroupSize.z == 0)
+        {
+            PWG_ERROR("ERROR::SHADER::COMPUTE::INVALID_WORK_GROUP_SIZE ({0})", computeFilePath.string());
+            m_localGroupSize = glm::uvec3(8, 8, 1);
+        }
 
         glDeleteShader(computeShader);
 	}
@@ -131,6 +137,12 @@ namespace pwg
 
     void ComputeShader::DispatchForTexture(const int width, const int height)
     {
+        if (m_localGroupSize.x == 0 || m_localGroupSize.y == 0)
+        {
+            PWG_ERROR("Cannot dispatch compute shader with invalid local group size");
+            return;
+        }
+
         int x = (width + m_localGroupSize.x - 1) / m_localGroupSize.x;
         int y = (height + m_localGroupSize.y - 1) / m_localGroupSize.y;
         Dispatch(x, y);

@@ -51,8 +51,11 @@ namespace pwg
 	{
 		ALBEDO,
 		NORMAL,
+		NORMAL16F,
 		DATA,
-		HEIGHT
+		HEIGHT,
+		HEIGHT2,
+		HEIGHT4
 	};
 
 	/**

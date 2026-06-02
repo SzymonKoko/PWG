@@ -34,6 +34,11 @@ namespace pwg
 		};
 	}
 
+	TerrainPassTypes MountainMaskPass::GetPassType()
+	{
+		return m_passType;
+	}
+
 	std::string MountainMaskPass::GetName()
 	{
 		return m_name;

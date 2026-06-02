@@ -15,7 +15,9 @@ namespace pwg
 		MASK,
 		COMPOSITION,
 		ANALYSIS,
-		SIMULATION
+		SIMULATION,
+		HYDROLOGY,
+		EROSION
 	};
 	
 	enum class ParameterType
@@ -43,6 +45,7 @@ namespace pwg
 	public:
 		virtual void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx) = 0;
 		virtual std::vector<UIParameters> GetParameters() = 0;
+		virtual TerrainPassTypes GetPassType() = 0;
 		virtual std::string GetName() = 0;
 	};
 }

@@ -16,6 +16,7 @@ namespace pwg
 
 		void AddPass(std::shared_ptr<TerrainPass> pass);
 		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx);
+		void ExecutePasses(TerrainPassTypes passType, std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx);
 		std::vector<std::shared_ptr<TerrainPass>>& GetPasses();
 		void ClearGraph();
 

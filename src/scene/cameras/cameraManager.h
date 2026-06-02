@@ -2,8 +2,10 @@
 #define SRC_SCENE_CAMERAS_CAMERA_MANAGER_H_
 
 #include "editorCamera.h"
+#include "flyoverCamera.h"
 #include "playerCamera.h"
 #include <memory>
+#include <functional>
 
 namespace pwg
 {
@@ -13,6 +15,7 @@ namespace pwg
 	enum class CameraType
 	{
 		EDITOR = 0, /**< Editor camera for free movement and scene inspection. */
+		FLYOVER,
 		PLAYER      /**< Player camera for gameplay perspective. */
 	};
 
@@ -60,6 +63,7 @@ namespace pwg
 		* @param z Z coordinate.
 		*/
 		void SetCameraPosition(float x, float y, float z);
+		void SetTerrainHeightProvider(std::function<float(float, float)> provider);
 
 		/**
 		* @brief Returns the current world position of the active camera.
@@ -85,6 +89,7 @@ namespace pwg
 		CameraType m_activeCameraType;					/**< Currently active camera type. */
 
 		std::shared_ptr<EditorCamera> m_editorCamera;	/**< Editor camera instance. */
+		std::shared_ptr<FlyoverCamera> m_flyoverCamera;	/**< Flyover camera instance. */
 		std::shared_ptr<PlayerCamera> m_playerCamera;	/**< Player camera instance. */
 		std::shared_ptr<ICamera> m_activeCamera;		/**< Currently active camera pointer. */
 	};

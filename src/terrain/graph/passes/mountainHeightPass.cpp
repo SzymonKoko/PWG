@@ -58,6 +58,10 @@ namespace pwg
 			{"Falloff Strength", ParameterType::Float, &m_parameters.falloffStrength, 0.0, 3.0}
 		};
 	}
+	TerrainPassTypes MountainHeightPass::GetPassType()
+	{
+		return m_passType;
+	}
 	std::string MountainHeightPass::GetName()
 	{
 		return m_name;

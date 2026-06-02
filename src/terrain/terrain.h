@@ -119,7 +119,7 @@ namespace pwg
 		/**
 		 * @brief Returns the terrain height at a given (x, z) coordinate.
 		 */
-		float GetTerrainHeightAt(int x, int z);
+		float GetTerrainHeightAt(float x, float z);
 
 		std::shared_ptr<TerrainDebug> GetTerrainDebug();
 

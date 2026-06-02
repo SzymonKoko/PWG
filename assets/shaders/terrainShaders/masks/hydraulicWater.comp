@@ -1,0 +1,230 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8) in;
+
+layout (r32f, binding = 0) writeonly uniform image2D u_waterOut;
+layout (r32f, binding = 1) writeonly uniform image2D u_flowAccumulationOut;
+layout (r32f, binding = 2) writeonly uniform image2D u_riverChannelsOut;
+
+uniform sampler2D u_height;
+uniform sampler2D u_waterIn;
+uniform sampler2D u_flux;
+uniform sampler2D u_diagonalFlux;
+uniform sampler2D u_flowAccumulationIn;
+uniform sampler2D u_riverChannelsIn;
+
+uniform int u_size;
+uniform float u_rainRate;
+uniform float u_rainElevationBias;
+uniform float u_rainMinHeight;
+uniform float u_rainMaxHeight;
+uniform float u_evaporation;
+uniform float u_infiltrationRate;
+uniform float u_lakeInfiltrationScale;
+uniform float u_lakeMinDepth;
+uniform float u_lakeLeveling;
+uniform float u_lakeWaterSmoothing;
+uniform float u_maxWaterDepth;
+uniform float u_maxSurfaceDrop;
+uniform float u_minFlowToErode;
+uniform float u_flowAccumulationGrowth;
+uniform float u_flowAccumulationDecay;
+uniform float u_riverChannelGrowth;
+uniform float u_riverChannelDecay;
+
+ivec2 ClampCoord(ivec2 p)
+{
+    return clamp(p, ivec2(0), ivec2(u_size - 1));
+}
+
+bool IsInside(ivec2 p)
+{
+    return p.x >= 0 && p.y >= 0 && p.x < u_size && p.y < u_size;
+}
+
+float HeightAt(ivec2 p)
+{
+    return texelFetch(u_height, ClampCoord(p), 0).r;
+}
+
+float RidgeSourceAt(ivec2 p)
+{
+    p = ClampCoord(p);
+    float center = HeightAt(p);
+    float neighborAverage = 0.0;
+    float highestNeighbor = -1000000.0;
+
+    for (int y = -1; y <= 1; ++y)
+    {
+        for (int x = -1; x <= 1; ++x)
+        {
+            if (x == 0 && y == 0)
+                continue;
+
+            float h = HeightAt(p + ivec2(x, y));
+            neighborAverage += h;
+            highestNeighbor = max(highestNeighbor, h);
+        }
+    }
+
+    neighborAverage *= 0.125;
+    float localProminence = center - neighborAverage;
+    float peakFactor = smoothstep(0.005, max(u_maxSurfaceDrop * 0.75, 0.006), localProminence);
+    float nearTop = smoothstep(-u_maxSurfaceDrop * 0.35, u_maxSurfaceDrop * 0.15, center - highestNeighbor);
+    float heightGate = smoothstep(u_rainMinHeight, max(u_rainMinHeight + 0.0001, u_rainMaxHeight), center);
+    return peakFactor * nearTop * mix(1.0, heightGate, clamp(u_rainElevationBias, 0.0, 1.0));
+}
+
+float WaterAt(ivec2 p)
+{
+    return clamp(texelFetch(u_waterIn, ClampCoord(p), 0).r, 0.0, u_maxWaterDepth);
+}
+
+float SafeWater(float water)
+{
+    if (isnan(water) || isinf(water))
+        return 0.0;
+
+    return clamp(water, 0.0, u_maxWaterDepth);
+}
+
+float SurfaceAt(ivec2 p)
+{
+    return HeightAt(p) + WaterAt(p);
+}
+
+float RainAt(ivec2 p)
+{
+    return u_rainRate * RidgeSourceAt(p);
+}
+
+vec4 FluxAt(ivec2 p)
+{
+    if (!IsInside(p))
+        return vec4(0.0);
+
+    return texelFetch(u_flux, p, 0);
+}
+
+vec4 DiagonalFluxAt(ivec2 p)
+{
+    if (!IsInside(p))
+        return vec4(0.0);
+
+    return texelFetch(u_diagonalFlux, p, 0);
+}
+
+float OutWaterAt(ivec2 id)
+{
+    vec4 f = FluxAt(id);
+    vec4 df = DiagonalFluxAt(id);
+    return f.x + f.y + f.z + f.w + df.x + df.y + df.z + df.w;
+}
+
+float InWaterAt(ivec2 id)
+{
+    float incoming = 0.0;
+    incoming += FluxAt(id + ivec2(-1, 0)).y;
+    incoming += FluxAt(id + ivec2(1, 0)).x;
+    incoming += FluxAt(id + ivec2(0, -1)).w;
+    incoming += FluxAt(id + ivec2(0, 1)).z;
+    incoming += DiagonalFluxAt(id + ivec2(-1, -1)).w;
+    incoming += DiagonalFluxAt(id + ivec2(1, -1)).z;
+    incoming += DiagonalFluxAt(id + ivec2(-1, 1)).y;
+    incoming += DiagonalFluxAt(id + ivec2(1, 1)).x;
+    return incoming;
+}
+
+float DownhillSlope(ivec2 id)
+{
+    float surface = SurfaceAt(id);
+    float best = 0.0;
+    best = max(best, clamp(surface - SurfaceAt(id + ivec2(-1, 0)), 0.0, u_maxSurfaceDrop));
+    best = max(best, clamp(surface - SurfaceAt(id + ivec2(1, 0)), 0.0, u_maxSurfaceDrop));
+    best = max(best, clamp(surface - SurfaceAt(id + ivec2(0, -1)), 0.0, u_maxSurfaceDrop));
+    best = max(best, clamp(surface - SurfaceAt(id + ivec2(0, 1)), 0.0, u_maxSurfaceDrop));
+    best = max(best, clamp((surface - SurfaceAt(id + ivec2(-1, -1))) * 0.70710678, 0.0, u_maxSurfaceDrop));
+    best = max(best, clamp((surface - SurfaceAt(id + ivec2(1, -1))) * 0.70710678, 0.0, u_maxSurfaceDrop));
+    best = max(best, clamp((surface - SurfaceAt(id + ivec2(-1, 1))) * 0.70710678, 0.0, u_maxSurfaceDrop));
+    best = max(best, clamp((surface - SurfaceAt(id + ivec2(1, 1))) * 0.70710678, 0.0, u_maxSurfaceDrop));
+    return best;
+}
+
+float AverageWater3x3(ivec2 id)
+{
+    float water = 0.0;
+    for (int y = -1; y <= 1; ++y)
+    {
+        for (int x = -1; x <= 1; ++x)
+        {
+            water += WaterAt(id + ivec2(x, y));
+        }
+    }
+
+    return water / 9.0;
+}
+
+float AverageSurface3x3(ivec2 id)
+{
+    float surface = 0.0;
+    for (int y = -1; y <= 1; ++y)
+    {
+        for (int x = -1; x <= 1; ++x)
+        {
+            ivec2 p = id + ivec2(x, y);
+            surface += SurfaceAt(p);
+        }
+    }
+
+    return surface / 9.0;
+}
+
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    if (id.x >= u_size || id.y >= u_size)
+        return;
+
+    float rain = RainAt(id);
+    float water = clamp(WaterAt(id) + rain, 0.0, u_maxWaterDepth);
+    float outWater = clamp(OutWaterAt(id), 0.0, u_maxWaterDepth * 8.0);
+    float inWater = clamp(InWaterAt(id), 0.0, u_maxWaterDepth * 8.0);
+    float newWater = SafeWater(water + inWater - outWater);
+
+    float flow = inWater + outWater;
+    float slope = DownhillSlope(id);
+    float velocity = flow / max(flow + newWater, 0.000001);
+    float stillWater = 1.0 - smoothstep(u_minFlowToErode, u_minFlowToErode + 0.08, flow);
+    float flatGround = 1.0 - smoothstep(0.006, 0.055, slope);
+    float puddleFactor = smoothstep(0.004, max(u_lakeMinDepth, 0.006), newWater) * stillWater * flatGround;
+    float lakeFactor = smoothstep(u_lakeMinDepth, u_lakeMinDepth * 4.0 + 0.0001, newWater) * stillWater * flatGround;
+    lakeFactor = max(lakeFactor, puddleFactor * 0.65);
+
+    if (lakeFactor > 0.0 && u_lakeLeveling > 0.0)
+    {
+        float targetSurface = AverageSurface3x3(id) + rain;
+        float targetWater = max(targetSurface - HeightAt(id), 0.0);
+        float smoothWater = mix(AverageWater3x3(id) + rain, targetWater, 0.75);
+        float smoothing = clamp(max(u_lakeLeveling, u_lakeWaterSmoothing) * lakeFactor, 0.0, 1.0);
+        newWater = SafeWater(mix(newWater, smoothWater, smoothing));
+    }
+
+    float infiltration = u_infiltrationRate * mix(1.0, u_lakeInfiltrationScale, max(lakeFactor, puddleFactor));
+    newWater = SafeWater(newWater - infiltration);
+    newWater = SafeWater(newWater * (1.0 - u_evaporation * mix(1.0, 0.25, max(lakeFactor, puddleFactor))));
+
+    float streamPower = clamp(newWater * velocity * max(slope, 0.0), 0.0, u_maxWaterDepth * u_maxSurfaceDrop);
+    float riverFactor = smoothstep(0.000002, 0.0015, streamPower) * (1.0 - lakeFactor);
+
+    float currentFlowAccumulation = texelFetch(u_flowAccumulationIn, id, 0).r;
+    float flowAccumulation = max(currentFlowAccumulation - u_flowAccumulationDecay * mix(1.0, 2.0, lakeFactor), 0.0);
+    flowAccumulation = clamp(max(flowAccumulation, (flow * 8.0 + riverFactor * 0.7 + lakeFactor * 0.25) * u_flowAccumulationGrowth), 0.0, 1.0);
+
+    float currentChannel = texelFetch(u_riverChannelsIn, id, 0).r;
+    float channel = max(currentChannel - u_riverChannelDecay * mix(1.0, 3.0, lakeFactor), 0.0);
+    channel = clamp(channel + riverFactor * u_riverChannelGrowth, 0.0, 1.0);
+
+    imageStore(u_waterOut, id, vec4(SafeWater(newWater), 0.0, 0.0, 0.0));
+    imageStore(u_flowAccumulationOut, id, vec4(flowAccumulation, 0.0, 0.0, 0.0));
+    imageStore(u_riverChannelsOut, id, vec4(channel, 0.0, 0.0, 0.0));
+}

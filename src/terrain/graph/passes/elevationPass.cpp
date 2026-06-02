@@ -39,6 +39,11 @@ namespace pwg
 		};
 	}
 
+	TerrainPassTypes ElevationPass::GetPassType()
+	{
+		return m_passType;
+	}
+
 	std::string ElevationPass::GetName()
 	{
 		return m_name; 

@@ -23,7 +23,9 @@ namespace pwg
 		MoveDown,			/**< Moves downward */
 		Exit,				/**< Exits the application */
 		EditorCamera,
+		FlyoverCamera,
 		PlayerCamera,
+		MoveBoost,
 		ToggleDebug,		/**< Toggles debug information or mode */
 		Count				/**< Helper value representing number of available actions */
 	};

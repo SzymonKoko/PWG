@@ -38,6 +38,11 @@ namespace pwg
 	}
 	std::shared_ptr<Texture> TerrainDebug::GetSelectedTexture()
 	{
+		if (m_selectedTexture < 0 || m_selectedTexture >= m_debugEntries.size())
+		{
+			return nullptr;
+		}
+
 		return m_debugEntries[m_selectedTexture].texture;
 	}
 	std::vector<DebugEntry>& TerrainDebug::GetEntries()

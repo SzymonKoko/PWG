@@ -11,7 +11,7 @@ namespace pwg
         m_terrainDebug = std::make_shared<TerrainDebug>();
         m_chunkManager = std::make_shared<ChunkManager>(resourceManager, m_terrainSettings, m_material, m_terrainDebug);
 
-        m_size = CHUNKS * m_terrainSettings.chunkSize;
+        m_size = m_chunkManager->GetWorldSize();
 
     }
 
@@ -31,7 +31,7 @@ namespace pwg
             }
         }
 
-        m_chunkManager->Update(camera);
+        m_chunkManager->Update(camera, dt);
 
 
     }
@@ -58,7 +58,7 @@ namespace pwg
 
     int Terrain::GetSize()
     {
-        return m_size;
+        return m_chunkManager->GetWorldSize();
     }
 
     TerrainNoiseSettings& Terrain::GetNoiseSettings()
@@ -77,12 +77,9 @@ namespace pwg
         m_terrainTextures.normalmap = textures.at("NormalMask");
     }
 
-    float Terrain::GetTerrainHeightAt(int x, int z)
+    float Terrain::GetTerrainHeightAt(float x, float z)
     {
-        //auto heightmapSample = m_terrainGenerator->GetCPUHeightmap();
-        x = (x - 0.0) / m_size;
-        z = (z - 0.0) / m_size;
-        return 0;// heightmapSample[z * m_size + x] * m_terrainNoiseSettings.amplitude;
+        return m_chunkManager->SampleHeightAtWorld(x, z);
     }
     std::shared_ptr<TerrainDebug> Terrain::GetTerrainDebug()
     {

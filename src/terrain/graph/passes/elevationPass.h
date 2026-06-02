@@ -23,6 +23,7 @@ namespace pwg
 
 		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx) override;
 		std::vector<UIParameters> GetParameters() override;
+		TerrainPassTypes GetPassType() override;
 		std::string GetName() override;
 
 	private:

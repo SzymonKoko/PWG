@@ -5,6 +5,7 @@ pwg::CameraManager::CameraManager(pwg::MouseInput& mouseInput, pwg::KeyboardInpu
 	  m_keyboardInput(keyboardInput)
 {
 	m_editorCamera = std::make_shared<EditorCamera>();
+	m_flyoverCamera = std::make_shared<FlyoverCamera>();
 	m_playerCamera = std::make_shared<PlayerCamera>();
 	m_activeCamera = m_editorCamera;
 	m_activeCameraType = CameraType::EDITOR;
@@ -27,6 +28,13 @@ void pwg::CameraManager::SetCamera(CameraType type)
 		m_activeCamera = m_editorCamera;
 		m_activeCameraType = CameraType::EDITOR;
 		PWG_INFO("SET CAMERA TO EDITOR MODE");
+		break;
+	}
+	case CameraType::FLYOVER:
+	{
+		m_activeCamera = m_flyoverCamera;
+		m_activeCameraType = CameraType::FLYOVER;
+		PWG_INFO("SET CAMERA TO FLYOVER MODE");
 		break;
 	}
 	case CameraType::PLAYER:
@@ -56,6 +64,14 @@ void pwg::CameraManager::SetCameraPosition(float x, float y, float z)
 	if (m_activeCamera)
 	{
 		m_activeCamera->SetCameraPosition(x, y, z);
+	}
+}
+
+void pwg::CameraManager::SetTerrainHeightProvider(std::function<float(float, float)> provider)
+{
+	if (m_playerCamera)
+	{
+		m_playerCamera->SetTerrainHeightProvider(provider);
 	}
 }
 

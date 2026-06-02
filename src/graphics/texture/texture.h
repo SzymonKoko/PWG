@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 #include "graphics/common/GL_Types.h"
 #include <filesystem>
+#include <vector>
 
 #include "core/logger/logger.h"
 
@@ -64,6 +65,19 @@ namespace pwg
 		*/
 		void ClearTexture();
 
+		void ClearTexture(float value);
+
+		/**
+		* @brief Copies pixel data from another texture of the same size.
+		* @param source Texture to copy from.
+		*/
+		void CopyFrom(const Texture& source);
+
+		/**
+		* @brief Reads the texture as floating point data from GPU memory.
+		*/
+		std::vector<float> ReadFloatData();
+
 		/**
 		* @brief Sets the texture wrapping mode for S and T coordinates.
 		* @param wrapS Wrapping mode for S axis.
@@ -86,6 +100,8 @@ namespace pwg
 		* @param nrChannels Number of color channels (e.g., RGB=3, RGBA=4).
 		*/
 		void UpdateData(unsigned char* data, int width, int height, int nrChannels);
+
+		void UpdateFloatData(const std::vector<float>& data, int width, int height);
 
 		/**
 		* @brief Returns the OpenGL texture ID.

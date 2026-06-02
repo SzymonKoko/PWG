@@ -13,6 +13,7 @@ namespace pwg
 
 		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx) override;
 		std::vector<UIParameters> GetParameters() override;
+		TerrainPassTypes GetPassType() override;
 		std::string GetName() override;
 
 	private:
@@ -21,7 +22,7 @@ namespace pwg
 		std::shared_ptr<ComputeShader> m_computeShader;
 		std::vector<std::string> m_inputTextures;
 		std::vector<std::string> m_outputTextures;
-		float m_amplitude{ 0 };
+		float m_amplitude{ 1.0f };
 		int m_terrainSize{ 0 };
 	};
 }
