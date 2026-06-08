@@ -37,17 +37,17 @@ namespace pwg
 
 		m_computeShader->ActivateShader();
 		m_computeShader->SetUniformInt("u_size", m_terrainSize);
-		m_computeShader->SetUniformFloat("u_flowRate", ctx.hydraulicSettings.flowRate);
-		m_computeShader->SetUniformFloat("u_flowInertia", ctx.hydraulicSettings.flowInertia);
+		m_computeShader->SetUniformFloat("u_pipeFlow", ctx.hydraulicSettings.pipeFlow);
+		m_computeShader->SetUniformFloat("u_pipeDamping", ctx.hydraulicSettings.pipeDamping);
 		m_computeShader->SetUniformFloat("u_rainRate", ctx.hydraulicSettings.rainRate);
 		m_computeShader->SetUniformFloat("u_rainElevationBias", ctx.hydraulicSettings.rainElevationBias);
 		m_computeShader->SetUniformFloat("u_rainMinHeight", ctx.hydraulicSettings.rainMinHeight);
 		m_computeShader->SetUniformFloat("u_rainMaxHeight", ctx.hydraulicSettings.rainMaxHeight);
 		m_computeShader->SetUniformFloat("u_boundaryDrain", ctx.hydraulicSettings.boundaryDrain);
 		m_computeShader->SetUniformFloat("u_maxWaterDepth", ctx.hydraulicSettings.maxWaterDepth);
-		m_computeShader->SetUniformFloat("u_maxSurfaceDrop", ctx.hydraulicSettings.maxSurfaceDrop);
 		m_computeShader->SetUniformFloat("u_riverChannelInfluence", ctx.hydraulicSettings.riverChannelInfluence);
 		m_computeShader->SetUniformFloat("u_riverChannelDepth", ctx.hydraulicSettings.riverChannelDepth);
+		m_computeShader->SetUniformFloat("u_flowConcentration", ctx.hydraulicSettings.flowConcentration);
 		m_computeShader->SetUniformInt("u_useDiagonalFlow", ctx.hydraulicSettings.useDiagonalFlow);
 		m_computeShader->SetUniformInt("u_height", 0);
 		m_computeShader->SetUniformInt("u_water", 1);
@@ -80,15 +80,14 @@ namespace pwg
 		}
 
 		return {
-			{"Rain - prefers high terrain", ParameterType::Float, &m_parameters.settings->rainElevationBias, 0.0f, 1.0f},
-			{"Rain - mountain source starts", ParameterType::Float, &m_parameters.settings->rainMinHeight, 0.0f, 2.0f},
-			{"Rain - mountain source full", ParameterType::Float, &m_parameters.settings->rainMaxHeight, 0.0f, 3.0f},
-			{"Flow - downhill speed", ParameterType::Float, &m_parameters.settings->flowRate, 0.05f, 0.95f},
-			{"Flow - keeps previous direction", ParameterType::Float, &m_parameters.settings->flowInertia, 0.0f, 0.95f},
-			{"Flow - max neighbor drop", ParameterType::Float, &m_parameters.settings->maxSurfaceDrop, 0.01f, 2.0f},
+			{"Rain - amount per step", ParameterType::Float, &m_parameters.settings->rainRate, 0.0f, 0.02f},
+			{"Rain - high terrain boost", ParameterType::Float, &m_parameters.settings->rainElevationBias, 0.0f, 1.0f},
+			{"Pipe - flow speed", ParameterType::Float, &m_parameters.settings->pipeFlow, 0.05f, 0.95f},
+			{"Pipe - direction memory", ParameterType::Float, &m_parameters.settings->pipeDamping, 0.0f, 0.95f},
+			{"Flow - river concentration", ParameterType::Float, &m_parameters.settings->flowConcentration, 0.0f, 0.85f},
 			{"Flow - diagonal neighbors", ParameterType::Bool, &m_parameters.settings->useDiagonalFlow, 0, 1},
-			{"Flow - carved channel pull", ParameterType::Float, &m_parameters.settings->riverChannelDepth, 0.0f, 0.2f},
-			{"Flow - map edge drain", ParameterType::Float, &m_parameters.settings->boundaryDrain, 0.0f, 1.0f}
+			{"Flow - map edge drain", ParameterType::Float, &m_parameters.settings->boundaryDrain, 0.0f, 1.0f},
+			{"Water - max depth", ParameterType::Float, &m_parameters.settings->maxWaterDepth, 0.2f, 6.0f}
 		};
 	}
 

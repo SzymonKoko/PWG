@@ -9,69 +9,77 @@ namespace pwg
 	struct HydraulicSimulationSettings
 	{
 		int stepsPerUpdate = 1;
-		int waterStepsPerSecond = 6;
-		int waterSubsteps = 1;
+		int waterStepsPerSecond = 8;
+		int waterSubsteps = 2;
 		int bakeParticleSteps = 24;
 		int bakeStepsPerFrame = 1;
 		int bakeUploadInterval = 4;
 		bool erosionEnabled = true;
 		bool autoWaterSimulation = false;
-		bool particleErosionEnabled = true;
+		bool particleErosionEnabled = false;
 		bool showWaterSurface = true;
 		bool waterRefractionEnabled = false;
-		bool useDiagonalFlow = false;
+		bool useDiagonalFlow = true;
 
-		float rainRate = 0.0025f;
-		float rainElevationBias = 1.0f;
-		float rainMinHeight = 0.55f;
-		float rainMaxHeight = 0.95f;
+		// Water budget
+		float rainRate = 0.004f;
+		float rainElevationBias = 0.35f;
+		float rainMinHeight = 0.0f;
+		float rainMaxHeight = 1.2f;
+		float evaporation = 0.00004f;
+		float infiltrationRate = 0.00003f;
+		float boundaryDrain = 0.92f;
+		float maxWaterDepth = 2.5f;
 
-		float flowRate = 0.55f;
-		float flowInertia = 0.0f;
-		float boundaryDrain = 0.85f;
-		float lakeLeveling = 0.22f;
-		float maxWaterDepth = 1.4f;
+		// Virtual pipes
+		float pipeFlow = 0.38f;
+		float pipeDamping = 0.28f;
+		float flowConcentration = 0.40f;
+
+		// Lakes
+		float lakeMinDepth = 0.012f;
+		float lakeLeveling = 0.48f;
+
+		// Erosion (stream-power)
+		float sedimentCapacity = 4.0f;
+		float erosionStrength = 0.20f;
+		float depositionStrength = 0.014f;
+		float flatteningStrength = 0.25f;
+		float minWaterToErode = 0.0008f;
+		float minFlowToErode = 0.0003f;
+		float maxHeightChange = 0.018f;
+		float maxErosionDepth = 1.0f;
+		float maxDepositHeight = 0.06f;
+
+		// River channel feedback
+		float flowAccumulationGrowth = 0.90f;
+		float flowAccumulationDecay = 0.008f;
+		float riverChannelGrowth = 0.22f;
+		float riverChannelDecay = 0.004f;
+		float riverChannelInfluence = 0.55f;
+		float riverChannelDepth = 0.14f;
+
+		// Legacy fields kept for project file compatibility
+		float flowRate = 0.38f;
+		float flowInertia = 0.28f;
 		float maxSurfaceDrop = 0.22f;
-
-		float evaporation = 0.0006f;
-		float infiltrationRate = 0.0004f;
-		float lakeInfiltrationScale = 0.05f;
-
-		float sedimentCapacity = 16.0f;
-		float erosionRate = 0.16f;
-		float slopeErosionRate = 0.42f;
+		float lakeInfiltrationScale = 0.03f;
+		float lakeWaterSmoothing = 0.30f;
+		float erosionRate = 0.14f;
+		float slopeErosionRate = 0.35f;
 		float slopeErosionMinSlope = 0.006f;
 		float slopeErosionWaterScale = 1.25f;
-		float depositionRate = 0.10f;
-		float valleyDepositionRate = 0.28f;
+		float depositionRate = 0.022f;
+		float valleyDepositionRate = 0.22f;
 		float valleyDepositionSlope = 0.09f;
-
+		float depositDiffusion = 0.0f;
 		float steepSlopeDepositionReduction = 0.9f;
 		float depositionSlopeStart = 0.04f;
 		float depositionSlopeEnd = 0.22f;
-
-		float minWaterToErode = 0.001f;
-		float minFlowToErode = 0.0005f;
-
-		float maxHeightChange = 0.032f;
-		float maxErosionDepth = 1.2f;
-		float maxDepositionHeight = 0.80f;
-
-		float lakeDeposition = 0.65f;
-		float lakeMinDepth = 0.035f;
-		float lakeBedSmoothing = 0.04f;
-		float lakeWaterSmoothing = 0.22f;
-
-		float channelSmoothing = 0.03f;
-
-		float flowAccumulationGrowth = 0.85f;
-		float flowAccumulationDecay = 0.015f;
-
-		float riverChannelGrowth = 0.14f;
-		float riverChannelDecay = 0.001f;
-		float riverChannelInfluence = 0.35f;
-		float riverChannelDepth = 0.09f;
-
+		float maxDepositionHeight = 0.10f;
+		float lakeDeposition = 0.72f;
+		float lakeBedSmoothing = 0.06f;
+		float channelSmoothing = 0.06f;
 		int particlesPerStep = 2500;
 		int dropletLifetime = 36;
 		int particleSeed = 1337;
@@ -103,6 +111,9 @@ namespace pwg
 	{
 		int chunkSize;
 		glm::vec2 offset{ 0.0f, 0.0f };
+		glm::vec2 worldOrigin{ 0.0f, 0.0f };
+		int worldSize{ 0 };
+		bool chunkLocalGeneration{ false };
 		int simulationIterations = 40;
 		HydraulicSimulationSettings hydraulicSettings;
 		bool cpuTerrainCacheValid = false;

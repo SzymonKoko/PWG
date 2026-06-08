@@ -20,6 +20,12 @@ void pwg::EditorCamera::SetDefaultCameraPosition(int size)
 
     m_editorCameraProperties.distanceToTarget = m_transform.position.x * 2;
 
+    // Scale zoom limits with the world size so the clamp keeps the camera out of
+    // the terrain (preventing the close-range GPU stall) while still allowing the
+    // whole world to be framed.
+    m_editorCameraProperties.minZoom = 60.0f;
+    m_editorCameraProperties.maxZoom = m_editorCameraProperties.distanceToTarget * 1.5f;
+
     m_cameraProperties.viewMatrix = glm::lookAt(m_transform.position, m_editorCameraProperties.target, m_cameraProperties.up);
 
     PWG_INFO("Camera set to default (Position: {0} {1} {2}, distance to target: {3}, target: {4} {5} {6})",
@@ -91,7 +97,7 @@ void pwg::EditorCamera::HandleMouseInput(pwg::MouseInput& mouseInput, float dt)
     if (scroll != 0.0f)
     {
         m_editorCameraProperties.distanceToTarget -= scroll * m_editorCameraProperties.zoomSpeed;
-        //m_editorCameraProperties.distanceToTarget = glm::clamp(m_editorCameraProperties.distanceToTarget, m_editorCameraProperties.minZoom, m_editorCameraProperties.maxZoom);
+        m_editorCameraProperties.distanceToTarget = glm::clamp(m_editorCameraProperties.distanceToTarget, m_editorCameraProperties.minZoom, m_editorCameraProperties.maxZoom);
 
         mouseInput.ResetScrollOffset();
     }

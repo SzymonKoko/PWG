@@ -2,9 +2,389 @@
 #include "imgui.h"
 #include "editorScene.h"
 #include "controls/noiseControls.h"
-#include "controls/terrainLayerControls.h"
 #include "controls/lightControls.h"
+#include "platform/nativeDialogs.h"
 
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <map>
+#include <numbers>
+#include <vector>
+#include <stb/stb_image.h>
+#include <stb/stb_image_write.h>
+
+namespace
+{
+	std::string NormalizePath(const std::string& path)
+	{
+		return std::filesystem::path(path).generic_string();
+	}
+
+	std::string ToLower(std::string value)
+	{
+		std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+		return value;
+	}
+
+	std::array<const char*, 6> SkyboxFaceSuffixes()
+	{
+		return { "rt", "lf", "up", "dn", "bk", "ft" };
+	}
+
+	pwg::SkyboxDefinition DefaultSkyboxDefinition()
+	{
+		pwg::SkyboxDefinition definition;
+		definition.name = "miramar";
+		definition.folder = "../assets/textures/skybox";
+		definition.faces = {
+			"../assets/textures/skybox/miramar_rt.tga",
+			"../assets/textures/skybox/miramar_lf.tga",
+			"../assets/textures/skybox/miramar_up.tga",
+			"../assets/textures/skybox/miramar_dn.tga",
+			"../assets/textures/skybox/miramar_bk.tga",
+			"../assets/textures/skybox/miramar_ft.tga"
+		};
+		return definition;
+	}
+
+	bool IsSupportedSkyboxTexture(const std::filesystem::path& path)
+	{
+		std::string extension = ToLower(path.extension().string());
+		return extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".tga";
+	}
+
+	const std::array<std::vector<std::string>, 6>& SkyboxFaceAliases()
+	{
+		static const std::array<std::vector<std::string>, 6> aliases = {
+			std::vector<std::string>{ "rt", "right", "px", "posx", "positivex", "xpos", "xpositive" },
+			std::vector<std::string>{ "lf", "left", "nx", "negx", "negativex", "xneg", "xnegative" },
+			std::vector<std::string>{ "up", "top", "py", "posy", "positivey", "ypos", "ypositive" },
+			std::vector<std::string>{ "dn", "down", "bottom", "ny", "negy", "negativey", "yneg", "ynegative" },
+			std::vector<std::string>{ "bk", "back", "pz", "posz", "positivez", "zpos", "zpositive" },
+			std::vector<std::string>{ "ft", "front", "nz", "negz", "negativez", "zneg", "znegative" }
+		};
+		return aliases;
+	}
+
+	bool TryMatchSkyboxFace(const std::string& stem, int& faceIndex, std::string& groupName)
+	{
+		std::string lowerStem = ToLower(stem);
+		const auto& aliases = SkyboxFaceAliases();
+		const std::vector<std::string> separators = { "_", "-", " " };
+
+		for (int i = 0; i < static_cast<int>(aliases.size()); ++i)
+		{
+			for (const auto& alias : aliases[i])
+			{
+				if (lowerStem == alias)
+				{
+					faceIndex = i;
+					groupName = "skybox";
+					return true;
+				}
+
+				for (const auto& separator : separators)
+				{
+					std::string suffix = separator + alias;
+					if (lowerStem.size() > suffix.size() && lowerStem.ends_with(suffix))
+					{
+						faceIndex = i;
+						groupName = stem.substr(0, stem.size() - suffix.size());
+						return true;
+					}
+
+					std::string prefix = alias + separator;
+					if (lowerStem.size() > prefix.size() && lowerStem.starts_with(prefix))
+					{
+						faceIndex = i;
+						groupName = stem.substr(prefix.size());
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	std::vector<pwg::SkyboxDefinition> FindSkyboxDefinitions(const std::string& folder)
+	{
+		std::vector<pwg::SkyboxDefinition> definitions;
+		if (folder.empty() || !std::filesystem::is_directory(folder))
+		{
+			return definitions;
+		}
+
+		std::map<std::string, std::array<std::string, 6>> groupedFaces;
+		for (const auto& entry : std::filesystem::directory_iterator(folder))
+		{
+			if (!entry.is_regular_file() || !IsSupportedSkyboxTexture(entry.path()))
+			{
+				continue;
+			}
+
+			std::string stem = entry.path().stem().string();
+			int faceIndex = -1;
+			std::string groupName;
+			if (TryMatchSkyboxFace(stem, faceIndex, groupName))
+			{
+				groupedFaces[groupName][faceIndex] = NormalizePath(entry.path().string());
+			}
+		}
+
+		for (const auto& [name, faces] : groupedFaces)
+		{
+			bool complete = true;
+			for (const auto& face : faces)
+			{
+				complete = complete && !face.empty();
+			}
+			if (!complete)
+			{
+				continue;
+			}
+
+			pwg::SkyboxDefinition definition;
+			definition.name = name;
+			definition.folder = NormalizePath(folder);
+			definition.faces = faces;
+			definitions.push_back(definition);
+		}
+		return definitions;
+	}
+
+	std::vector<std::string> FaceVector(const pwg::SkyboxDefinition& definition)
+	{
+		return {
+			definition.faces[0],
+			definition.faces[1],
+			definition.faces[2],
+			definition.faces[3],
+			definition.faces[4],
+			definition.faces[5]
+		};
+	}
+
+	std::string ImportedSkyboxFolder(const std::string& imagePath)
+	{
+		std::string stem = std::filesystem::path(imagePath).stem().string();
+		for (char& c : stem)
+		{
+			if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-')
+			{
+				c = '_';
+			}
+		}
+		return NormalizePath("../assets/cache/skybox_imports/" + stem);
+	}
+
+	void CopyFaceRegion(const unsigned char* source, int sourceWidth, int sourceHeight, int sourceX, int sourceY, int faceSize, std::vector<unsigned char>& face)
+	{
+		face.resize(static_cast<std::size_t>(faceSize) * static_cast<std::size_t>(faceSize) * 4);
+		for (int y = 0; y < faceSize; ++y)
+		{
+			for (int x = 0; x < faceSize; ++x)
+			{
+				int sx = std::clamp(sourceX + x, 0, sourceWidth - 1);
+				int sy = std::clamp(sourceY + y, 0, sourceHeight - 1);
+				const unsigned char* src = source + (static_cast<std::size_t>(sy) * sourceWidth + sx) * 4;
+				unsigned char* dst = face.data() + (static_cast<std::size_t>(y) * faceSize + x) * 4;
+				dst[0] = src[0];
+				dst[1] = src[1];
+				dst[2] = src[2];
+				dst[3] = src[3];
+			}
+		}
+	}
+
+	glm::vec3 CubemapDirection(int faceIndex, float u, float v)
+	{
+		float x = 2.0f * u - 1.0f;
+		float y = 2.0f * v - 1.0f;
+		switch (faceIndex)
+		{
+		case 0: return glm::normalize(glm::vec3(1.0f, -y, -x));  // +X rt
+		case 1: return glm::normalize(glm::vec3(-1.0f, -y, x));  // -X lf
+		case 2: return glm::normalize(glm::vec3(x, 1.0f, y));    // +Y up
+		case 3: return glm::normalize(glm::vec3(x, -1.0f, -y));  // -Y dn
+		case 4: return glm::normalize(glm::vec3(-x, -y, 1.0f));  // +Z bk
+		default: return glm::normalize(glm::vec3(x, -y, -1.0f)); // -Z ft
+		}
+	}
+
+	void SampleBilinear(const unsigned char* source, int width, int height, float u, float v, unsigned char* out)
+	{
+		u = u - std::floor(u);
+		v = std::clamp(v, 0.0f, 1.0f);
+		float x = u * static_cast<float>(width - 1);
+		float y = v * static_cast<float>(height - 1);
+		int x0 = static_cast<int>(std::floor(x));
+		int y0 = static_cast<int>(std::floor(y));
+		int x1 = (x0 + 1) % width;
+		int y1 = std::min(y0 + 1, height - 1);
+		float tx = x - static_cast<float>(x0);
+		float ty = y - static_cast<float>(y0);
+
+		for (int c = 0; c < 4; ++c)
+		{
+			float c00 = source[(static_cast<std::size_t>(y0) * width + x0) * 4 + c];
+			float c10 = source[(static_cast<std::size_t>(y0) * width + x1) * 4 + c];
+			float c01 = source[(static_cast<std::size_t>(y1) * width + x0) * 4 + c];
+			float c11 = source[(static_cast<std::size_t>(y1) * width + x1) * 4 + c];
+			float top = c00 + (c10 - c00) * tx;
+			float bottom = c01 + (c11 - c01) * tx;
+			out[c] = static_cast<unsigned char>(std::clamp(top + (bottom - top) * ty, 0.0f, 255.0f));
+		}
+	}
+
+	void RenderEquirectFace(const unsigned char* source, int sourceWidth, int sourceHeight, int faceIndex, int faceSize, std::vector<unsigned char>& face)
+	{
+		face.resize(static_cast<std::size_t>(faceSize) * static_cast<std::size_t>(faceSize) * 4);
+		const float pi = std::numbers::pi_v<float>;
+		for (int y = 0; y < faceSize; ++y)
+		{
+			for (int x = 0; x < faceSize; ++x)
+			{
+				float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(faceSize);
+				float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(faceSize);
+				glm::vec3 direction = CubemapDirection(faceIndex, u, v);
+				float longitude = std::atan2(direction.z, direction.x);
+				float latitude = std::asin(std::clamp(direction.y, -1.0f, 1.0f));
+				float sourceU = 0.5f + longitude / (2.0f * pi);
+				float sourceV = 0.5f - latitude / pi;
+				unsigned char* dst = face.data() + (static_cast<std::size_t>(y) * faceSize + x) * 4;
+				SampleBilinear(source, sourceWidth, sourceHeight, sourceU, sourceV, dst);
+			}
+		}
+	}
+
+	bool WriteSkyboxFaces(const std::string& outputFolder, const std::string& name, const std::array<std::vector<unsigned char>, 6>& faces, int faceSize, std::array<std::string, 6>& outputPaths)
+	{
+		std::filesystem::create_directories(outputFolder);
+		auto suffixes = SkyboxFaceSuffixes();
+		for (int i = 0; i < 6; ++i)
+		{
+			std::string path = NormalizePath(outputFolder + "/" + name + "_" + suffixes[i] + ".png");
+			if (stbi_write_png(path.c_str(), faceSize, faceSize, 4, faces[i].data(), faceSize * 4) == 0)
+			{
+				return false;
+			}
+			outputPaths[i] = path;
+		}
+		return true;
+	}
+
+	bool HasFaceTransforms(const pwg::SkyboxDefinition& definition)
+	{
+		for (int i = 0; i < 6; ++i)
+		{
+			if ((definition.rotations[i] % 4) != 0 || definition.flipHorizontal[i] || definition.flipVertical[i])
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void TransformFaceImage(const unsigned char* source, int size, int rotation, bool flipHorizontal, bool flipVertical, std::vector<unsigned char>& output)
+	{
+		output.resize(static_cast<std::size_t>(size) * static_cast<std::size_t>(size) * 4);
+		rotation = ((rotation % 4) + 4) % 4;
+
+		for (int y = 0; y < size; ++y)
+		{
+			for (int x = 0; x < size; ++x)
+			{
+				int sx = x;
+				int sy = y;
+
+				if (flipHorizontal)
+				{
+					sx = size - 1 - sx;
+				}
+				if (flipVertical)
+				{
+					sy = size - 1 - sy;
+				}
+
+				int rx = sx;
+				int ry = sy;
+				switch (rotation)
+				{
+				case 1:
+					rx = sy;
+					ry = size - 1 - sx;
+					break;
+				case 2:
+					rx = size - 1 - sx;
+					ry = size - 1 - sy;
+					break;
+				case 3:
+					rx = size - 1 - sy;
+					ry = sx;
+					break;
+				default:
+					break;
+				}
+
+				const unsigned char* src = source + (static_cast<std::size_t>(ry) * size + rx) * 4;
+				unsigned char* dst = output.data() + (static_cast<std::size_t>(y) * size + x) * 4;
+				dst[0] = src[0];
+				dst[1] = src[1];
+				dst[2] = src[2];
+				dst[3] = src[3];
+			}
+		}
+	}
+
+	std::vector<std::string> BuildSkyboxLoadFaces(const pwg::SkyboxDefinition& definition, std::string& status)
+	{
+		std::vector<std::string> sourceFaces = FaceVector(definition);
+		if (!HasFaceTransforms(definition))
+		{
+			return sourceFaces;
+		}
+
+		std::string outputFolder = NormalizePath("../assets/cache/skybox_oriented/" + definition.name);
+		std::filesystem::create_directories(outputFolder);
+		auto suffixes = SkyboxFaceSuffixes();
+		std::vector<std::string> transformedFaces(6);
+
+		for (int i = 0; i < 6; ++i)
+		{
+			int width = 0;
+			int height = 0;
+			int channels = 0;
+			stbi_set_flip_vertically_on_load(false);
+			unsigned char* image = stbi_load(definition.faces[i].c_str(), &width, &height, &channels, STBI_rgb_alpha);
+			if (!image || width != height)
+			{
+				if (image)
+				{
+					stbi_image_free(image);
+				}
+				status = "Cannot orient skybox face: " + definition.faces[i];
+				return {};
+			}
+
+			std::vector<unsigned char> transformed;
+			TransformFaceImage(image, width, definition.rotations[i], definition.flipHorizontal[i], definition.flipVertical[i], transformed);
+			stbi_image_free(image);
+
+			std::string path = NormalizePath(outputFolder + "/" + definition.name + "_" + suffixes[i] + ".png");
+			if (stbi_write_png(path.c_str(), width, height, 4, transformed.data(), width * 4) == 0)
+			{
+				status = "Failed to write oriented skybox face";
+				return {};
+			}
+			transformedFaces[i] = path;
+		}
+
+		status = "Skybox loaded with face orientation overrides: " + definition.name;
+		return transformedFaces;
+	}
+}
 
 pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardInput& kinput, std::shared_ptr<ResourceManager> resourceManager, Renderer& renderer)
 	: m_window(window), 
@@ -42,58 +422,8 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     /*== TEXTURE LOADING ==*/
     std::string terrainTexturesPath = "../assets/textures/";
-    std::vector<std::string> texturesPathsAlbedo;
-    std::vector<std::string> texturesPathsNormal;
-    std::vector<std::string> texturesPathsData;
-
-    //Albedo
-    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_Color.jpg");
-    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_Color.jpg");
-    texturesPathsAlbedo.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_Color.jpg");
-
-    //Normal
-    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_NormalGL.jpg");
-    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_NormalGL.jpg");
-    texturesPathsNormal.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_NormalGL.jpg");
-
-    //Roughness
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_Roughness.jpg");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_Roughness.jpg");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_Roughness.jpg");
-
-    //Metallic
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_Roughness.jpg");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_Roughness.jpg");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_Roughness.jpg");
-
-    //AO
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_AmbientOcclusion.jpg");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_AmbientOcclusion.jpg");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_AmbientOcclusion.jpg");
-
-    //Height
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_grass2/Grass002_2K-JPG_Displacement.jpg");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_stone2/Rock060_2K-JPG_Displacement.jpg");
-    texturesPathsData.push_back(terrainTexturesPath + "pbr/pbr_sediment/Ground079S_2K-JPG_Displacement.jpg");
-
-
-    textureManager->LoadTextureArray("terrainTexturesAlbedo", texturesPathsAlbedo, TextureType::ALBEDO);
-    textureManager->LoadTextureArray("terrainTexturesNormal", texturesPathsNormal, TextureType::NORMAL);
-    textureManager->LoadTextureArray("terrainTexturesData", texturesPathsData, TextureType::DATA);
-    auto textureArrayAlbedo = textureManager->GetTextureArray("terrainTexturesAlbedo");
-    auto textureArrayNormal = textureManager->GetTextureArray("terrainTexturesNormal");
-    auto textureArrayData = textureManager->GetTextureArray("terrainTexturesData");
-
-    std::vector<std::string> skyboxPaths = {
-        terrainTexturesPath + "skybox/miramar_rt.tga",
-        terrainTexturesPath + "skybox/miramar_lf.tga",
-        terrainTexturesPath + "skybox/miramar_up.tga",
-        terrainTexturesPath + "skybox/miramar_dn.tga",
-        terrainTexturesPath + "skybox/miramar_bk.tga",
-        terrainTexturesPath + "skybox/miramar_ft.tga",
-    };
-
-    textureManager->LoadCubeMapTexture("Skybox", skyboxPaths, TextureType::ALBEDO);
+    m_skyboxDefinition = DefaultSkyboxDefinition();
+    textureManager->LoadCubeMapTexture("Skybox", FaceVector(m_skyboxDefinition), TextureType::ALBEDO);
 
 
     /*== CREATING MATERIALS ==*/
@@ -101,9 +431,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     auto unlitMaterial = materialManager->CreateMaterial("UnlitMaterial", unlitShader);
     auto skyboxMaterial = materialManager->CreateMaterial("SkyboxMaterial", skyboxShader);
 
-    terrainMaterial->SetTextureArray("u_TexturesAlbedo", textureArrayAlbedo);
-    terrainMaterial->SetTextureArray("u_TexturesNormal", textureArrayNormal);
-    terrainMaterial->SetTextureArray("u_TexturesData", textureArrayData);
+    m_terrainMaterialLibrary = std::make_shared<TerrainMaterialLibrary>(m_resourceManager, terrainMaterial);
     auto skybox = textureManager->GetCubeMapTexture("Skybox");
 
     m_terrain = std::make_shared<Terrain>(m_resourceManager);
@@ -151,7 +479,11 @@ void pwg::EditorScene::Update(const float& dt)
 
 void pwg::EditorScene::Draw()
 {
-    ImGui::Begin("Main View");
+    DrawOutliner();
+
+    m_showMainView = true;
+    {
+    ImGui::Begin("Main View", nullptr, ImGuiWindowFlags_NoCollapse);
 
     ImVec2 windowSize = ImGui::GetContentRegionAvail();
 
@@ -196,37 +528,490 @@ void pwg::EditorScene::Draw()
     ImGui::EndChild();
 
     ImGui::End();
+    }
 
-    ImGui::Begin("Terrain Controls");
+    if (m_showTerrainControls)
+    {
+    ImGui::Begin("Terrain Controls", &m_showTerrainControls);
 
-    if (ImGui::BeginTabBar("Terrain"));
+    if (ImGui::BeginTabBar("Terrain"))
     {
         controls::NoiseControls::ShowControl(m_terrain->GetChunkManager());
-        controls::TerrainLayerControls::ShowControl(m_terrain->GetTerrainLayers());
+        ImGui::EndTabBar();
     }
-    ImGui::EndTabBar();
-
-    ImGui::End();
-
-    ImGui::Begin("Light Controls");
-
-    if (ImGui::BeginTabBar("Light"))
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
     {
-        controls::LightControls::ShowControl(m_sunObject);
+        m_dirty = true;
     }
-    ImGui::EndTabBar();
 
     ImGui::End();
+    }
 
-    ImGui::Begin("Debug");
+    if (m_showDebugWindow)
+    {
+    ImGui::Begin("Debug", &m_showDebugWindow);
 
     if (ImGui::BeginTabBar("TerrainDebug"))
     {
-        m_terrain->GetTerrainDebug()->ShowGUI();
+        if (ImGui::BeginTabItem("Viewport"))
+        {
+            m_terrain->GetTerrainDebug()->ShowGUI();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Masks"))
+        {
+            controls::ShowMaskPreviews(m_terrain->GetChunkManager());
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
     }
-    ImGui::EndTabBar();
 
     ImGui::End();
+    }
+
+    if (m_showMaterialLibrary)
+    {
+    ImGui::Begin("Material Library", &m_showMaterialLibrary);
+
+    if (m_terrainMaterialLibrary && m_terrainMaterialLibrary->ShowGui())
+    {
+        m_dirty = true;
+    }
+
+    ImGui::End();
+    }
+
+    DrawWorldWindow();
+}
+
+void pwg::EditorScene::NewProject()
+{
+    m_terrain->GetChunkManager()->ConfigureTerrain(31, 129);
+
+    Light defaultLight;
+    defaultLight.color = glm::vec3(1.0f);
+    defaultLight.intensivity = 1.0f;
+    m_sunObject->SetLight(defaultLight);
+
+    SunObjectProperties defaultSun;
+    defaultSun.orbitSpeed = 0.05f;
+    defaultSun.orbitRadius = 5000.0f;
+    m_sunObject->SetSunObjectProperties(defaultSun);
+
+    ResetSkyboxToDefault();
+    m_terrain->GetChunkManager()->Regenerate();
+    ResetEditorWindows();
+    m_cameraManager->SetCamera(CameraType::EDITOR);
+    m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
+    m_dirty = false;
+}
+
+std::shared_ptr<pwg::Terrain> pwg::EditorScene::GetTerrain()
+{
+    return m_terrain;
+}
+
+std::shared_ptr<pwg::SunObject> pwg::EditorScene::GetSunObject()
+{
+    return m_sunObject;
+}
+
+pwg::CameraManager* pwg::EditorScene::GetCameraManager()
+{
+    return m_cameraManager.get();
+}
+
+std::shared_ptr<pwg::TerrainMaterialLibrary> pwg::EditorScene::GetTerrainMaterialLibrary()
+{
+    return m_terrainMaterialLibrary;
+}
+
+const pwg::SkyboxDefinition& pwg::EditorScene::GetSkyboxDefinition() const
+{
+    return m_skyboxDefinition;
+}
+
+void pwg::EditorScene::SetSkyboxDefinition(const SkyboxDefinition& definition)
+{
+    m_skyboxDefinition = definition;
+    ReloadSkybox();
+}
+
+bool pwg::EditorScene::ReloadSkybox()
+{
+	for (const auto& face : m_skyboxDefinition.faces)
+    {
+        if (face.empty() || !std::filesystem::exists(face))
+        {
+            m_skyboxStatus = "Skybox missing face: " + face;
+            return false;
+        }
+    }
+
+    std::string transformStatus;
+    std::vector<std::string> loadFaces = BuildSkyboxLoadFaces(m_skyboxDefinition, transformStatus);
+    if (loadFaces.empty())
+    {
+        m_skyboxStatus = transformStatus.empty() ? "Skybox orientation failed" : transformStatus;
+        return false;
+    }
+
+    auto textureManager = m_resourceManager->GetTextureManager();
+    textureManager->ReloadCubeMapTexture("Skybox", loadFaces, TextureType::ALBEDO);
+    m_skybox->SetCubeMapTexture(textureManager->GetCubeMapTexture("Skybox"));
+    m_skyboxStatus = transformStatus.empty() ? "Skybox loaded: " + m_skyboxDefinition.name : transformStatus;
+    return true;
+}
+
+bool pwg::EditorScene::ImportSkyboxImage(const std::string& imagePath)
+{
+    if (imagePath.empty() || !std::filesystem::exists(imagePath))
+    {
+        m_skyboxStatus = "Skybox image does not exist";
+        return false;
+    }
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    stbi_set_flip_vertically_on_load(false);
+    unsigned char* image = stbi_load(imagePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    if (!image)
+    {
+        m_skyboxStatus = "Failed to read skybox image";
+        return false;
+    }
+
+    std::array<std::vector<unsigned char>, 6> faces;
+    int faceSize = 0;
+    std::string layoutName;
+
+    if (width == height * 6)
+    {
+        layoutName = "strip_h";
+        faceSize = height;
+        for (int i = 0; i < 6; ++i)
+        {
+            CopyFaceRegion(image, width, height, i * faceSize, 0, faceSize, faces[i]);
+        }
+    }
+    else if (height == width * 6)
+    {
+        layoutName = "strip_v";
+        faceSize = width;
+        for (int i = 0; i < 6; ++i)
+        {
+            CopyFaceRegion(image, width, height, 0, i * faceSize, faceSize, faces[i]);
+        }
+    }
+    else if (width % 4 == 0 && height % 3 == 0 && width / 4 == height / 3)
+    {
+        layoutName = "cross_4x3";
+        faceSize = width / 4;
+        std::array<std::pair<int, int>, 6> cells = {
+            std::pair<int, int>{ 2, 1 }, // rt
+            std::pair<int, int>{ 0, 1 }, // lf
+            std::pair<int, int>{ 1, 0 }, // up
+            std::pair<int, int>{ 1, 2 }, // dn
+            std::pair<int, int>{ 3, 1 }, // bk
+            std::pair<int, int>{ 1, 1 }  // ft
+        };
+        for (int i = 0; i < 6; ++i)
+        {
+            CopyFaceRegion(image, width, height, cells[i].first * faceSize, cells[i].second * faceSize, faceSize, faces[i]);
+        }
+    }
+    else if (width % 3 == 0 && height % 4 == 0 && width / 3 == height / 4)
+    {
+        layoutName = "cross_3x4";
+        faceSize = width / 3;
+        std::array<std::pair<int, int>, 6> cells = {
+            std::pair<int, int>{ 2, 1 }, // rt
+            std::pair<int, int>{ 0, 1 }, // lf
+            std::pair<int, int>{ 1, 0 }, // up
+            std::pair<int, int>{ 1, 2 }, // dn
+            std::pair<int, int>{ 1, 3 }, // bk
+            std::pair<int, int>{ 1, 1 }  // ft
+        };
+        for (int i = 0; i < 6; ++i)
+        {
+            CopyFaceRegion(image, width, height, cells[i].first * faceSize, cells[i].second * faceSize, faceSize, faces[i]);
+        }
+    }
+    else if (width == height * 2)
+    {
+        layoutName = "equirect";
+        faceSize = std::clamp(height / 2, 256, 2048);
+        for (int i = 0; i < 6; ++i)
+        {
+            RenderEquirectFace(image, width, height, i, faceSize, faces[i]);
+        }
+    }
+    else
+    {
+        stbi_image_free(image);
+        m_skyboxStatus = "Unsupported skybox image layout. Use 6x1, 1x6, 4x3/3x4 cross, or 2:1 equirectangular.";
+        return false;
+    }
+
+    std::string baseName = std::filesystem::path(imagePath).stem().string();
+    std::string outputFolder = ImportedSkyboxFolder(imagePath);
+    SkyboxDefinition imported;
+    imported.name = baseName + "_" + layoutName;
+    imported.folder = outputFolder;
+
+    bool written = WriteSkyboxFaces(outputFolder, imported.name, faces, faceSize, imported.faces);
+    stbi_image_free(image);
+    if (!written)
+    {
+        m_skyboxStatus = "Failed to write generated skybox faces";
+        return false;
+    }
+
+    m_skyboxDefinition = imported;
+    return ReloadSkybox();
+}
+
+bool pwg::EditorScene::ConsumeDirtyFlag()
+{
+    bool dirty = m_dirty;
+    m_dirty = false;
+    return dirty;
+}
+
+bool& pwg::EditorScene::ShowMainView()
+{
+    return m_showMainView;
+}
+
+bool& pwg::EditorScene::ShowTerrainControls()
+{
+    return m_showTerrainControls;
+}
+
+bool& pwg::EditorScene::ShowWorld()
+{
+    return m_showWorld;
+}
+
+bool& pwg::EditorScene::ShowOutliner()
+{
+    return m_showOutliner;
+}
+
+bool& pwg::EditorScene::ShowDebugWindow()
+{
+    return m_showDebugWindow;
+}
+
+bool& pwg::EditorScene::ShowMaterialLibrary()
+{
+    return m_showMaterialLibrary;
+}
+
+const std::string& pwg::EditorScene::GetProjectLayoutIni() const
+{
+    return m_projectLayoutIni;
+}
+
+void pwg::EditorScene::SetProjectLayoutIni(const std::string& layoutIni)
+{
+    m_projectLayoutIni = layoutIni;
+}
+
+void pwg::EditorScene::ResetEditorWindows()
+{
+    m_showMainView = true;
+    m_showOutliner = true;
+    m_showTerrainControls = true;
+    m_showWorld = true;
+    m_showDebugWindow = true;
+    m_showMaterialLibrary = true;
+}
+
+void pwg::EditorScene::DrawOutliner()
+{
+    if (!m_showOutliner)
+    {
+        return;
+    }
+
+    ImGui::Begin("Outliner", &m_showOutliner);
+    if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::Checkbox("Main View", &m_showMainView);
+        if (ImGui::TreeNodeEx("Terrain", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Checkbox("Terrain Controls", &m_showTerrainControls);
+            ImGui::Checkbox("Debug", &m_showDebugWindow);
+            ImGui::TreePop();
+        }
+        ImGui::Checkbox("Material Library", &m_showMaterialLibrary);
+        ImGui::Checkbox("World", &m_showWorld);
+        ImGui::TreePop();
+    }
+    ImGui::End();
+}
+
+void pwg::EditorScene::DrawWorldWindow()
+{
+    if (!m_showWorld)
+    {
+        return;
+    }
+
+    ImGui::Begin("World", &m_showWorld);
+    if (ImGui::BeginTabBar("WorldTabs"))
+    {
+        if (ImGui::BeginTabItem("Sky"))
+        {
+            DrawSkyboxControls();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Sun"))
+        {
+            controls::LightControls::ShowControl(m_sunObject);
+            if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+            {
+                m_dirty = true;
+            }
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
+    ImGui::End();
+}
+
+void pwg::EditorScene::DrawSkyboxControls()
+{
+    ImGui::Text("Skybox");
+    ImGui::Text("Active: %s", m_skyboxDefinition.name.c_str());
+    ImGui::TextWrapped("Status: %s", m_skyboxStatus.c_str());
+
+    std::vector<SkyboxDefinition> presets = FindSkyboxDefinitions("../assets/textures/skybox");
+    if (ImGui::BeginCombo("Preset", m_skyboxDefinition.name.c_str()))
+    {
+        for (const auto& preset : presets)
+        {
+            bool selected = preset.name == m_skyboxDefinition.name && preset.folder == m_skyboxDefinition.folder;
+            if (ImGui::Selectable(preset.name.c_str(), selected))
+            {
+                m_skyboxDefinition = preset;
+                if (ReloadSkybox())
+                {
+                    m_dirty = true;
+                }
+            }
+            if (selected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    if (ImGui::Button("Load Skybox Folder..."))
+    {
+        std::string folder = platform::PickFolderDialog("Select skybox folder");
+        if (!folder.empty() && LoadSkyboxFolder(folder))
+        {
+            m_dirty = true;
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Import Single Image..."))
+    {
+        std::string imagePath = platform::OpenImageDialog();
+        if (!imagePath.empty() && ImportSkyboxImage(imagePath))
+        {
+            m_dirty = true;
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reload Skybox"))
+    {
+        if (ReloadSkybox())
+        {
+            m_dirty = true;
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Skybox"))
+    {
+        ResetSkyboxToDefault();
+        m_dirty = true;
+    }
+
+    if (ImGui::TreeNode("Faces"))
+    {
+        auto suffixes = SkyboxFaceSuffixes();
+        for (int i = 0; i < 6; ++i)
+        {
+            ImGui::TextWrapped("%s: %s", suffixes[i], m_skyboxDefinition.faces[i].c_str());
+        }
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Face Orientation"))
+    {
+        auto suffixes = SkyboxFaceSuffixes();
+        const char* rotationLabels[] = { "0", "90", "180", "270" };
+        bool orientationChanged = false;
+        for (int i = 0; i < 6; ++i)
+        {
+            ImGui::PushID(i);
+            int rotation = ((m_skyboxDefinition.rotations[i] % 4) + 4) % 4;
+            ImGui::Text("%s", suffixes[i]);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(90.0f);
+            if (ImGui::Combo("Rotation", &rotation, rotationLabels, 4))
+            {
+                m_skyboxDefinition.rotations[i] = rotation;
+                orientationChanged = true;
+            }
+            ImGui::SameLine();
+            orientationChanged = ImGui::Checkbox("Flip H", &m_skyboxDefinition.flipHorizontal[i]) || orientationChanged;
+            ImGui::SameLine();
+            orientationChanged = ImGui::Checkbox("Flip V", &m_skyboxDefinition.flipVertical[i]) || orientationChanged;
+            ImGui::PopID();
+        }
+
+        if (ImGui::Button("Reset Face Orientation"))
+        {
+            m_skyboxDefinition.rotations = {};
+            m_skyboxDefinition.flipHorizontal = {};
+            m_skyboxDefinition.flipVertical = {};
+            orientationChanged = true;
+        }
+
+        if (orientationChanged)
+        {
+            if (ReloadSkybox())
+            {
+                m_dirty = true;
+            }
+        }
+        ImGui::TreePop();
+    }
+}
+
+bool pwg::EditorScene::LoadSkyboxFolder(const std::string& folder)
+{
+    auto definitions = FindSkyboxDefinitions(folder);
+    if (definitions.empty())
+    {
+        m_skyboxStatus = "Folder does not contain a complete skybox set (_rt, _lf, _up, _dn, _bk, _ft)";
+        return false;
+    }
+
+    m_skyboxDefinition = definitions.front();
+    return ReloadSkybox();
+}
+
+void pwg::EditorScene::ResetSkyboxToDefault()
+{
+    m_skyboxDefinition = DefaultSkyboxDefinition();
+    ReloadSkybox();
 }
 
 
@@ -247,4 +1032,3 @@ void pwg::EditorScene::HandleKeyboardInputs()
         m_cameraManager->SetCamera(CameraType::PLAYER);
     }
 }
-

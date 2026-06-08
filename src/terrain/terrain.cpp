@@ -7,7 +7,6 @@ namespace pwg
     {
 
         m_material = resourceManager->GetMaterialManager()->GetMaterial("TerrainMaterial");
-        m_terrainLayersManager = std::make_unique<TerrainLayersManager>();
         m_terrainDebug = std::make_shared<TerrainDebug>();
         m_chunkManager = std::make_shared<ChunkManager>(resourceManager, m_terrainSettings, m_material, m_terrainDebug);
 
@@ -21,19 +20,7 @@ namespace pwg
 
     void Terrain::Update(float dt, std::shared_ptr<ICamera> camera)
     {
-        bool regenerateLayers = false;
-
-        for (auto& layer : m_terrainLayersManager->GetLayers())
-        {
-            if (layer.dirty)
-            {
-                regenerateLayers = true;
-            }
-        }
-
         m_chunkManager->Update(camera, dt);
-
-
     }
 
     void Terrain::Draw(Renderer& renderer)
@@ -64,11 +51,6 @@ namespace pwg
     TerrainNoiseSettings& Terrain::GetNoiseSettings()
     {
         return m_terrainNoiseSettings;
-    }
-
-    std::vector<TerrainLayer>& Terrain::GetTerrainLayers()
-    {
-        return m_terrainLayersManager->GetLayers();
     }
 
     void Terrain::SetTerrainTextures(std::unordered_map<std::string, std::shared_ptr<Texture>>& textures)

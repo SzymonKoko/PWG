@@ -8,10 +8,27 @@
 #include "terrain/lod/LODManager.h"
 #include "scene/cameras/icamera.h"
 #include "resources/resourceManager.h"
+#include "graphics/texture/texture.h"
+#include <glm/glm.hpp>
 #include <vector>
 
 namespace pwg
 {
+	// Snapshot of the live simulation textures so the eroded terrain and the water
+	// (rivers / lakes) survive saving and reopening a project.
+	struct SimulationStateSnapshot
+	{
+		int worldSize{ 0 };
+		std::vector<float> finalHeight;
+		std::vector<float> water;
+		std::vector<float> sediment;
+		std::vector<float> deposit;
+		std::vector<float> flowAccumulation;
+		std::vector<float> riverChannels;
+
+		bool HasData() const { return worldSize > 0 && !finalHeight.empty(); }
+	};
+
 	class ChunkManager
 	{
 	public:
@@ -21,14 +38,23 @@ namespace pwg
 		void Update(std::shared_ptr<ICamera> camera, float dt);
 		void Draw();
 		void Regenerate();
+		void StepSimulation();
 		void StepWaterSimulation();
 		void StepErosionSimulation();
+		void BeginWaterSettle();
+		void CancelWaterSettle();
 		void BakeParticleErosion();
 		void StartParticleBake();
 		void CancelParticleBake();
 		void ResetWaterSimulation();
 		void ResetErosionSimulation();
 		void ConfigureTerrain(int chunkCount, int chunkSize);
+
+		void GenerateWorld();
+		void BakeErosionAfterWorldGen();
+
+		SimulationStateSnapshot CaptureSimulationState();
+		void RestoreSimulationState(const SimulationStateSnapshot& snapshot);
 
 		void SetNeedRegenerate(bool enabled);
 		void SetAmplitude(float amplitude);
@@ -42,6 +68,7 @@ namespace pwg
 		int GetParticleBakeTotal() const;
 		float SampleHeightAtWorld(float worldX, float worldZ);
 		void UpdateHeightCache();
+		void MaybeUpdateHeightCache(float dt);
 
 		TerrainChunk& GetChunk(int x, int y);
 
@@ -60,6 +87,14 @@ namespace pwg
 		int m_worldSize{ 0 };
 		glm::vec3 m_cameraPosition{ 0 };
 		float m_waterSimulationAccumulator{ 0.0f };
+		float m_heightCacheAccumulator{ 0.0f };
+		static constexpr float m_heightCacheInterval{ 0.4f };
+
+		bool m_simulationRanThisTick{ false };
+		bool m_prevSimulating{ false };
+		bool m_waterSettling{ false };
+		int m_settleStepsDone{ 0 };
+		int m_settleMaxSteps{ 0 };
 		bool m_particleBakeActive{ false };
 		int m_particleBakeStep{ 0 };
 		int m_particleBakeTotal{ 0 };
@@ -71,7 +106,14 @@ namespace pwg
 		int m_sceneColorCopyHeight{ 0 };
 
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> m_globalMasks;
-	
+
+		glm::vec4 m_frustumPlanes[6]{};
+		bool m_frustumValid{ false };
+
+		bool IsChunkVisible(const TerrainChunk& chunk, float worldHalfSize) const;
+		void UpdateFrustum(std::shared_ptr<ICamera> camera);
+		void SetupSharedTerrainUniforms(bool waterOverlay);
+		void DrawTerrainChunks(bool waterOverlay);
 	};
 }
 #endif // !SRC_TERRAIN_CHUNK_CHUNK_MANAGER_H_

@@ -32,6 +32,11 @@ namespace pwg
 		m_mesh->Draw();
 	}
 
+	void SkyBox::SetCubeMapTexture(std::shared_ptr<CubeMapTexture> cubemap)
+	{
+		m_cubeMapTexture = cubemap;
+	}
+
 	std::shared_ptr<Material> SkyBox::GetMaterial()
 	{
 		return m_material;

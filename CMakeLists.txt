@@ -25,17 +25,25 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(spdlog)
 
+FetchContent_Declare(
+	yaml-cpp
+	GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+	GIT_TAG 0.8.0
+)
+
+FetchContent_MakeAvailable(yaml-cpp)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(ASSET_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets)
 
 # Collect all source files
-file(GLOB_RECURSE ALL_SOURCES
+file(GLOB_RECURSE ALL_SOURCES CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
     "${PROJECT_SOURCE_DIR}/src/*.h"
 	"${PROJECT_SOURCE_DIR}/src/*.inl"
 )
 
-file(GLOB_RECURSE ASSETS_SOURCES
+file(GLOB_RECURSE ASSETS_SOURCES CONFIGURE_DEPENDS
 	"${PROJECT_SOURCE_DIR}/assets/shaders/*.*"
 )
 
@@ -112,6 +120,10 @@ target_link_libraries(${PROJECT_NAME}
 		spdlog::spdlog
 		FastNoiseLite
 		OpenMP::OpenMP_CXX
+		yaml-cpp::yaml-cpp
+		Comdlg32
+		Shell32
+		Ole32
 )
 
 # Configure output directories for game

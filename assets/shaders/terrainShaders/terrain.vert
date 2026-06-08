@@ -30,7 +30,7 @@ void main()
     //Height
     float h = texture(u_Heightmap, uv).r;
     float waterDepth = texture(u_Watermap, uv).r;
-    float waterVisible = smoothstep(0.025, 0.08, waterDepth);
+    float waterVisible = smoothstep(0.008, 0.04, waterDepth);
 
     vec3 pos = a_Pos;
     pos.y = h;

@@ -43,28 +43,17 @@ namespace pwg
 		m_computeShader->ActivateShader();
 
 		m_computeShader->SetUniformInt("u_size", m_terrainSize);
-		m_computeShader->SetUniformFloat("u_capacity", ctx.hydraulicSettings.sedimentCapacity);
-		m_computeShader->SetUniformFloat("u_erosionRate", ctx.hydraulicSettings.erosionRate);
-		m_computeShader->SetUniformFloat("u_slopeErosionRate", ctx.hydraulicSettings.slopeErosionRate);
-		m_computeShader->SetUniformFloat("u_slopeErosionMinSlope", ctx.hydraulicSettings.slopeErosionMinSlope);
-		m_computeShader->SetUniformFloat("u_slopeErosionWaterScale", ctx.hydraulicSettings.slopeErosionWaterScale);
-		m_computeShader->SetUniformFloat("u_depositionRate", ctx.hydraulicSettings.depositionRate);
-		m_computeShader->SetUniformFloat("u_valleyDepositionRate", ctx.hydraulicSettings.valleyDepositionRate);
-		m_computeShader->SetUniformFloat("u_valleyDepositionSlope", ctx.hydraulicSettings.valleyDepositionSlope);
-		m_computeShader->SetUniformFloat("u_steepSlopeDepositionReduction", ctx.hydraulicSettings.steepSlopeDepositionReduction);
-		m_computeShader->SetUniformFloat("u_depositionSlopeStart", ctx.hydraulicSettings.depositionSlopeStart);
-		m_computeShader->SetUniformFloat("u_depositionSlopeEnd", ctx.hydraulicSettings.depositionSlopeEnd);
+		m_computeShader->SetUniformFloat("u_sedimentCapacity", ctx.hydraulicSettings.sedimentCapacity);
+		m_computeShader->SetUniformFloat("u_erosionStrength", ctx.hydraulicSettings.erosionStrength);
+		m_computeShader->SetUniformFloat("u_depositionStrength", ctx.hydraulicSettings.depositionStrength);
 		m_computeShader->SetUniformFloat("u_minWaterToErode", ctx.hydraulicSettings.minWaterToErode);
 		m_computeShader->SetUniformFloat("u_minFlowToErode", ctx.hydraulicSettings.minFlowToErode);
 		m_computeShader->SetUniformFloat("u_maxHeightChange", ctx.hydraulicSettings.maxHeightChange);
 		m_computeShader->SetUniformFloat("u_maxErosionDepth", ctx.hydraulicSettings.maxErosionDepth);
-		m_computeShader->SetUniformFloat("u_maxDepositionHeight", ctx.hydraulicSettings.maxDepositionHeight);
-		m_computeShader->SetUniformFloat("u_lakeDeposition", ctx.hydraulicSettings.lakeDeposition);
-		m_computeShader->SetUniformFloat("u_lakeMinDepth", ctx.hydraulicSettings.lakeMinDepth);
-		m_computeShader->SetUniformFloat("u_lakeBedSmoothing", ctx.hydraulicSettings.lakeBedSmoothing);
-		m_computeShader->SetUniformFloat("u_channelSmoothing", ctx.hydraulicSettings.channelSmoothing);
+		m_computeShader->SetUniformFloat("u_maxDepositHeight", ctx.hydraulicSettings.maxDepositHeight);
 		m_computeShader->SetUniformFloat("u_riverChannelInfluence", ctx.hydraulicSettings.riverChannelInfluence);
 		m_computeShader->SetUniformFloat("u_riverChannelDepth", ctx.hydraulicSettings.riverChannelDepth);
+		m_computeShader->SetUniformFloat("u_flatteningStrength", ctx.hydraulicSettings.flatteningStrength);
 		m_computeShader->SetUniformInt("u_heightIn", 0);
 		m_computeShader->SetUniformInt("u_baseHeight", 1);
 		m_computeShader->SetUniformInt("u_waterIn", 2);
@@ -75,9 +64,11 @@ namespace pwg
 		m_computeShader->SetUniformInt("u_flowAccumulationIn", 7);
 		m_computeShader->SetUniformInt("u_depositIn", 8);
 
-		m_tempHeight->texture->ClearTexture(0.0f);
-		m_tempSediment->texture->ClearTexture(0.0f);
-		m_tempDeposit->texture->ClearTexture(0.0f);
+		// Keep the previous state as the default output. If a shader compile/dispatch
+		// issue ever prevents writes, we preserve terrain instead of swapping in zeros.
+		m_tempHeight->texture->CopyFrom(*finalHeight->texture);
+		m_tempSediment->texture->CopyFrom(*sediment->texture);
+		m_tempDeposit->texture->CopyFrom(*deposit->texture);
 		erosionDelta->texture->ClearTexture(0.0f);
 
 		m_computeShader->BindTextureSampler(0, finalHeight->texture->GetTextureID());
@@ -115,41 +106,21 @@ namespace pwg
 
 		return {
 			{"Enable Erosion", ParameterType::Bool, &m_parameters.settings->erosionEnabled, 0, 1},
-			{"Auto Water Physics", ParameterType::Bool, &m_parameters.settings->autoWaterSimulation, 0, 1},
+			{"Auto-run simulation", ParameterType::Bool, &m_parameters.settings->autoWaterSimulation, 0, 1},
 			{"Show Water Surface", ParameterType::Bool, &m_parameters.settings->showWaterSurface, 0, 1},
 			{"Use Water Refraction", ParameterType::Bool, &m_parameters.settings->waterRefractionEnabled, 0, 1},
 			{"Sim - steps per click", ParameterType::Int, &m_parameters.settings->stepsPerUpdate, 1, 32},
-			{"Sim - water steps/sec", ParameterType::Int, &m_parameters.settings->waterStepsPerSecond, 1, 120},
-			{"Sim - water substeps", ParameterType::Int, &m_parameters.settings->waterSubsteps, 1, 8},
-			{"Rain - amount per step", ParameterType::Float, &m_parameters.settings->rainRate, 0.0f, 0.05f},
-			{"Water - evaporates each step", ParameterType::Float, &m_parameters.settings->evaporation, 0.0f, 0.05f},
-			{"Water - soaks into ground", ParameterType::Float, &m_parameters.settings->infiltrationRate, 0.0f, 0.03f},
-			{"Water - lake soaking multiplier", ParameterType::Float, &m_parameters.settings->lakeInfiltrationScale, 0.0f, 1.0f},
-			{"Water - max depth clamp", ParameterType::Float, &m_parameters.settings->maxWaterDepth, 0.1f, 10.0f},
-			{"Sediment - transport capacity", ParameterType::Float, &m_parameters.settings->sedimentCapacity, 0.1f, 20.0f},
-			{"Erosion - river/channel carving", ParameterType::Float, &m_parameters.settings->erosionRate, 0.0f, 1.0f},
-			{"Erosion - slope wash strength", ParameterType::Float, &m_parameters.settings->slopeErosionRate, 0.0f, 0.5f},
-			{"Erosion - slope wash starts", ParameterType::Float, &m_parameters.settings->slopeErosionMinSlope, 0.0f, 0.12f},
-			{"Erosion - rain/water boost", ParameterType::Float, &m_parameters.settings->slopeErosionWaterScale, 0.0f, 2.0f},
-			{"Deposition - general settling", ParameterType::Float, &m_parameters.settings->depositionRate, 0.0f, 0.3f},
-			{"Deposition - valley/alluvial boost", ParameterType::Float, &m_parameters.settings->valleyDepositionRate, 0.0f, 0.4f},
-			{"Deposition - valley max slope", ParameterType::Float, &m_parameters.settings->valleyDepositionSlope, 0.0f, 0.3f},
-			{"Deposition - less on fast slopes", ParameterType::Float, &m_parameters.settings->steepSlopeDepositionReduction, 0.0f, 1.0f},
-			{"Deposition - slope reduction starts", ParameterType::Float, &m_parameters.settings->depositionSlopeStart, 0.0f, 0.3f},
-			{"Deposition - slope reduction full", ParameterType::Float, &m_parameters.settings->depositionSlopeEnd, 0.01f, 0.6f},
-			{"Erosion - minimum water", ParameterType::Float, &m_parameters.settings->minWaterToErode, 0.0f, 0.2f},
-			{"Erosion - minimum flow", ParameterType::Float, &m_parameters.settings->minFlowToErode, 0.0f, 0.2f},
-			{"Limits - max terrain change/step", ParameterType::Float, &m_parameters.settings->maxHeightChange, 0.001f, 0.2f},
-			{"Limits - max cut below base", ParameterType::Float, &m_parameters.settings->maxErosionDepth, 0.01f, 2.0f},
-			{"Limits - max fill above base", ParameterType::Float, &m_parameters.settings->maxDepositionHeight, 0.01f, 2.0f},
-			{"Lakes - extra sediment settling", ParameterType::Float, &m_parameters.settings->lakeDeposition, 0.0f, 1.0f},
-			{"Lakes - min pooled depth", ParameterType::Float, &m_parameters.settings->lakeMinDepth, 0.01f, 0.5f},
-			{"Lakes - water leveling", ParameterType::Float, &m_parameters.settings->lakeLeveling, 0.0f, 0.5f},
-			{"Lakes - smooth lake bed", ParameterType::Float, &m_parameters.settings->lakeBedSmoothing, 0.0f, 0.3f},
-			{"Lakes - smooth water surface", ParameterType::Float, &m_parameters.settings->lakeWaterSmoothing, 0.0f, 0.5f},
-			{"Debug - flow accumulation growth", ParameterType::Float, &m_parameters.settings->flowAccumulationGrowth, 0.0f, 1.0f},
-			{"Debug - flow accumulation decay", ParameterType::Float, &m_parameters.settings->flowAccumulationDecay, 0.0f, 0.3f},
-			{"Channels - smooth carved beds", ParameterType::Float, &m_parameters.settings->channelSmoothing, 0.0f, 0.5f}
+			{"Sim - steps per second", ParameterType::Int, &m_parameters.settings->waterStepsPerSecond, 1, 60},
+			{"Sim - substeps", ParameterType::Int, &m_parameters.settings->waterSubsteps, 1, 8},
+			{"Erosion - channel carving", ParameterType::Float, &m_parameters.settings->erosionStrength, 0.0f, 0.6f},
+			{"Erosion - terrain flattening", ParameterType::Float, &m_parameters.settings->flatteningStrength, 0.0f, 1.0f},
+			{"Erosion - sediment capacity", ParameterType::Float, &m_parameters.settings->sedimentCapacity, 0.5f, 20.0f},
+			{"Sediment - cosmetic deposit", ParameterType::Float, &m_parameters.settings->depositionStrength, 0.0f, 0.08f},
+			{"Sediment - max deposit height", ParameterType::Float, &m_parameters.settings->maxDepositHeight, 0.01f, 0.5f},
+			{"Limits - max change/step", ParameterType::Float, &m_parameters.settings->maxHeightChange, 0.001f, 0.1f},
+			{"Limits - max cut depth", ParameterType::Float, &m_parameters.settings->maxErosionDepth, 0.01f, 2.0f},
+			{"Rivers - channel depth", ParameterType::Float, &m_parameters.settings->riverChannelDepth, 0.0f, 0.3f},
+			{"Rivers - channel influence", ParameterType::Float, &m_parameters.settings->riverChannelInfluence, 0.0f, 1.0f}
 		};
 	}
 

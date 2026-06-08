@@ -42,12 +42,10 @@ namespace pwg
 		m_computeShader->SetUniformFloat("u_rainMaxHeight", ctx.hydraulicSettings.rainMaxHeight);
 		m_computeShader->SetUniformFloat("u_evaporation", ctx.hydraulicSettings.evaporation);
 		m_computeShader->SetUniformFloat("u_infiltrationRate", ctx.hydraulicSettings.infiltrationRate);
-		m_computeShader->SetUniformFloat("u_lakeInfiltrationScale", ctx.hydraulicSettings.lakeInfiltrationScale);
+		m_computeShader->SetUniformFloat("u_boundaryDrain", ctx.hydraulicSettings.boundaryDrain);
 		m_computeShader->SetUniformFloat("u_lakeMinDepth", ctx.hydraulicSettings.lakeMinDepth);
 		m_computeShader->SetUniformFloat("u_lakeLeveling", ctx.hydraulicSettings.lakeLeveling);
-		m_computeShader->SetUniformFloat("u_lakeWaterSmoothing", ctx.hydraulicSettings.lakeWaterSmoothing);
 		m_computeShader->SetUniformFloat("u_maxWaterDepth", ctx.hydraulicSettings.maxWaterDepth);
-		m_computeShader->SetUniformFloat("u_maxSurfaceDrop", ctx.hydraulicSettings.maxSurfaceDrop);
 		m_computeShader->SetUniformFloat("u_minFlowToErode", ctx.hydraulicSettings.minFlowToErode);
 		m_computeShader->SetUniformFloat("u_flowAccumulationGrowth", ctx.hydraulicSettings.flowAccumulationGrowth);
 		m_computeShader->SetUniformFloat("u_flowAccumulationDecay", ctx.hydraulicSettings.flowAccumulationDecay);
@@ -87,7 +85,19 @@ namespace pwg
 
 	std::vector<UIParameters> HydraulicWaterPass::GetParameters()
 	{
-		return {};
+		if (!m_parameters.settings)
+		{
+			return {};
+		}
+
+		return {
+			{"Water - evaporation", ParameterType::Float, &m_parameters.settings->evaporation, 0.0f, 0.01f},
+			{"Water - infiltration", ParameterType::Float, &m_parameters.settings->infiltrationRate, 0.0f, 0.01f},
+			{"Lakes - min depth", ParameterType::Float, &m_parameters.settings->lakeMinDepth, 0.005f, 0.15f},
+			{"Lakes - surface leveling", ParameterType::Float, &m_parameters.settings->lakeLeveling, 0.0f, 0.8f},
+			{"Rivers - channel growth", ParameterType::Float, &m_parameters.settings->riverChannelGrowth, 0.0f, 0.5f},
+			{"Rivers - flow accumulation", ParameterType::Float, &m_parameters.settings->flowAccumulationGrowth, 0.0f, 1.0f}
+		};
 	}
 
 	TerrainPassTypes HydraulicWaterPass::GetPassType()

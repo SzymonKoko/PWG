@@ -12,11 +12,24 @@
 #include "objects/sunObject.h"
 #include "cameras/cameraManager.h"
 #include "terrain/gpu/terrainComputePipeline.h"
+#include "terrain/materials/terrainMaterialLibrary.h"
 
+#include <array>
 #include <memory>
+#include <string>
 
 namespace pwg
 {
+	struct SkyboxDefinition
+	{
+		std::string name{ "miramar" };
+		std::string folder{ "../assets/textures/skybox" };
+		std::array<std::string, 6> faces{};
+		std::array<int, 6> rotations{};
+		std::array<bool, 6> flipHorizontal{};
+		std::array<bool, 6> flipVertical{};
+	};
+
 	/**
 	 * @brief Represents the editor scene.
 	 * Manages terrain, entities, cameras, lighting, meshes, input, and rendering.
@@ -53,12 +66,37 @@ namespace pwg
 		 */
 		void Draw() override;
 
+		void NewProject();
+		std::shared_ptr<Terrain> GetTerrain();
+		std::shared_ptr<SunObject> GetSunObject();
+		CameraManager* GetCameraManager();
+		std::shared_ptr<TerrainMaterialLibrary> GetTerrainMaterialLibrary();
+		const SkyboxDefinition& GetSkyboxDefinition() const;
+		void SetSkyboxDefinition(const SkyboxDefinition& definition);
+		bool ReloadSkybox();
+		bool ImportSkyboxImage(const std::string& imagePath);
+		const std::string& GetProjectLayoutIni() const;
+		void SetProjectLayoutIni(const std::string& layoutIni);
+		void ResetEditorWindows();
+		bool ConsumeDirtyFlag();
+		bool& ShowMainView();
+		bool& ShowTerrainControls();
+		bool& ShowDebugWindow();
+		bool& ShowMaterialLibrary();
+		bool& ShowWorld();
+		bool& ShowOutliner();
+
 	private:
 
 		/**
 		 * @brief Handles keyboard input for the scene.
 		 */
 		void HandleKeyboardInputs();
+		void DrawOutliner();
+		void DrawWorldWindow();
+		void DrawSkyboxControls();
+		bool LoadSkyboxFolder(const std::string& folder);
+		void ResetSkyboxToDefault();
 
 		GLFWwindow* m_window;									/**< Pointer to the GLFW window. */
 		MouseInput& m_mouseInput;								/**< Reference to the mouse input handler. */
@@ -73,9 +111,20 @@ namespace pwg
 		std::unique_ptr<CameraManager> m_cameraManager;			/**< Handles active camera and switching between cameras. */
 		std::shared_ptr<SunObject> m_sunObject;					/**< Sun object providing lighting. */
 		std::shared_ptr<SkyBox> m_skybox;
+		std::shared_ptr<TerrainMaterialLibrary> m_terrainMaterialLibrary;
+		SkyboxDefinition m_skyboxDefinition;
+		std::string m_skyboxStatus{ "Ready" };
+		std::string m_projectLayoutIni;
 
 
 		float m_aspectRatio = 16.0f / 9.0f;						/**< Aspect ratio of the viewport. */
+		bool m_showMainView{ true };
+		bool m_showOutliner{ true };
+		bool m_showTerrainControls{ true };
+		bool m_showWorld{ true };
+		bool m_showDebugWindow{ true };
+		bool m_showMaterialLibrary{ true };
+		bool m_dirty{ false };
 	};
 } // namespace pwg
 

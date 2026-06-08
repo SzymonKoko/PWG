@@ -12,19 +12,16 @@ uniform vec2 u_offset;
 
 void main()
 {
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    if (texelCoord.x >= u_size || texelCoord.y >= u_size)
+        return;
+
+    vec2 uv = vec2(texelCoord) / vec2(u_size);
+
+    vec2 worldPos = vec2(uv * u_scale * u_frequency) + u_offset;
     fnl_state noise = fnlCreateState(u_seed);
     noise.noise_type = u_noiseType;
-
-    // ===== PADDED COORD =====
-    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
-
-    vec2 newTexelCoord = vec2(texelCoord) / vec2(u_size); 
-
-    vec2 worldPos = vec2(newTexelCoord * u_scale * u_frequency) + u_offset;
-
-    vec2 p = worldPos;
-
-    float n = fnlGetNoise2D(noise, p.x, p.y);
+    float n = fnlGetNoise2D(noise, worldPos.x, worldPos.y);
     n = (n + 1.0) * 0.5;
 
     imageStore(elevationMask, texelCoord, vec4(n, 0.0, 0.0, 1.0));

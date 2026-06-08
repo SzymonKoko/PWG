@@ -161,6 +161,8 @@ namespace pwg
 		*/
 		void SetMaterialProperties(MaterialProperties& materialProperties);
 
+		std::shared_ptr<Shader> GetShader() const { return m_shader; }
+
 	private:
 
 		std::unordered_map<std::string, float> m_floatUniforms;								/**< Stored float uniforms */

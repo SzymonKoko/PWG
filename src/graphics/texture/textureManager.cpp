@@ -31,6 +31,28 @@ void pwg::TextureManager::LoadTextureArray(const std::string& name, std::vector<
 
 }
 
+void pwg::TextureManager::ReloadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureType type)
+{
+    if (texturePaths.empty())
+    {
+        PWG_ERROR("Cannot reload texture array '{}': no texture paths", name);
+        return;
+    }
+
+    int width = 0;
+    int height = 0;
+    int ch = 0;
+    if (!stbi_info(texturePaths[0].c_str(), &width, &height, &ch))
+    {
+        PWG_ERROR("Cannot reload texture array '{}': failed to read '{}'", name, texturePaths[0]);
+        return;
+    }
+
+    auto textureArray = std::make_shared<TextureArray>(width, height, static_cast<int>(texturePaths.size()), type);
+    textureArray->LoadTexturesIntoArray(texturePaths);
+    m_textureArrays[name] = textureArray;
+}
+
 void pwg::TextureManager::LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths, TextureType type)
 {
     if (m_cubeMapTextures.contains(name))
@@ -40,6 +62,18 @@ void pwg::TextureManager::LoadCubeMapTexture(const std::string& name, std::vecto
 
     auto cubeMapTexture = std::make_shared<CubeMapTexture>(cubemapPaths, type);
 
+    m_cubeMapTextures[name] = cubeMapTexture;
+}
+
+void pwg::TextureManager::ReloadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths, TextureType type)
+{
+    if (cubemapPaths.size() != 6)
+    {
+        PWG_ERROR("Cannot reload cubemap '{}': expected 6 faces, got {}", name, cubemapPaths.size());
+        return;
+    }
+
+    auto cubeMapTexture = std::make_shared<CubeMapTexture>(cubemapPaths, type);
     m_cubeMapTextures[name] = cubeMapTexture;
 }
 

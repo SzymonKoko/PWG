@@ -32,16 +32,38 @@ uniform float u_snowHeight;
 uniform float u_snowSoftness;
 uniform float u_wetnessStrength;
 uniform float u_waterAlpha;
+uniform float u_materialTiling[32];
+uniform float u_materialNormalStrength[32];
+uniform float u_materialRoughnessScale[32];
+uniform float u_materialHeightStrength[32];
+
+int DataRoughnessIndex(int layer) { return layer; }
+int DataAoIndex(int layer) { return layer + 32; }
+int DataHeightIndex(int layer) { return layer + 64; }
+
+struct SurfaceSample
+{
+    vec3 albedo;
+    vec3 normalTex;
+    float roughness;
+    float ao;
+};
 
 // =========================
 // HEIGHT SAMPLING (BLEND)
 // =========================
 float SampleHeight(vec2 uv, float rock)
 {
-    float gH = texture(u_TexturesData, vec3(uv, 9)).r;
-    float rH = texture(u_TexturesData, vec3(uv, 10)).r;
-    float sH = texture(u_TexturesData, vec3(uv, 11)).r;
-    return mix(mix(gH, rH, rock), sH, 0.25);
+    vec2 gUv = uv * max(u_materialTiling[0], 0.001);
+    vec2 rUv = uv * max(u_materialTiling[1], 0.001);
+    vec2 sUv = uv * max(u_materialTiling[2], 0.001);
+    vec2 snUv = uv * max(u_materialTiling[3], 0.001);
+    float gH = texture(u_TexturesData, vec3(gUv, 12)).r * u_materialHeightStrength[0];
+    float rH = texture(u_TexturesData, vec3(rUv, 13)).r * u_materialHeightStrength[1];
+    float sH = texture(u_TexturesData, vec3(sUv, 14)).r * u_materialHeightStrength[2];
+    float snH = texture(u_TexturesData, vec3(snUv, 15)).r * u_materialHeightStrength[3];
+    float terrainH = mix(mix(gH, rH, rock), sH, 0.25);
+    return mix(terrainH, snH, 0.10);
 }
 
 // =========================
@@ -88,7 +110,7 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDirTS, float heightScale, float ro
 // =========================
 void main()
 {
-    vec3 normal = normalize(f_Normal);
+    vec3 normal = SafeNormalize(f_Normal, vec3(0.0, 1.0, 0.0));
 
     // world UV (tiling)
     vec2 uv = f_Pos.xz * 0.01;
@@ -96,7 +118,7 @@ void main()
     float halfSize = (u_worldSize - 1.0) * 0.5;
     vec2 debugUV = (f_Pos.xz + halfSize) / u_worldSize;
     float waterDepth = f_WaterDepth;
-    if (u_renderWaterOverlay && waterDepth < 0.012)
+    if (u_renderWaterOverlay && waterDepth < 0.004)
     {
         discard;
     }
@@ -107,60 +129,58 @@ void main()
     float flowAccumulation = texture(u_FlowAccumulationmap, debugUV).r;
     float riverChannel = texture(u_RiverChannelmap, debugUV).r;
 
+    float depositMask = texture(u_Depositmap, debugUV).r;
+
+    vec3 albedo;
+    vec3 normalTex;
+    float roughness;
+    float metallic = 0.0;
+    float ao;
+    float rock = 0.0;
+    float snowMask = 0.0;
+    float wetness = 0.0;
     float cliffRock = smoothstep(0.12, 0.82, slope);
     float exposedHighRock = smoothstep(u_snowHeight * 0.35, u_snowHeight * 0.95, f_Pos.y) * 0.35;
     float channelRock = smoothstep(0.18, 0.7, riverChannel) * smoothstep(0.08, 0.45, slope) * 0.35;
-    float rock = clamp(max(cliffRock, exposedHighRock) + channelRock, 0.0, 1.0);
+    rock = clamp(max(cliffRock, exposedHighRock) + channelRock, 0.0, 1.0);
 
-    // ===== TBN + view dir
-    mat3 TBN = ComputeTBN(normal, uv, f_Pos);
-    vec3 V = normalize(u_cameraPosition - f_Pos);
-    vec3 viewDirTS = normalize(transpose(TBN) * V);
+    vec2 gUv = uv * max(u_materialTiling[0], 0.001);
+    vec3 gA = texture(u_TexturesAlbedo, vec3(gUv, 0)).rgb;
+    vec3 gN = texture(u_TexturesNormal, vec3(gUv, 0)).rgb * 2.0 - 1.0;
+    gN.xy *= u_materialNormalStrength[0];
+    float gR = clamp(texture(u_TexturesData, vec3(gUv, 0)).r * u_materialRoughnessScale[0], 0.02, 1.0);
+    float gAO = texture(u_TexturesData, vec3(gUv, 8)).r;
 
-    // ===== distance fade
-    float dist = length(u_cameraPosition - f_Pos);
-    float fade = clamp(1.0 - dist / 50.0, 0.0, 1.0);
+    vec2 rUv = uv * max(u_materialTiling[1], 0.001);
+    vec3 rA = texture(u_TexturesAlbedo, vec3(rUv, 1)).rgb;
+    vec3 rN = texture(u_TexturesNormal, vec3(rUv, 1)).rgb * 2.0 - 1.0;
+    rN.xy *= u_materialNormalStrength[1];
+    float rR = clamp(texture(u_TexturesData, vec3(rUv, 1)).r * u_materialRoughnessScale[1], 0.02, 1.0);
+    float rAO = texture(u_TexturesData, vec3(rUv, 9)).r;
 
-    // ===== PARALLAX
-    float heightScale = mix(0.018, 0.045, rock);
-    if (!u_renderWaterOverlay && fade > 0.01)
-    {
-        vec2 parallaxUV = ParallaxMapping(uv, viewDirTS, heightScale, rock);
-        uv = mix(uv, parallaxUV, fade);
-    }
+    vec2 sUv = uv * max(u_materialTiling[2], 0.001);
+    vec3 sA = texture(u_TexturesAlbedo, vec3(sUv, 2)).rgb;
+    vec3 sN = texture(u_TexturesNormal, vec3(sUv, 2)).rgb * 2.0 - 1.0;
+    sN.xy *= u_materialNormalStrength[2];
+    float sR = clamp(texture(u_TexturesData, vec3(sUv, 2)).r * u_materialRoughnessScale[2], 0.02, 1.0);
+    float sAO = texture(u_TexturesData, vec3(sUv, 10)).r;
 
-    // =========================
-    // GRASS
-    // =========================
-    vec3 gA = texture(u_TexturesAlbedo, vec3(uv, 0)).rgb;
-    vec3 gN = texture(u_TexturesNormal, vec3(uv, 0)).rgb * 2.0 - 1.0;
-    float gR = texture(u_TexturesData, vec3(uv, 0)).r;
-    float gAO = texture(u_TexturesData, vec3(uv, 6)).r;
+    vec2 snUv = uv * max(u_materialTiling[3], 0.001);
+    vec3 snA = texture(u_TexturesAlbedo, vec3(snUv, 3)).rgb;
+    vec3 snN = texture(u_TexturesNormal, vec3(snUv, 3)).rgb * 2.0 - 1.0;
+    snN.xy *= u_materialNormalStrength[3];
+    float snR = clamp(texture(u_TexturesData, vec3(snUv, 3)).r * u_materialRoughnessScale[3], 0.02, 1.0);
+    float snAO = texture(u_TexturesData, vec3(snUv, 11)).r;
 
-    // =========================
-    // ROCK
-    // =========================
-    vec3 rA = texture(u_TexturesAlbedo, vec3(uv, 1)).rgb;
-    vec3 rN = texture(u_TexturesNormal, vec3(uv, 1)).rgb * 2.0 - 1.0;
-    float rR = texture(u_TexturesData, vec3(uv, 1)).r;
-    float rAO = texture(u_TexturesData, vec3(uv, 7)).r;
+    albedo = mix(gA, rA, rock);
+    normalTex = normalize(mix(gN, rN, rock));
+    roughness = mix(gR, rR, rock);
+    ao = mix(gAO, rAO, rock);
 
-    vec3 sA = texture(u_TexturesAlbedo, vec3(uv, 2)).rgb;
-    vec3 sN = texture(u_TexturesNormal, vec3(uv, 2)).rgb * 2.0 - 1.0;
-    float sR = texture(u_TexturesData, vec3(uv, 2)).r;
-    float sAO = texture(u_TexturesData, vec3(uv, 8)).r;
-
-    // =========================
-    // BLEND
-    // =========================
-    vec3 albedo = mix(gA, rA, rock);
-    vec3 normalTex = normalize(mix(gN, rN, rock));
-    float roughness = mix(gR, rR, rock);
-    float metallic = 0.0;
-    float ao = mix(gAO, rAO, rock);
-
-    float depositMask = texture(u_Depositmap, debugUV).r;
-    float alluvium = smoothstep(0.006, 0.12, depositMask) * (1.0 - smoothstep(0.55, 0.95, rock));
+    float depositAmount = smoothstep(0.02, 0.16, depositMask);
+    float flatGround = 1.0 - smoothstep(0.10, 0.30, slope);
+    float channelArea = max(smoothstep(0.15, 0.55, flowAccumulation), smoothstep(0.20, 0.60, riverChannel));
+    float alluvium = depositAmount * clamp(max(flatGround, channelArea), 0.0, 1.0) * (1.0 - smoothstep(0.45, 0.85, rock));
     albedo = mix(albedo, sA, alluvium * 0.88);
     normalTex = normalize(mix(normalTex, sN, alluvium * 0.75));
     roughness = mix(roughness, sR, alluvium * 0.85);
@@ -168,30 +188,46 @@ void main()
 
     float standingWater = smoothstep(0.008, 0.09, waterDepth);
     float flowWetness = max(smoothstep(0.08, 0.55, flowAccumulation), smoothstep(0.12, 0.65, riverChannel)) * 0.38;
-    float wetness = clamp(max(standingWater, flowWetness) * u_wetnessStrength * (1.0 - rock * 0.35), 0.0, 1.0);
+    wetness = clamp(max(standingWater, flowWetness) * u_wetnessStrength * (1.0 - rock * 0.35), 0.0, 1.0);
     albedo = mix(albedo, albedo * vec3(0.42, 0.48, 0.50), wetness);
     roughness = mix(roughness, 0.42, wetness * 0.75);
 
-    float snowAltitude = smoothstep(u_snowHeight, u_snowHeight + max(u_snowSoftness, 1.0), f_Pos.y);
-    float snowSlope = 1.0 - smoothstep(0.42, 0.88, slope);
-    float snowMask = clamp(snowAltitude * snowSlope * (1.0 - wetness * 0.65) * (1.0 - alluvium * 0.75), 0.0, 1.0);
-    vec3 snowColor = vec3(0.88, 0.90, 0.86);
-    albedo = mix(albedo, snowColor, snowMask);
-    roughness = mix(roughness, 0.72, snowMask);
+    snowMask = clamp(smoothstep(u_snowHeight, u_snowHeight + max(u_snowSoftness, 1.0), f_Pos.y), 0.0, 1.0);
+    albedo = mix(albedo, snA, snowMask);
+    normalTex = normalize(mix(normalTex, snN, snowMask * 0.65));
+    roughness = mix(roughness, snR, snowMask);
     metallic = mix(metallic, 0.0, snowMask);
-    ao = mix(ao, 0.92, snowMask * 0.65);
+    ao = mix(ao, snAO, snowMask * 0.65);
+
+    // ===== TBN + view dir
+    mat3 TBN = ComputeTBN(normal, uv, f_Pos);
+    vec3 toCamera = u_cameraPosition - f_Pos;
+    float cameraDistance = length(toCamera);
+    vec3 V = SafeNormalize(toCamera, normal);
+    vec3 viewDirTS = SafeNormalize(transpose(TBN) * V, vec3(0.0, 0.0, 1.0));
+
+    // ===== distance fade
+    float fade = clamp(1.0 - cameraDistance / 50.0, 0.0, 1.0);
+
+    // ===== PARALLAX
+    float heightScale = mix(0.018, 0.045, rock);
+    if (!u_renderWaterOverlay && fade > 0.01 && cameraDistance > 0.08)
+    {
+        vec2 parallaxUV = ParallaxMapping(uv, viewDirTS, heightScale, rock);
+        uv = mix(uv, parallaxUV, fade);
+    }
 
     // ===== FINAL NORMAL
     normalTex.xy *= u_normalStrength;
-    normalTex = normalize(normalTex);
-    vec3 detailNormal = normalize(TBN * normalTex);
+    normalTex = SafeNormalize(normalTex, vec3(0.0, 0.0, 1.0));
+    vec3 detailNormal = SafeNormalize(TBN * normalTex, normal);
     float detailStrength = clamp((1.0 - snowMask * 0.55) * (1.0 - wetness * 0.25), 0.0, 1.0);
     vec3 N = normalize(mix(normal, detailNormal, detailStrength));
 
     // ===== LIGHTING
     vec3 litColor = ApplyLighting(N, V, albedo, metallic, roughness, ao, f_Pos);
 
-    float visibleWater = smoothstep(0.025, 0.16, waterDepth);
+    float visibleWater = smoothstep(0.008, 0.12, waterDepth);
     float riverTrace = max(smoothstep(0.08, 0.45, flowAccumulation), smoothstep(0.12, 0.6, riverChannel)) * smoothstep(0.01, 0.08, waterDepth);
     float deepWater = smoothstep(0.16, 0.55, waterDepth);
     vec3 shallowWaterColor = vec3(0.05, 0.48, 0.72);
@@ -222,7 +258,7 @@ void main()
             vec3 refractedGrass = texture(u_TexturesAlbedo, vec3(uv + refractionOffset, 0)).rgb;
             vec3 refractedRock = texture(u_TexturesAlbedo, vec3(uv + refractionOffset, 1)).rgb;
             vec3 refractedSediment = texture(u_TexturesAlbedo, vec3(uv + refractionOffset, 2)).rgb;
-            refractedScene = mix(mix(refractedGrass, refractedRock, rock), refractedSediment, alluvium);
+            refractedScene = mix(refractedGrass, refractedRock, rock);
         }
         float foam = smoothstep(0.22, 0.85, riverChannel + flowAccumulation) * smoothstep(0.02, 0.12, waterDepth) * (1.0 - deepWater);
         vec3 transparentWater = mix(refractedScene, waterColor, 0.26 + deepWater * 0.34 + riverTrace * 0.12);
@@ -341,9 +377,6 @@ void main()
             FragColor = vec4(mix(vec3(0.04), vec3(0.8, 0.58, 0.32), deposit), 1.0);
             return;
         }
-        
-        
-
     }
 
     FragColor = vec4(litColor, 1.0);

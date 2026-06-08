@@ -49,6 +49,7 @@ namespace pwg
 		 * @brief Draws the currently active scene.
 		 */
 		void Draw();
+		EditorScene* GetEditorScene();
 
 	private:
 		std::unique_ptr<IScene> m_currentScene;				/**< Pointer to the current active scene (editor or play). */

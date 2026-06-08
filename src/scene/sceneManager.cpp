@@ -40,3 +40,8 @@ void pwg::SceneManager::Draw()
 		m_editorScene->Draw();
 	}
 }
+
+pwg::EditorScene* pwg::SceneManager::GetEditorScene()
+{
+	return m_editorScene.get();
+}

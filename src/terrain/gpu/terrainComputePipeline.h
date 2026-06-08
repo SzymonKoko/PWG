@@ -30,12 +30,18 @@ namespace pwg
 
 		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void RegenerateTerrain(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void StepSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void StepWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void SettleWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, int iterations);
 		void StepErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void StepParticleBake(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool uploadPreview);
 		void BakeParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void RefreshMaskPass(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void GenerateWorld(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void ResetWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void ResetErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+
+		TerrainPassContext& GetPassContext();
 
 		void BuildGraph();
 		void AddComputeShader(std::string name, std::shared_ptr<ComputeShader> computeShader);

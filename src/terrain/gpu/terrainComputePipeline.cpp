@@ -59,6 +59,8 @@ namespace pwg
 	void TerrainComputePipeline::RegenerateTerrain(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
 		m_terrainPassContext.offset = glm::vec2(0, 0);
+		m_terrainPassContext.worldOrigin = glm::vec2(0, 0);
+		m_terrainPassContext.worldSize = m_size;
 		m_terrainPassContext.deferParticleTextureUpload = false;
 		m_graph->Execute(masks, m_terrainPassContext);
 		masks.at("BaseHeight")->texture->CopyFrom(*masks.at("FinalHeight")->texture);
@@ -74,12 +76,13 @@ namespace pwg
 		m_terrainMasks = masks;
 	}
 
-	void TerrainComputePipeline::StepErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void TerrainComputePipeline::StepSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
 		m_terrainPassContext.offset = glm::vec2(0, 0);
 		m_terrainPassContext.deferParticleTextureUpload = false;
 		for (int i = 0; i < m_terrainPassContext.hydraulicSettings.stepsPerUpdate; i++)
 		{
+			m_graph->ExecutePasses(TerrainPassTypes::HYDROLOGY, masks, m_terrainPassContext);
 			if (m_terrainPassContext.hydraulicSettings.erosionEnabled)
 			{
 				m_graph->ExecutePasses(TerrainPassTypes::EROSION, masks, m_terrainPassContext);
@@ -87,6 +90,11 @@ namespace pwg
 		}
 		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
 		m_terrainMasks = masks;
+	}
+
+	void TerrainComputePipeline::StepErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		StepSimulation(masks);
 	}
 
 	void TerrainComputePipeline::StepParticleBake(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool uploadPreview)
@@ -125,6 +133,45 @@ namespace pwg
 			m_graph->ExecutePasses(TerrainPassTypes::HYDROLOGY, masks, m_terrainPassContext);
 		}
 		m_terrainMasks = masks;
+	}
+
+	void TerrainComputePipeline::SettleWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, int iterations)
+	{
+		m_terrainPassContext.offset = glm::vec2(0, 0);
+		m_terrainPassContext.deferParticleTextureUpload = false;
+
+		// Settle existing water without adding new rain and without eroding, so the
+		// remaining water just keeps flowing downhill until it pools in the lowest
+		// points. We temporarily zero the rain so the simulation drains to rest.
+		float savedRain = m_terrainPassContext.hydraulicSettings.rainRate;
+		m_terrainPassContext.hydraulicSettings.rainRate = 0.0f;
+
+		int steps = std::max(iterations, 1);
+		for (int i = 0; i < steps; i++)
+		{
+			m_graph->ExecutePasses(TerrainPassTypes::HYDROLOGY, masks, m_terrainPassContext);
+		}
+
+		m_terrainPassContext.hydraulicSettings.rainRate = savedRain;
+		m_terrainMasks = masks;
+	}
+
+	void TerrainComputePipeline::RefreshMaskPass(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		m_terrainPassContext.offset = glm::vec2(0, 0);
+		m_terrainPassContext.deferParticleTextureUpload = false;
+		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
+		m_terrainMasks = masks;
+	}
+
+	void TerrainComputePipeline::GenerateWorld(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		RegenerateTerrain(masks);
+	}
+
+	TerrainPassContext& TerrainComputePipeline::GetPassContext()
+	{
+		return m_terrainPassContext;
 	}
 
 	void TerrainComputePipeline::ResetWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
@@ -171,8 +218,12 @@ namespace pwg
 		auto finalHeightPass = std::make_shared<FinalHeightPass>(m_computeShaders["FinalHeight"], m_size);
 		auto normalMaskPass = std::make_shared<NormalMaskPass>(m_computeShaders["NormalMask"], m_size);
 		auto slopeMaskPass = std::make_shared<SlopeMaskPass>(m_computeShaders["SlopeMask"], m_size);
-		auto particleErosionPass = std::make_shared<ParticleErosionPass>(m_size);
-		particleErosionPass->SetHydraulicSettings(&m_terrainPassContext.hydraulicSettings);
+		auto hydraulicFluxPass = std::make_shared<HydraulicFluxPass>(m_computeShaders["HydraulicFlux"], m_size);
+		auto hydraulicWaterPass = std::make_shared<HydraulicWaterPass>(m_computeShaders["HydraulicWater"], m_size);
+		auto erosionPass = std::make_shared<ErosionPass>(m_computeShaders["ErosionMask"], m_size);
+		hydraulicFluxPass->SetHydraulicSettings(&m_terrainPassContext.hydraulicSettings);
+		hydraulicWaterPass->SetHydraulicSettings(&m_terrainPassContext.hydraulicSettings);
+		erosionPass->SetHydraulicSettings(&m_terrainPassContext.hydraulicSettings);
 
 		m_graph->AddPass(elevationPass);
 		m_graph->AddPass(mountainMaskPass);
@@ -181,7 +232,9 @@ namespace pwg
 		m_graph->AddPass(finalHeightPass);
 		m_graph->AddPass(normalMaskPass);
 		m_graph->AddPass(slopeMaskPass);
-		m_graph->AddPass(particleErosionPass);
+		m_graph->AddPass(hydraulicFluxPass);
+		m_graph->AddPass(hydraulicWaterPass);
+		m_graph->AddPass(erosionPass);
 
 		PWG_INFO("Graph builded successfully");
 	}

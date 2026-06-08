@@ -16,10 +16,9 @@ namespace pwg
 		auto mountainMaskTexture = masks.at("MountainMask");
 
 		m_computeShader->ActivateShader();
-
+		m_computeShader->SetUniformInt("u_size", m_terrainSize);
 		m_computeShader->SetUniformFloat("u_minThreshold", m_parameters.minThreshold);
 		m_computeShader->SetUniformFloat("u_maxThreshold", m_parameters.maxThreshold);
-
 		m_computeShader->BindImage(0, mountainMaskTexture->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
 		m_computeShader->BindImage(1, elevationTexture->texture->GetTextureID(), GL_READ_ONLY, GL_R32F);
 		m_computeShader->DispatchForTexture(m_terrainSize, m_terrainSize);
@@ -44,4 +43,3 @@ namespace pwg
 		return m_name;
 	}
 }
-

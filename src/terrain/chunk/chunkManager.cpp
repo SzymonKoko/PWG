@@ -79,34 +79,11 @@ namespace pwg
 		}
 
 		m_cameraPosition = camera->GetCameraPosition();
+		UpdateFrustum(camera);
 
 		if (m_needRegenerate)
 		{
 			Regenerate();
-		}
-
-		if (m_particleBakeActive)
-		{
-			auto& settings = m_terrainComputePipeline->GetHydraulicSettings();
-			int stepsPerFrame = std::clamp(settings.bakeStepsPerFrame, 1, 8);
-			int uploadInterval = std::max(settings.bakeUploadInterval, 1);
-
-			for (int i = 0; i < stepsPerFrame && m_particleBakeActive; ++i)
-			{
-				m_particleBakeStep++;
-				bool finished = m_particleBakeStep >= m_particleBakeTotal;
-				bool uploadPreview = finished || (m_particleBakeStep % uploadInterval == 0);
-				m_terrainComputePipeline->StepParticleBake(m_globalMasks, uploadPreview);
-				if (uploadPreview)
-				{
-					UpdateHeightCache();
-				}
-				if (finished)
-				{
-					m_particleBakeActive = false;
-					UpdateHeightCache();
-				}
-			}
 		}
 
 		auto& hydraulicSettings = m_terrainComputePipeline->GetHydraulicSettings();
@@ -122,7 +99,7 @@ namespace pwg
 			{
 				for (int i = 0; i < substeps; ++i)
 				{
-					StepWaterSimulation();
+					StepSimulation();
 				}
 
 				m_waterSimulationAccumulator -= stepInterval;
@@ -133,110 +110,238 @@ namespace pwg
 			{
 				m_waterSimulationAccumulator = 0.0f;
 			}
+
+			MaybeUpdateHeightCache(dt);
 		}
 		else
 		{
 			m_waterSimulationAccumulator = 0.0f;
 		}
+
+		// When the simulation stops, keep the water physics alive: any water still
+		// sitting on slopes keeps flowing downhill (no rain, no erosion) until it
+		// drains into the lowest points / pools into lakes.
+		bool simulatingNow = hydraulicSettings.autoWaterSimulation || m_simulationRanThisTick;
+		if (simulatingNow)
+		{
+			m_waterSettling = false;
+		}
+		else if (m_prevSimulating)
+		{
+			BeginWaterSettle();
+		}
+		m_prevSimulating = simulatingNow;
+
+		if (!simulatingNow && m_waterSettling)
+		{
+			int substeps = std::clamp(hydraulicSettings.waterSubsteps, 1, 8);
+			int iterationsThisFrame = std::min(substeps * 2, m_settleMaxSteps - m_settleStepsDone);
+			if (iterationsThisFrame > 0)
+			{
+				m_terrainComputePipeline->SettleWaterSimulation(m_globalMasks, iterationsThisFrame);
+				m_settleStepsDone += iterationsThisFrame;
+			}
+			if (m_settleStepsDone >= m_settleMaxSteps)
+			{
+				m_waterSettling = false;
+			}
+		}
+
+		m_simulationRanThisTick = false;
 	}
 
-	void ChunkManager::Draw()
+	void ChunkManager::BeginWaterSettle()
+	{
+		m_waterSettling = true;
+		m_settleStepsDone = 0;
+		// Enough iterations for water to traverse the map and reach the lowest points,
+		// bounded so we never spin the GPU forever once everything has pooled.
+		m_settleMaxSteps = std::clamp(m_worldSize, 400, 2000);
+	}
+
+	void ChunkManager::CancelWaterSettle()
+	{
+		m_waterSettling = false;
+		m_settleStepsDone = 0;
+	}
+
+	void ChunkManager::UpdateFrustum(std::shared_ptr<ICamera> camera)
+	{
+		glm::mat4 view = camera->GetViewMatrix();
+		glm::mat4 proj = camera->GetProjectionMatrix();
+		glm::mat4 viewProj = proj * view;
+
+		m_frustumPlanes[0] = glm::vec4(viewProj[0][3] + viewProj[0][0], viewProj[1][3] + viewProj[1][0], viewProj[2][3] + viewProj[2][0], viewProj[3][3] + viewProj[3][0]);
+		m_frustumPlanes[1] = glm::vec4(viewProj[0][3] - viewProj[0][0], viewProj[1][3] - viewProj[1][0], viewProj[2][3] - viewProj[2][0], viewProj[3][3] - viewProj[3][0]);
+		m_frustumPlanes[2] = glm::vec4(viewProj[0][3] + viewProj[0][1], viewProj[1][3] + viewProj[1][1], viewProj[2][3] + viewProj[2][1], viewProj[3][3] + viewProj[3][1]);
+		m_frustumPlanes[3] = glm::vec4(viewProj[0][3] - viewProj[0][1], viewProj[1][3] - viewProj[1][1], viewProj[2][3] - viewProj[2][1], viewProj[3][3] - viewProj[3][1]);
+		m_frustumPlanes[4] = glm::vec4(viewProj[0][3] + viewProj[0][2], viewProj[1][3] + viewProj[1][2], viewProj[2][3] + viewProj[2][2], viewProj[3][3] + viewProj[3][2]);
+		m_frustumPlanes[5] = glm::vec4(viewProj[0][3] - viewProj[0][2], viewProj[1][3] - viewProj[1][2], viewProj[2][3] - viewProj[2][2], viewProj[3][3] - viewProj[3][2]);
+
+		for (int i = 0; i < 6; ++i)
+		{
+			float length = glm::length(glm::vec3(m_frustumPlanes[i]));
+			if (length > 0.0f)
+			{
+				m_frustumPlanes[i] /= length;
+			}
+		}
+		m_frustumValid = true;
+	}
+
+	bool ChunkManager::IsChunkVisible(const TerrainChunk& chunk, float worldHalfSize) const
+	{
+		if (!m_frustumValid)
+		{
+			return true;
+		}
+
+		// The vertex shader places geometry at the raw heightmap value (pos.y = h)
+		// in world units, which can range up to several thousand. Using m_amplitude
+		// here is wrong: it produced a paper-thin AABB so tall chunks near the camera
+		// were culled while flat distant ones survived. Cull on the XZ footprint with
+		// a very generous vertical extent so the test is effectively horizontal.
+		const float edgeMargin = (m_terrainSettings.chunkSize - 1) * 0.5f;
+		float chunkWorldX = chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1);
+		float chunkWorldZ = chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1);
+		glm::vec3 minBounds(
+			chunkWorldX - worldHalfSize - edgeMargin,
+			-100000.0f,
+			chunkWorldZ - worldHalfSize - edgeMargin);
+		glm::vec3 maxBounds(
+			chunkWorldX - worldHalfSize + (m_terrainSettings.chunkSize - 1) + edgeMargin,
+			100000.0f,
+			chunkWorldZ - worldHalfSize + (m_terrainSettings.chunkSize - 1) + edgeMargin);
+
+		for (int i = 0; i < 6; ++i)
+		{
+			glm::vec3 positive(
+				m_frustumPlanes[i].x >= 0.0f ? maxBounds.x : minBounds.x,
+				m_frustumPlanes[i].y >= 0.0f ? maxBounds.y : minBounds.y,
+				m_frustumPlanes[i].z >= 0.0f ? maxBounds.z : minBounds.z);
+			if (glm::dot(glm::vec3(m_frustumPlanes[i]), positive) + m_frustumPlanes[i].w < 0.0f)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	void ChunkManager::SetupSharedTerrainUniforms(bool waterOverlay)
+	{
+		auto& entries = m_terrainDebug->GetEntries();
+		if (entries.empty())
+		{
+			return;
+		}
+
+		int debugMode = m_terrainDebug->GetDebugMode();
+		if (debugMode < 0 || debugMode >= static_cast<int>(entries.size()))
+		{
+			debugMode = 0;
+		}
+		const auto& entry = entries[debugMode];
+
+		auto tex = m_globalMasks["FinalHeight"]->texture;
+		switch (entry.mode)
+		{
+		case DebugMode::DEBUG_HEIGHT:
+			tex = m_globalMasks["FinalHeight"]->texture;
+			break;
+		case DebugMode::DEBUG_WATER:
+		case DebugMode::DEBUG_RIVERS_LAKES:
+			tex = m_globalMasks["WaterMask"]->texture;
+			break;
+		case DebugMode::DEBUG_SEDIMENT:
+			tex = m_globalMasks["SedimentMask"]->texture;
+			break;
+		case DebugMode::DEBUG_DEPOSIT:
+			tex = m_globalMasks["DepositMask"]->texture;
+			break;
+		case DebugMode::DEBUG_WATER_FLUX:
+			tex = m_globalMasks["WaterFlux"]->texture;
+			break;
+		case DebugMode::DEBUG_DIAGONAL_FLUX:
+			tex = m_globalMasks["WaterFluxDiagonal"]->texture;
+			break;
+		case DebugMode::DEBUG_EROSION_DELTA:
+			tex = m_globalMasks["ErosionDelta"]->texture;
+			break;
+		case DebugMode::DEBUG_FLOW_ACCUMULATION:
+			tex = m_globalMasks["FlowAccumulationMask"]->texture;
+			break;
+		case DebugMode::DEBUG_RIVER_CHANNELS:
+			tex = m_globalMasks["RiverChannelMask"]->texture;
+			break;
+		default:
+			if (entry.texture)
+			{
+				tex = entry.texture;
+			}
+			break;
+		}
+
+		m_terrainMaterial->SetUniformFloat("u_amplitude", m_amplitude);
+		m_terrainMaterial->SetUniformTexture("u_Heightmap", m_globalMasks["FinalHeight"]->texture);
+		m_terrainMaterial->SetUniformTexture("u_Normalmap", m_globalMasks["NormalMask"]->texture);
+		m_terrainMaterial->SetUniformTexture("u_Watermap", m_globalMasks["WaterMask"]->texture);
+		m_terrainMaterial->SetUniformTexture("u_Depositmap", m_globalMasks["DepositMask"]->texture);
+		m_terrainMaterial->SetUniformTexture("u_FlowAccumulationmap", m_globalMasks["FlowAccumulationMask"]->texture);
+		m_terrainMaterial->SetUniformTexture("u_RiverChannelmap", m_globalMasks["RiverChannelMask"]->texture);
+		m_terrainMaterial->SetUniformInt("u_worldSize", m_worldSize);
+		m_terrainMaterial->SetUniformVec3("u_cameraPosition", m_cameraPosition);
+		m_terrainMaterial->SetUniformInt("u_renderWaterOverlay", waterOverlay ? 1 : 0);
+		m_terrainMaterial->SetUniformInt("u_debugMode", static_cast<int>(entry.mode));
+		m_terrainMaterial->SetUniformInt("u_debugEnabled", m_terrainDebug->GetStatus());
+		m_terrainMaterial->SetUniformTexture("u_debugTexture", tex);
+		m_terrainMaterial->Apply();
+	}
+
+	void ChunkManager::DrawTerrainChunks(bool waterOverlay)
 	{
 		float worldHalfSize = (m_worldSize - 1) * 0.5f;
+		auto shader = m_terrainMaterial->GetShader();
+		if (!shader)
+		{
+			return;
+		}
 
 		for (int i = 0; i < m_chunkCount; i++)
 		{
 			for (int j = 0; j < m_chunkCount; j++)
 			{
 				auto& chunk = m_chunks[static_cast<size_t>(j) * m_chunkCount + i];
+				if (!IsChunkVisible(chunk, worldHalfSize))
+				{
+					continue;
+				}
+
 				auto mesh = m_lodManager->GetMesh(chunk.lod);
-
 				glm::vec2 uvOffset = glm::vec2(chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1), chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1)) / glm::vec2(m_worldSize);
-
 				glm::vec2 uvScale = glm::vec2(m_terrainSettings.chunkSize - 1) / glm::vec2(m_worldSize);
-
 				float chunkWorldX = chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1);
 				float chunkWorldZ = chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1);
 
 				mesh->SetPosition(glm::vec3(chunkWorldX - worldHalfSize, 0, chunkWorldZ - worldHalfSize));
-
 				auto modelMatrix = mesh->GetModelMatrix();
 
-				chunk.material->SetUniformMat4("u_model", modelMatrix);
-				chunk.material->SetUniformFloat("u_amplitude", m_amplitude);
-				chunk.material->SetUniformTexture("u_Heightmap", m_globalMasks["FinalHeight"]->texture);
-				chunk.material->SetUniformTexture("u_Normalmap", m_globalMasks["NormalMask"]->texture);
-				chunk.material->SetUniformTexture("u_Watermap", m_globalMasks["WaterMask"]->texture);
-				chunk.material->SetUniformTexture("u_Depositmap", m_globalMasks["DepositMask"]->texture);
-				chunk.material->SetUniformTexture("u_FlowAccumulationmap", m_globalMasks["FlowAccumulationMask"]->texture);
-				chunk.material->SetUniformTexture("u_RiverChannelmap", m_globalMasks["RiverChannelMask"]->texture);
-				chunk.material->SetUniformVec2("u_uvOffset", uvOffset);
-				chunk.material->SetUniformVec2("u_uvScale", uvScale);
-				chunk.material->SetUniformInt("u_worldSize", m_worldSize);
-				chunk.material->SetUniformVec3("u_cameraPosition", m_cameraPosition);
-				chunk.material->SetUniformInt("u_renderWaterOverlay", false);
-
-				auto& entries = m_terrainDebug->GetEntries();
-				int debugMode = m_terrainDebug->GetDebugMode();
-				if (entries.empty())
-				{
-					continue;
-				}
-				if (debugMode < 0 || debugMode >= entries.size())
-				{
-					debugMode = 0;
-				}
-				auto entry = entries[debugMode];
-				
-				chunk.material->SetUniformInt("u_debugMode", (int)entry.mode);
-				chunk.material->SetUniformInt("u_debugEnabled", m_terrainDebug->GetStatus());
-
-				auto tex = m_globalMasks["FinalHeight"]->texture;
-				switch (entry.mode)
-				{
-				case DebugMode::DEBUG_HEIGHT:
-					tex = m_globalMasks["FinalHeight"]->texture;
-					break;
-				case DebugMode::DEBUG_WATER:
-				case DebugMode::DEBUG_RIVERS_LAKES:
-					tex = m_globalMasks["WaterMask"]->texture;
-					break;
-				case DebugMode::DEBUG_SEDIMENT:
-					tex = m_globalMasks["SedimentMask"]->texture;
-					break;
-				case DebugMode::DEBUG_DEPOSIT:
-					tex = m_globalMasks["DepositMask"]->texture;
-					break;
-				case DebugMode::DEBUG_WATER_FLUX:
-					tex = m_globalMasks["WaterFlux"]->texture;
-					break;
-				case DebugMode::DEBUG_DIAGONAL_FLUX:
-					tex = m_globalMasks["WaterFluxDiagonal"]->texture;
-					break;
-				case DebugMode::DEBUG_EROSION_DELTA:
-					tex = m_globalMasks["ErosionDelta"]->texture;
-					break;
-				case DebugMode::DEBUG_FLOW_ACCUMULATION:
-					tex = m_globalMasks["FlowAccumulationMask"]->texture;
-					break;
-				case DebugMode::DEBUG_RIVER_CHANNELS:
-					tex = m_globalMasks["RiverChannelMask"]->texture;
-					break;
-				default:
-					if (entry.texture)
-					{
-						tex = entry.texture;
-					}
-					break;
-				}
-				chunk.material->SetUniformTexture("u_debugTexture", tex);
-				
-
-				chunk.material->Apply();
-
+				shader->SetUniformMat4("u_model", modelMatrix);
+				shader->SetUniformVec2("u_uvOffset", uvOffset);
+				shader->SetUniformVec2("u_uvScale", uvScale);
 				mesh->Draw();
 			}
 		}
+	}
+
+	void ChunkManager::Draw()
+	{
+		if (m_terrainDebug->GetEntries().empty())
+		{
+			return;
+		}
+
+		SetupSharedTerrainUniforms(false);
+		DrawTerrainChunks(false);
 
 		if (m_terrainDebug->GetStatus() || !m_terrainComputePipeline->GetHydraulicSettings().showWaterSurface)
 		{
@@ -271,34 +376,15 @@ namespace pwg
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glDepthMask(GL_FALSE);
 
-		for (int i = 0; i < m_chunkCount; i++)
+		m_terrainMaterial->SetUniformInt("u_renderWaterOverlay", 1);
+		m_terrainMaterial->SetUniformInt("u_useWaterRefraction", useWaterRefraction ? 1 : 0);
+		if (useWaterRefraction)
 		{
-			for (int j = 0; j < m_chunkCount; j++)
-			{
-				auto& chunk = m_chunks[static_cast<size_t>(j) * m_chunkCount + i];
-				auto mesh = m_lodManager->GetMesh(chunk.lod);
-
-				glm::vec2 uvOffset = glm::vec2(chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1), chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1)) / glm::vec2(m_worldSize);
-				glm::vec2 uvScale = glm::vec2(m_terrainSettings.chunkSize - 1) / glm::vec2(m_worldSize);
-				float chunkWorldX = chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1);
-				float chunkWorldZ = chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1);
-
-				mesh->SetPosition(glm::vec3(chunkWorldX - worldHalfSize, 0, chunkWorldZ - worldHalfSize));
-
-				chunk.material->SetUniformMat4("u_model", mesh->GetModelMatrix());
-				chunk.material->SetUniformVec2("u_uvOffset", uvOffset);
-				chunk.material->SetUniformVec2("u_uvScale", uvScale);
-				chunk.material->SetUniformInt("u_renderWaterOverlay", true);
-				chunk.material->SetUniformInt("u_useWaterRefraction", useWaterRefraction);
-				if (useWaterRefraction)
-				{
-					chunk.material->SetUniformTexture("u_SceneColor", m_sceneColorCopy);
-				}
-				chunk.material->SetUniformVec2("u_viewportSize", glm::vec2(viewportWidth, viewportHeight));
-				chunk.material->Apply();
-				mesh->Draw();
-			}
+			m_terrainMaterial->SetUniformTexture("u_SceneColor", m_sceneColorCopy);
 		}
+		m_terrainMaterial->SetUniformVec2("u_viewportSize", glm::vec2(viewportWidth, viewportHeight));
+		m_terrainMaterial->Apply();
+		DrawTerrainChunks(true);
 
 		glDepthMask(GL_TRUE);
 		glDisable(GL_BLEND);
@@ -325,10 +411,77 @@ namespace pwg
 		m_needRegenerate = false;
 	}
 
-	void ChunkManager::StepErosionSimulation()
+	SimulationStateSnapshot ChunkManager::CaptureSimulationState()
+	{
+		SimulationStateSnapshot snapshot;
+		snapshot.worldSize = m_worldSize;
+
+		auto read = [&](const char* name) -> std::vector<float>
+		{
+			auto it = m_globalMasks.find(name);
+			if (it == m_globalMasks.end() || !it->second || !it->second->texture)
+			{
+				return {};
+			}
+			return it->second->texture->ReadFloatData();
+		};
+
+		snapshot.finalHeight = read("FinalHeight");
+		snapshot.water = read("WaterMask");
+		snapshot.sediment = read("SedimentMask");
+		snapshot.deposit = read("DepositMask");
+		snapshot.flowAccumulation = read("FlowAccumulationMask");
+		snapshot.riverChannels = read("RiverChannelMask");
+		return snapshot;
+	}
+
+	void ChunkManager::RestoreSimulationState(const SimulationStateSnapshot& snapshot)
+	{
+		if (!snapshot.HasData() || snapshot.worldSize != m_worldSize)
+		{
+			return;
+		}
+
+		size_t expected = static_cast<size_t>(m_worldSize) * static_cast<size_t>(m_worldSize);
+		auto write = [&](const char* name, const std::vector<float>& data)
+		{
+			if (data.size() < expected)
+			{
+				return;
+			}
+			auto it = m_globalMasks.find(name);
+			if (it == m_globalMasks.end() || !it->second || !it->second->texture)
+			{
+				return;
+			}
+			it->second->texture->UpdateFloatData(data, m_worldSize, m_worldSize);
+		};
+
+		write("FinalHeight", snapshot.finalHeight);
+		write("WaterMask", snapshot.water);
+		write("SedimentMask", snapshot.sediment);
+		write("DepositMask", snapshot.deposit);
+		write("FlowAccumulationMask", snapshot.flowAccumulation);
+		write("RiverChannelMask", snapshot.riverChannels);
+
+		m_globalMasks["ErodedHeight"] = m_globalMasks["FinalHeight"];
+
+		// Recompute normals / slope from the restored heightmap so shading matches.
+		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
+		UpdateHeightCache();
+		CancelWaterSettle();
+	}
+
+	void ChunkManager::StepSimulation()
 	{
 		m_particleBakeActive = false;
-		m_terrainComputePipeline->StepErosionSimulation(m_globalMasks);
+		m_simulationRanThisTick = true;
+		m_terrainComputePipeline->StepSimulation(m_globalMasks);
+	}
+
+	void ChunkManager::StepErosionSimulation()
+	{
+		StepSimulation();
 		UpdateHeightCache();
 	}
 
@@ -362,6 +515,7 @@ namespace pwg
 	void ChunkManager::ResetWaterSimulation()
 	{
 		m_particleBakeActive = false;
+		CancelWaterSettle();
 		m_terrainComputePipeline->ResetWaterSimulation(m_globalMasks);
 	}
 
@@ -387,6 +541,25 @@ namespace pwg
 		if (chunkCount == m_chunkCount && chunkSize == m_terrainSettings.chunkSize)
 		{
 			return;
+		}
+
+		// Preserve all tuned pass parameters (noise / mountains / erosion) across the
+		// pipeline rebuild so changing the map size does not reset the user's terrain settings.
+		struct SavedParam { ParameterType type; double value; };
+		std::unordered_map<std::string, std::unordered_map<std::string, SavedParam>> savedParams;
+		if (m_terrainComputePipeline)
+		{
+			for (const auto& pass : m_terrainComputePipeline->GetGraph()->GetPasses())
+			{
+				for (const auto& p : pass->GetParameters())
+				{
+					double v = 0.0;
+					if (p.type == ParameterType::Float) v = *static_cast<float*>(p.data);
+					else if (p.type == ParameterType::Int || p.type == ParameterType::List) v = *static_cast<int*>(p.data);
+					else if (p.type == ParameterType::Bool) v = (*static_cast<bool*>(p.data)) ? 1.0 : 0.0;
+					savedParams[pass->GetName()][p.name] = { p.type, v };
+				}
+			}
 		}
 
 		m_chunkCount = chunkCount;
@@ -427,6 +600,28 @@ namespace pwg
 		}
 
 		m_terrainComputePipeline->BuildGraph();
+
+		// Restore the saved pass parameters into the freshly built graph.
+		for (const auto& pass : m_terrainComputePipeline->GetGraph()->GetPasses())
+		{
+			auto passIt = savedParams.find(pass->GetName());
+			if (passIt == savedParams.end())
+			{
+				continue;
+			}
+			for (const auto& p : pass->GetParameters())
+			{
+				auto paramIt = passIt->second.find(p.name);
+				if (paramIt == passIt->second.end())
+				{
+					continue;
+				}
+				if (p.type == ParameterType::Float) *static_cast<float*>(p.data) = static_cast<float>(paramIt->second.value);
+				else if (p.type == ParameterType::Int || p.type == ParameterType::List) *static_cast<int*>(p.data) = static_cast<int>(paramIt->second.value);
+				else if (p.type == ParameterType::Bool) *static_cast<bool*>(p.data) = paramIt->second.value > 0.5;
+			}
+		}
+
 		m_heightCache.clear();
 		m_heightCacheValid = false;
 		m_needRegenerate = true;
@@ -521,6 +716,16 @@ namespace pwg
 
 		m_heightCache = heightMask->second->texture->ReadFloatData();
 		m_heightCacheValid = m_heightCache.size() >= static_cast<size_t>(m_worldSize) * static_cast<size_t>(m_worldSize);
+		m_heightCacheAccumulator = 0.0f;
+	}
+
+	void ChunkManager::MaybeUpdateHeightCache(float dt)
+	{
+		m_heightCacheAccumulator += std::clamp(dt, 0.0f, 0.25f);
+		if (m_heightCacheAccumulator >= m_heightCacheInterval)
+		{
+			UpdateHeightCache();
+		}
 	}
 
 	TerrainChunk& ChunkManager::GetChunk(int x, int y)
@@ -535,6 +740,22 @@ namespace pwg
 	std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& ChunkManager::GetMasks()
 	{
 		return m_globalMasks;
+	}
+
+	void ChunkManager::GenerateWorld()
+	{
+		m_terrainComputePipeline->GenerateWorld(m_globalMasks);
+		UpdateHeightCache();
+		m_needRegenerate = false;
+	}
+
+	void ChunkManager::BakeErosionAfterWorldGen()
+	{
+		for (int i = 0; i < 8; ++i)
+		{
+			StepSimulation();
+		}
+		UpdateHeightCache();
 	}
 }
 

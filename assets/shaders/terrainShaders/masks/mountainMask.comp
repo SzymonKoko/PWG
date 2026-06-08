@@ -6,15 +6,16 @@ layout (r32f, binding = 1) readonly uniform image2D elevationMask;
 
 uniform float u_minThreshold;
 uniform float u_maxThreshold;
+uniform int u_size;
 
 void main()
 {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    if (texelCoord.x >= u_size || texelCoord.y >= u_size)
+        return;
+
     float elevation = imageLoad(elevationMask, texelCoord).r;
+    float height = smoothstep(u_minThreshold, u_maxThreshold, elevation);
 
-	float height = smoothstep(u_minThreshold, u_maxThreshold, elevation);
-
-
-	imageStore(mountainMask, texelCoord, vec4(height));
-
+    imageStore(mountainMask, texelCoord, vec4(height));
 }

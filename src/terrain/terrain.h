@@ -8,7 +8,6 @@
 #include "resources/resourceManager.h"
 #include "graphics/renderer/irenderable.h"
 #include "terrain/terrainGenerator.h"
-#include "terrain/terrainLayersManager.h"
 #include "graphics/shader/computeShader.h"
 #include "terrain/chunk/chunkManager.h"
 #include "terrain/debug/terrainDebug.h"
@@ -109,11 +108,6 @@ namespace pwg
 		 */
 		TerrainNoiseSettings& GetNoiseSettings();
 
-		/**
-		 * @brief Returns terrain layers managed by TerrainLayersManager.
-		 */
-		std::vector<TerrainLayer>& GetTerrainLayers();
-
 		void SetTerrainTextures(std::unordered_map<std::string, std::shared_ptr<Texture>>& textures);
 
 		/**
@@ -135,7 +129,6 @@ namespace pwg
 		int m_size;														/**< Terrain size (width/height). */
 		std::shared_ptr<Mesh> m_mesh;									/**< Mesh representing terrain surface. */
 		std::shared_ptr<Material> m_material;							/**< Terrain material (shader + textures). */
-		std::unique_ptr<TerrainLayersManager> m_terrainLayersManager;	/**< Manages terrain layers and splat maps. */
 		TerrainNoiseSettings m_terrainNoiseSettings;					/**< Noise settings for procedural generation. */
 		TerrainTextures m_terrainTextures;
 		TerrainSettings m_terrainSettings;

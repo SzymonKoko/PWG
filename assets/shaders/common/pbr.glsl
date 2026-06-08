@@ -9,6 +9,16 @@ uniform float u_groundAmbient;
 
 const float PI = 3.14159265359;
 
+vec3 SafeNormalize(vec3 v, vec3 fallback)
+{
+    float len2 = dot(v, v);
+    if (len2 <= 0.00000001)
+    {
+        return fallback;
+    }
+    return v * inversesqrt(len2);
+}
+
 mat3 ComputeTBN(vec3 normal, vec2 uv, vec3 fragPos)
 {
     vec3 Q1  = dFdx(fragPos);
@@ -16,9 +26,9 @@ mat3 ComputeTBN(vec3 normal, vec2 uv, vec3 fragPos)
     vec2 st1 = dFdx(uv);
     vec2 st2 = dFdy(uv);
 
-    vec3 N   = normalize(normal);
-    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
-    vec3 B  = -normalize(cross(N, T));
+    vec3 N = SafeNormalize(normal, vec3(0.0, 1.0, 0.0));
+    vec3 T = SafeNormalize(Q1 * st2.t - Q2 * st1.t, vec3(1.0, 0.0, 0.0));
+    vec3 B = -SafeNormalize(cross(N, T), vec3(0.0, 0.0, 1.0));
 
     return mat3(T, B, N);
 }
@@ -67,8 +77,8 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 
 vec3 ApplyLighting(vec3 N, vec3 V, vec3 albedo, float metallic, float roughness, float ao, vec3 fragPos)
 {
-    N = normalize(N);
-    V = normalize(V);
+    N = SafeNormalize(N, vec3(0.0, 1.0, 0.0));
+    V = SafeNormalize(V, vec3(0.0, 0.0, 1.0));
     albedo = max(albedo, vec3(0.0));
     metallic = clamp(metallic, 0.0, 1.0);
     roughness = clamp(roughness, 0.04, 1.0);
@@ -79,8 +89,8 @@ vec3 ApplyLighting(vec3 N, vec3 V, vec3 albedo, float metallic, float roughness,
 
     vec3 Lo = vec3(0.0);
 
-    vec3 L = normalize(-u_lightDirection);
-    vec3 H = normalize(V + L);
+    vec3 L = SafeNormalize(-u_lightDirection, vec3(0.0, 1.0, 0.0));
+    vec3 H = SafeNormalize(V + L, L);
     vec3 radiance = u_lightColor * u_lightIntensity;
 
     float NDF = DistributionGGX(N, H, roughness);   

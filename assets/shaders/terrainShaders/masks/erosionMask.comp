@@ -18,28 +18,17 @@ uniform sampler2D u_flowAccumulationIn;
 uniform sampler2D u_depositIn;
 
 uniform int u_size;
-uniform float u_capacity;
-uniform float u_erosionRate;
-uniform float u_slopeErosionRate;
-uniform float u_slopeErosionMinSlope;
-uniform float u_slopeErosionWaterScale;
-uniform float u_depositionRate;
-uniform float u_valleyDepositionRate;
-uniform float u_valleyDepositionSlope;
-uniform float u_steepSlopeDepositionReduction;
-uniform float u_depositionSlopeStart;
-uniform float u_depositionSlopeEnd;
+uniform float u_sedimentCapacity;
+uniform float u_erosionStrength;
+uniform float u_depositionStrength;
 uniform float u_minWaterToErode;
 uniform float u_minFlowToErode;
 uniform float u_maxHeightChange;
 uniform float u_maxErosionDepth;
-uniform float u_maxDepositionHeight;
-uniform float u_lakeDeposition;
-uniform float u_lakeMinDepth;
-uniform float u_lakeBedSmoothing;
-uniform float u_channelSmoothing;
+uniform float u_maxDepositHeight;
 uniform float u_riverChannelInfluence;
 uniform float u_riverChannelDepth;
+uniform float u_flatteningStrength;
 
 ivec2 ClampCoord(ivec2 p)
 {
@@ -81,17 +70,12 @@ float RiverChannelAt(ivec2 p)
     return texelFetch(u_riverChannelsIn, ClampCoord(p), 0).r;
 }
 
-float FlowAccumulationAt(ivec2 p)
-{
-    return texelFetch(u_flowAccumulationIn, ClampCoord(p), 0).r;
-}
-
 vec4 FluxAt(ivec2 p)
 {
     if (!IsInside(p))
         return vec4(0.0);
 
-    return texelFetch(u_flux, p, 0);
+    return max(texelFetch(u_flux, p, 0), vec4(0.0));
 }
 
 vec4 DiagonalFluxAt(ivec2 p)
@@ -99,61 +83,7 @@ vec4 DiagonalFluxAt(ivec2 p)
     if (!IsInside(p))
         return vec4(0.0);
 
-    return texelFetch(u_diagonalFlux, p, 0);
-}
-
-float LocalSlope(ivec2 id)
-{
-    float left = HeightAt(id + ivec2(-1, 0));
-    float right = HeightAt(id + ivec2(1, 0));
-    float down = HeightAt(id + ivec2(0, -1));
-    float up = HeightAt(id + ivec2(0, 1));
-    return length(vec2(right - left, up - down)) * 0.5;
-}
-
-float AverageHeight3x3(ivec2 id)
-{
-    float h = 0.0;
-    h += HeightAt(id + ivec2(-1, -1));
-    h += HeightAt(id + ivec2( 0, -1));
-    h += HeightAt(id + ivec2( 1, -1));
-    h += HeightAt(id + ivec2(-1,  0));
-    h += HeightAt(id);
-    h += HeightAt(id + ivec2( 1,  0));
-    h += HeightAt(id + ivec2(-1,  1));
-    h += HeightAt(id + ivec2( 0,  1));
-    h += HeightAt(id + ivec2( 1,  1));
-    return h / 9.0;
-}
-
-float AverageWater3x3(ivec2 id)
-{
-    float w = 0.0;
-    w += WaterAt(id + ivec2(-1, -1));
-    w += WaterAt(id + ivec2( 0, -1));
-    w += WaterAt(id + ivec2( 1, -1));
-    w += WaterAt(id + ivec2(-1,  0));
-    w += WaterAt(id);
-    w += WaterAt(id + ivec2( 1,  0));
-    w += WaterAt(id + ivec2(-1,  1));
-    w += WaterAt(id + ivec2( 0,  1));
-    w += WaterAt(id + ivec2( 1,  1));
-    return w / 9.0;
-}
-
-float AverageSurface3x3(ivec2 id)
-{
-    float s = 0.0;
-    s += HeightAt(id + ivec2(-1, -1)) + WaterAt(id + ivec2(-1, -1));
-    s += HeightAt(id + ivec2( 0, -1)) + WaterAt(id + ivec2( 0, -1));
-    s += HeightAt(id + ivec2( 1, -1)) + WaterAt(id + ivec2( 1, -1));
-    s += HeightAt(id + ivec2(-1,  0)) + WaterAt(id + ivec2(-1,  0));
-    s += HeightAt(id) + WaterAt(id);
-    s += HeightAt(id + ivec2( 1,  0)) + WaterAt(id + ivec2( 1,  0));
-    s += HeightAt(id + ivec2(-1,  1)) + WaterAt(id + ivec2(-1,  1));
-    s += HeightAt(id + ivec2( 0,  1)) + WaterAt(id + ivec2( 0,  1));
-    s += HeightAt(id + ivec2( 1,  1)) + WaterAt(id + ivec2( 1,  1));
-    return s / 9.0;
+    return max(texelFetch(u_diagonalFlux, p, 0), vec4(0.0));
 }
 
 float SurfaceAt(ivec2 p)
@@ -215,24 +145,20 @@ float DownhillSlope(ivec2 id)
     best = max(best, (surface - SurfaceAt(id + ivec2(1, -1))) * 0.70710678);
     best = max(best, (surface - SurfaceAt(id + ivec2(-1, 1))) * 0.70710678);
     best = max(best, (surface - SurfaceAt(id + ivec2(1, 1))) * 0.70710678);
-    return best;
+    return max(best, 0.0);
 }
 
-float HeightRange3x3(ivec2 id)
+float ThermalTransfer(float h, float hn)
 {
-    float low = HeightAt(id);
-    float high = low;
-    for (int y = -1; y <= 1; ++y)
-    {
-        for (int x = -1; x <= 1; ++x)
-        {
-            float h = HeightAt(id + ivec2(x, y));
-            low = min(low, h);
-            high = max(high, h);
-        }
-    }
-
-    return high - low;
+    // Only the part of the height difference above the talus angle is allowed to move.
+    // Positive => neighbour is higher (material slides in), negative => we are higher
+    // (material slides out). This is the classic gravity-driven thermal weathering.
+    const float talus = 0.0035;
+    float d = hn - h;
+    float a = abs(d);
+    if (a <= talus)
+        return 0.0;
+    return sign(d) * (a - talus);
 }
 
 void main()
@@ -252,131 +178,84 @@ void main()
 
     float transportedSedimentOut = sediment * clamp(outWater / max(water, 0.000001), 0.0, 1.0);
     float transportedSedimentIn = IncomingSedimentAt(id);
-    float newWater = max(water + inWater - outWater, 0.0);
     float newSediment = max(sediment + transportedSedimentIn - transportedSedimentOut, 0.0);
 
     float flow = inWater + outWater;
-    float velocity = flow / max(flow + newWater, 0.000001);
+    float velocity = flow / max(flow + water, 0.000001);
+    float slope = DownhillSlope(id);
+    float waterFactor = smoothstep(u_minWaterToErode, u_minWaterToErode + 0.05, water);
+    float flowFactor = smoothstep(u_minFlowToErode, u_minFlowToErode + 0.08, flow);
+    float channelBoost = 1.0 + RiverChannelAt(id) * u_riverChannelInfluence;
 
-    float downhillSlope = DownhillSlope(id);
-    float localSlope = LocalSlope(id);
-    float slope = max(downhillSlope, localSlope * 0.75);
-    float relief = HeightRange3x3(id);
-
-    float lakeFactor = smoothstep(u_lakeMinDepth, u_lakeMinDepth * 3.0 + 0.0001, newWater)
-        * (1.0 - smoothstep(u_minFlowToErode, u_minFlowToErode + 0.18, flow))
-        * (1.0 - smoothstep(0.01, 0.08, slope));
-
-    float riverFactor = smoothstep(u_minFlowToErode, u_minFlowToErode + 0.18, flow)
-        * smoothstep(u_minWaterToErode, u_minWaterToErode + 0.08, newWater)
-        * (1.0 - lakeFactor);
-
-    float slopeWash = smoothstep(
-            u_slopeErosionMinSlope,
-            max(u_slopeErosionMinSlope + 0.0001, u_slopeErosionMinSlope * 7.0),
-            slope)
-        * smoothstep(0.0001, 0.010, newWater)
-        * (1.0 - lakeFactor);
-
-    float valleyShape = (1.0 - smoothstep(
-            u_valleyDepositionSlope,
-            max(u_valleyDepositionSlope + 0.0001, u_valleyDepositionSlope * 3.0),
-            slope))
-        * smoothstep(0.001, 0.08, newWater)
-        * (1.0 - smoothstep(0.0, 0.18, relief));
-
-    float valleyFactor = clamp(max(valleyShape, lakeFactor), 0.0, 1.0);
-
-    float currentChannel = RiverChannelAt(id);
-    float channelFactor = max(riverFactor, currentChannel * u_riverChannelInfluence);
-    float hillslopeFactor = max(slopeWash, channelFactor * 0.35);
-    float streamPower = (outWater * 0.75 + inWater * 0.25) * max(downhillSlope, 0.0);
-    float rillFactor = smoothstep(0.000002, 0.0015, streamPower) * (1.0 - lakeFactor);
-
-    // Transport capacity combines concentrated river flow with rainfall-driven slope wash.
-    float carryingCapacity = max(
-        (flow + newWater * u_slopeErosionWaterScale) *
-        max(velocity, 0.15) *
-        max(slope, 0.006) *
-        u_capacity *
-        (0.30 + hillslopeFactor * 0.45 + rillFactor * 0.85),
-        0.0
-    );
-
-    carryingCapacity *= 1.0 - lakeFactor * 0.9;
-
+    float capacity = u_sedimentCapacity * velocity * max(slope, 0.002) * waterFactor * flowFactor * channelBoost;
     float heightDelta = 0.0;
 
-    bool canErodeByChannel = newWater > u_minWaterToErode && flow > u_minFlowToErode;
-    bool canErodeBySlopeWash = slopeWash > 0.01 && newWater > 0.0003;
-
-    if ((canErodeByChannel || canErodeBySlopeWash) && newSediment < carryingCapacity)
+    if (capacity > newSediment && flowFactor > 0.0)
     {
-        float channelErosion = (carryingCapacity - newSediment)
-            * u_erosionRate
-            * max(channelFactor, rillFactor);
-
-        float slopeErosion = slopeWash
-            * newWater
-            * (0.20 + clamp(slope * 6.0, 0.0, 1.0))
-            * u_capacity
-            * u_slopeErosionRate;
-
-        float sedimentRoom = max(carryingCapacity - newSediment, 0.0);
-        float eroded = min(channelErosion + slopeErosion, sedimentRoom + u_maxHeightChange * 0.75);
-
-        eroded = clamp(eroded, 0.0, u_maxHeightChange);
-        eroded *= 1.0 - lakeFactor;
+        float eroded = min((capacity - newSediment) * u_erosionStrength, u_maxHeightChange);
         eroded = min(eroded, max(height - (baseHeight - u_maxErosionDepth), 0.0));
 
-        float removedDeposit = min(deposit, eroded);
+        float removedDeposit = min(deposit, eroded * 0.35);
         deposit -= removedDeposit;
+        eroded -= removedDeposit;
 
         height -= eroded;
         newSediment += eroded;
         heightDelta -= eroded;
     }
-
-    float depositionTarget = carryingCapacity * mix(1.0, 0.20, valleyFactor);
-    if (newSediment > depositionTarget)
+    else if (newSediment > capacity && u_depositionStrength > 0.0)
     {
-        float depositAmount = (newSediment - depositionTarget) * u_depositionRate;
-        float steepSlope = smoothstep(u_depositionSlopeStart, max(u_depositionSlopeStart + 0.0001, u_depositionSlopeEnd), slope);
-        float flowKeepsSediment = smoothstep(u_minFlowToErode, u_minFlowToErode + 0.18, flow);
-        float slopeReduction = steepSlope * (1.0 - valleyFactor) * clamp(u_steepSlopeDepositionReduction, 0.0, 1.0);
-        float settlingWater = mix(1.0 - flowKeepsSediment * 0.65, 1.0, valleyFactor);
-        float lakeDeposit = mix(0.35, 1.0 + u_lakeDeposition, lakeFactor);
-        float valleyDeposit = 1.0 + valleyFactor * u_valleyDepositionRate * 8.0;
+        // Concentrate deposition in low-energy spots (flat valley floors, channels,
+        // lake beds) instead of smearing a thin film across every slope. On steeper
+        // ground the surplus sediment keeps travelling downhill until it reaches a
+        // place calm enough to actually settle.
+        float flatness = 1.0 - smoothstep(0.015, 0.10, slope);
+        float channelArea = clamp(RiverChannelAt(id) * u_riverChannelInfluence, 0.0, 1.0);
+        float depositGate = clamp(max(flatness, channelArea), 0.0, 1.0);
 
-        depositAmount *= max(1.0 - slopeReduction, 0.05) * max(settlingWater, 0.08) * lakeDeposit * valleyDeposit;
-        depositAmount = clamp(depositAmount, 0.0, u_maxHeightChange);
-        depositAmount = min(depositAmount, max((baseHeight + u_maxDepositionHeight) - height, 0.0));
+        float deposited = min((newSediment - capacity) * u_depositionStrength * depositGate, u_maxHeightChange * 0.35);
+        float depositRoom = max(u_maxDepositHeight - deposit, 0.0);
+        deposited = min(deposited, depositRoom);
 
-        height += depositAmount;
-        deposit += depositAmount;
-        newSediment -= depositAmount;
-        heightDelta += depositAmount;
+        deposit += deposited;
+        newSediment -= deposited;
+        // Intentionally do NOT raise the terrain here. Aggradation would flatten the
+        // local slope, drop the transport capacity and feed back into even more
+        // deposition - the runaway "snowball". Sediment stays a cosmetic layer only.
     }
 
-    float carvingFactor = max(riverFactor, rillFactor);
+    // Relax the cosmetic deposit slightly each step so calm areas converge to a stable
+    // amount that is continuously replenished by active deposition, instead of
+    // accumulating without bound until it suddenly covers everything.
+    deposit = max(deposit - deposit * 0.01, 0.0);
 
-    if (carvingFactor > 0.0 && u_channelSmoothing > 0.0)
+    // Thermal weathering / flattening: gravity slowly slides material off steep rock
+    // faces down to lower neighbours, washing cliffs and smoothing the terrain. Net
+    // change = what slides in from higher neighbours minus what slides out to lower
+    // ones, so it is roughly mass conserving and independent of water.
+    if (u_flatteningStrength > 0.0)
     {
-        float smoothDelta = (AverageHeight3x3(id) - height) * u_channelSmoothing * carvingFactor * 0.25;
-        smoothDelta = clamp(smoothDelta, -u_maxHeightChange * 0.25, u_maxHeightChange * 0.25);
-        height += smoothDelta;
-        heightDelta += smoothDelta;
+        float h0 = originalHeight;
+        float net = 0.0;
+        net += ThermalTransfer(h0, HeightAt(id + ivec2(-1, 0)));
+        net += ThermalTransfer(h0, HeightAt(id + ivec2(1, 0)));
+        net += ThermalTransfer(h0, HeightAt(id + ivec2(0, -1)));
+        net += ThermalTransfer(h0, HeightAt(id + ivec2(0, 1)));
+        net += 0.70710678 * ThermalTransfer(h0, HeightAt(id + ivec2(-1, -1)));
+        net += 0.70710678 * ThermalTransfer(h0, HeightAt(id + ivec2(1, -1)));
+        net += 0.70710678 * ThermalTransfer(h0, HeightAt(id + ivec2(-1, 1)));
+        net += 0.70710678 * ThermalTransfer(h0, HeightAt(id + ivec2(1, 1)));
+
+        // 0.07 * total-neighbour-weight (~6.83) keeps the implicit smoothing coefficient
+        // below the 0.5 stability bound even at full strength; clamp to the step limit.
+        float thermal = clamp(net * u_flatteningStrength * 0.07, -u_maxHeightChange, u_maxHeightChange);
+        height += thermal;
     }
 
-    if (lakeFactor > 0.0)
-    {
-        float bedDelta = (AverageHeight3x3(id) - height) * u_lakeBedSmoothing * lakeFactor;
-        bedDelta = clamp(bedDelta, -u_maxHeightChange * 0.35, u_maxHeightChange * 0.35);
-        height += bedDelta;
-        heightDelta += bedDelta;
-    }
-
-    height = clamp(height, baseHeight - u_maxErosionDepth, baseHeight + u_maxDepositionHeight);
+    // Height can be cut down by water/thermal erosion and raised by thermal fill in
+    // valleys. Deposition is purely cosmetic now, so the upper bound is the symmetric
+    // thermal range rather than the tiny deposit limit.
+    height = clamp(height, baseHeight - u_maxErosionDepth, baseHeight + u_maxErosionDepth);
     heightDelta = height - originalHeight;
 
     imageStore(u_heightOut, id, vec4(height, 0.0, 0.0, 0.0));

@@ -16,6 +16,7 @@ namespace pwg
 		~SkyBox() = default;
 
 		void Draw();
+		void SetCubeMapTexture(std::shared_ptr<CubeMapTexture> cubemap);
 
         std::shared_ptr<Material> GetMaterial();
 

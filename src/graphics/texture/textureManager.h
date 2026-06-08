@@ -41,8 +41,10 @@ namespace pwg
 		* @param texturePaths Vector of file paths for the individual layers.
 		*/
 		void LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureType type);
+		void ReloadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureType type);
 
 		void LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths, TextureType type);
+		void ReloadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths, TextureType type);
 
 		/**
 		* @brief Unloads a texture by its ID and deletes it from GPU memory.
