@@ -25,6 +25,8 @@ namespace pwg
 		std::vector<UIParameters> GetParameters() override;
 		TerrainPassTypes GetPassType() override;
 		std::string GetName() override;
+		const std::vector<std::string>& GetInputMasks() const override { return m_inputTextures; }
+		const std::vector<std::string>& GetOutputMasks() const override { return m_outputTextures; }
 
 	private:
 		std::string m_name = "ElevationPass";

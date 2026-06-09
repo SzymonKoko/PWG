@@ -8,6 +8,7 @@ namespace pwg
 		  m_terrainSize(terrainSize)
 	{
 		m_inputTextures = { "Elevation", "MountainHeight" };
+		m_outputTextures = { "FinalMask" };
 	}
 
 	void FinalMaskPass::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, TerrainPassContext& ctx)

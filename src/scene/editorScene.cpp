@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include "editorScene.h"
 #include "controls/noiseControls.h"
+#include "controls/terrainGraphEditor.h"
 #include "controls/environmentControls.h"
 #include "platform/nativeDialogs.h"
 
@@ -469,7 +470,14 @@ void pwg::EditorScene::Update(const float& dt)
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    m_cameraManager->Update(dt);
+    if (m_terrainGraphInputCaptured)
+    {
+        m_mouseInput.ResetScrollOffset();
+    }
+    else
+    {
+        m_cameraManager->Update(dt);
+    }
     auto activeCamera = m_cameraManager->GetActiveCamera();
     m_terrain->Update(dt ,activeCamera);
     m_environment->Update(dt);
@@ -605,6 +613,30 @@ void pwg::EditorScene::Draw()
     }
 
     ImGui::End();
+    }
+
+    if (m_showTerrainGraph)
+    {
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.08f, 0.09f, 0.10f, 0.72f));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.06f, 0.07f, 0.08f, 0.26f));
+    ImGui::Begin("Terrain Graph", &m_showTerrainGraph, ImGuiWindowFlags_NoMove);
+    bool terrainGraphInputCaptured = false;
+    bool terrainGraphViewChanged = false;
+    if (controls::TerrainGraphEditor::Show(m_terrain->GetChunkManager(), m_terrainGraphViewState, &terrainGraphInputCaptured, &terrainGraphViewChanged))
+    {
+        m_dirty = true;
+    }
+    if (terrainGraphViewChanged)
+    {
+        m_dirty = true;
+    }
+    m_terrainGraphInputCaptured = terrainGraphInputCaptured;
+    ImGui::End();
+    ImGui::PopStyleColor(2);
+    }
+    else
+    {
+        m_terrainGraphInputCaptured = false;
     }
 
     if (m_showMaterialLibrary)
@@ -839,6 +871,11 @@ bool& pwg::EditorScene::ShowMaterialLibrary()
     return m_showMaterialLibrary;
 }
 
+bool& pwg::EditorScene::ShowTerrainGraph()
+{
+    return m_showTerrainGraph;
+}
+
 const std::string& pwg::EditorScene::GetProjectLayoutIni() const
 {
     return m_projectLayoutIni;
@@ -849,6 +886,21 @@ void pwg::EditorScene::SetProjectLayoutIni(const std::string& layoutIni)
     m_projectLayoutIni = layoutIni;
 }
 
+pwg::controls::TerrainGraphViewState& pwg::EditorScene::GetTerrainGraphViewState()
+{
+    return m_terrainGraphViewState;
+}
+
+const pwg::controls::TerrainGraphViewState& pwg::EditorScene::GetTerrainGraphViewState() const
+{
+    return m_terrainGraphViewState;
+}
+
+void pwg::EditorScene::SetTerrainGraphViewState(const controls::TerrainGraphViewState& viewState)
+{
+    m_terrainGraphViewState = viewState;
+}
+
 void pwg::EditorScene::ResetEditorWindows()
 {
     m_showMainView = true;
@@ -857,6 +909,7 @@ void pwg::EditorScene::ResetEditorWindows()
     m_showWorld = true;
     m_showDebugWindow = true;
     m_showMaterialLibrary = true;
+    m_showTerrainGraph = true;
 }
 
 void pwg::EditorScene::DrawOutliner()
@@ -873,6 +926,7 @@ void pwg::EditorScene::DrawOutliner()
         if (ImGui::TreeNodeEx("Terrain", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::Checkbox("Terrain Controls", &m_showTerrainControls);
+            ImGui::Checkbox("Terrain Graph", &m_showTerrainGraph);
             ImGui::Checkbox("Debug", &m_showDebugWindow);
             ImGui::TreePop();
         }

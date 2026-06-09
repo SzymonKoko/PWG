@@ -27,6 +27,14 @@ namespace pwg
 			return node;
 		}
 
+		YAML::Node Vec2Node(const ImVec2& value)
+		{
+			YAML::Node node;
+			node["x"] = value.x;
+			node["y"] = value.y;
+			return node;
+		}
+
 		std::string RoleName(TerrainMaterialRole role)
 		{
 			switch (role)
@@ -207,12 +215,46 @@ namespace pwg
 			YAML::Node node;
 			node["showMainView"] = true;
 			node["showTerrainControls"] = scene.ShowTerrainControls();
+			node["showTerrainGraph"] = scene.ShowTerrainGraph();
 			node["showWorld"] = scene.ShowWorld();
 			node["showOutliner"] = scene.ShowOutliner();
 			node["showDebugWindow"] = scene.ShowDebugWindow();
 			node["showMaterialLibrary"] = scene.ShowMaterialLibrary();
 			node["imguiLayout"] = scene.GetProjectLayoutIni();
+
+			const auto& graphView = scene.GetTerrainGraphViewState();
+			YAML::Node graphViewNode;
+			graphViewNode["pan"] = Vec2Node(graphView.pan);
+			graphViewNode["zoom"] = graphView.zoom;
+			for (const auto& graphNode : graphView.nodes)
+			{
+				YAML::Node nodeLayout;
+				nodeLayout["pass"] = graphNode.passName;
+				nodeLayout["position"] = Vec2Node(graphNode.position);
+				graphViewNode["nodes"].push_back(nodeLayout);
+			}
+			for (const auto& graphEdge : graphView.proposedEdges)
+			{
+				YAML::Node edgeNode;
+				edgeNode["fromPass"] = graphEdge.fromPass;
+				edgeNode["toPass"] = graphEdge.toPass;
+				edgeNode["maskName"] = graphEdge.maskName;
+				graphViewNode["proposedEdges"].push_back(edgeNode);
+			}
+			node["terrainGraphView"] = graphViewNode;
 			return node;
+		}
+
+		ImVec2 ReadVec2(const YAML::Node& node, const ImVec2& fallback)
+		{
+			if (!node)
+			{
+				return fallback;
+			}
+			return {
+				node["x"] ? node["x"].as<float>() : fallback.x,
+				node["y"] ? node["y"].as<float>() : fallback.y
+			};
 		}
 
 		void ReadEditorUi(const YAML::Node& node, EditorScene& scene)
@@ -224,6 +266,7 @@ namespace pwg
 
 			scene.ShowMainView() = true;
 			ReadValue(node, "showTerrainControls", scene.ShowTerrainControls());
+			ReadValue(node, "showTerrainGraph", scene.ShowTerrainGraph());
 			ReadValue(node, "showWorld", scene.ShowWorld());
 			ReadValue(node, "showOutliner", scene.ShowOutliner());
 			ReadValue(node, "showDebugWindow", scene.ShowDebugWindow());
@@ -240,6 +283,51 @@ namespace pwg
 			std::string layout;
 			ReadValue(node, "imguiLayout", layout);
 			scene.SetProjectLayoutIni(layout);
+
+			auto graphViewNode = node["terrainGraphView"];
+			if (graphViewNode)
+			{
+				auto graphView = scene.GetTerrainGraphViewState();
+				graphView.pan = ReadVec2(graphViewNode["pan"], graphView.pan);
+				ReadValue(graphViewNode, "zoom", graphView.zoom);
+				graphView.zoom = std::clamp(graphView.zoom, 0.30f, 2.75f);
+				graphView.nodes.clear();
+				graphView.proposedEdges.clear();
+
+				auto nodes = graphViewNode["nodes"];
+				if (nodes && nodes.IsSequence())
+				{
+					for (const auto& nodeLayout : nodes)
+					{
+						if (!nodeLayout["pass"])
+						{
+							continue;
+						}
+						controls::TerrainGraphNodeLayout layoutNode;
+						layoutNode.passName = nodeLayout["pass"].as<std::string>();
+						layoutNode.position = ReadVec2(nodeLayout["position"], layoutNode.position);
+						graphView.nodes.push_back(layoutNode);
+					}
+				}
+
+				auto proposedEdges = graphViewNode["proposedEdges"];
+				if (proposedEdges && proposedEdges.IsSequence())
+				{
+					for (const auto& edgeNode : proposedEdges)
+					{
+						if (!edgeNode["fromPass"] || !edgeNode["toPass"] || !edgeNode["maskName"])
+						{
+							continue;
+						}
+						controls::TerrainGraphProposedEdge edge;
+						edge.fromPass = edgeNode["fromPass"].as<std::string>();
+						edge.toPass = edgeNode["toPass"].as<std::string>();
+						edge.maskName = edgeNode["maskName"].as<std::string>();
+						graphView.proposedEdges.push_back(edge);
+					}
+				}
+				scene.SetTerrainGraphViewState(graphView);
+			}
 		}
 
 		void ReadTerrainMaterials(const YAML::Node& node, TerrainMaterialLibrary& library)

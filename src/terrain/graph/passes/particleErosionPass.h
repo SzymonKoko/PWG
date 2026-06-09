@@ -22,6 +22,8 @@ namespace pwg
 		std::vector<UIParameters> GetParameters() override;
 		TerrainPassTypes GetPassType() override;
 		std::string GetName() override;
+		const std::vector<std::string>& GetInputMasks() const override { return m_inputTextures; }
+		const std::vector<std::string>& GetOutputMasks() const override { return m_outputTextures; }
 
 	private:
 		struct HeightSample
@@ -45,6 +47,8 @@ namespace pwg
 
 		std::string m_name = "2. Particle hydraulic erosion";
 		TerrainPassTypes m_passType = TerrainPassTypes::EROSION;
+		std::vector<std::string> m_inputTextures;
+		std::vector<std::string> m_outputTextures;
 		ParticleErosionPassParameters m_parameters;
 		int m_terrainSize{ 0 };
 		int m_stepCounter{ 0 };

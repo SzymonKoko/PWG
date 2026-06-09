@@ -21,11 +21,15 @@ namespace pwg
 		std::vector<UIParameters> GetParameters() override;
 		TerrainPassTypes GetPassType() override;
 		std::string GetName() override;
+		const std::vector<std::string>& GetInputMasks() const override { return m_inputTextures; }
+		const std::vector<std::string>& GetOutputMasks() const override { return m_outputTextures; }
 
 	private:
 		std::string m_name = "2. Water physics";
 		TerrainPassTypes m_passType = TerrainPassTypes::HYDROLOGY;
 		std::shared_ptr<ComputeShader> m_computeShader;
+		std::vector<std::string> m_inputTextures;
+		std::vector<std::string> m_outputTextures;
 		HydraulicWaterPassParameters m_parameters;
 		int m_terrainSize = 0;
 
