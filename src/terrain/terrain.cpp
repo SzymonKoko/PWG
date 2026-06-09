@@ -28,6 +28,11 @@ namespace pwg
         m_chunkManager->Draw();
     }
 
+    void Terrain::DrawShadowMap(std::shared_ptr<Shader> shader, const glm::mat4& lightSpaceMatrix)
+    {
+        m_chunkManager->DrawShadowMap(shader, lightSpaceMatrix);
+    }
+
     std::shared_ptr<Mesh> Terrain::GetMesh()
     {
         return m_mesh;

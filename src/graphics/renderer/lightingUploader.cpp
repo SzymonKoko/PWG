@@ -1,18 +1,21 @@
 #include "lightingUploader.h"
 
-void pwg::LightingUploader::Upload(std::shared_ptr<Material> material, Light& light, glm::vec3 cameraPosition)
+void pwg::LightingUploader::Upload(std::shared_ptr<Material> material, const EnvironmentLighting& lighting, glm::vec3 cameraPosition)
 {
-	material->SetUniformVec3("u_lightPosition", light.position);
-	material->SetUniformVec3("u_lightDirection", light.direction);
-	material->SetUniformVec3("u_lightColor", light.color);
-	material->SetUniformFloat("u_lightIntensity", light.intensivity);
+	material->SetUniformVec3("u_lightPosition", -lighting.sunDirection * 100000.0f);
+	material->SetUniformVec3("u_lightDirection", lighting.sunDirection);
+	material->SetUniformVec3("u_lightColor", lighting.sunColor);
+	material->SetUniformFloat("u_lightIntensity", lighting.sunIntensity);
 	material->SetUniformVec3("u_cameraPosition", cameraPosition);
-	material->SetUniformFloat("u_exposure", light.exposure);
-	material->SetUniformFloat("u_skyAmbient", light.skyAmbient);
-	material->SetUniformFloat("u_groundAmbient", light.groundAmbient);
-	material->SetUniformFloat("u_normalStrength", light.normalStrength);
-	material->SetUniformFloat("u_snowHeight", light.snowHeight);
-	material->SetUniformFloat("u_snowSoftness", light.snowSoftness);
-	material->SetUniformFloat("u_wetnessStrength", light.wetnessStrength);
-	material->SetUniformFloat("u_waterAlpha", light.waterAlpha);
+	material->SetUniformFloat("u_exposure", 1.0f);
+	material->SetUniformFloat("u_skyAmbient", lighting.skyAmbient);
+	material->SetUniformFloat("u_groundAmbient", lighting.groundAmbient);
+	material->SetUniformVec3("u_skyTint", lighting.skyTint);
+	material->SetUniformVec3("u_groundAlbedo", lighting.groundAlbedo);
+	material->SetUniformFloat("u_fogDensity", lighting.fogDensity);
+	material->SetUniformFloat("u_normalStrength", lighting.normalStrength);
+	material->SetUniformFloat("u_snowHeight", lighting.snowHeight);
+	material->SetUniformFloat("u_snowSoftness", lighting.snowSoftness);
+	material->SetUniformFloat("u_wetnessStrength", lighting.wetnessStrength);
+	material->SetUniformFloat("u_waterAlpha", lighting.waterAlpha);
 }

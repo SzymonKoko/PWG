@@ -1,7 +1,7 @@
 #include "projectSerializer.h"
 
 #include "scene/editorScene.h"
-#include "scene/objects/sunObject.h"
+#include "scene/environment/environmentSettings.h"
 #include "terrain/materials/terrainMaterialLibrary.h"
 #include "terrain/graph/passes/terrainPass.h"
 #include "terrain/graph/terrainPassContext.h"
@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <filesystem>
 #include <cstdint>
+#include <cmath>
 
 namespace pwg
 {
@@ -113,6 +114,44 @@ namespace pwg
 			{
 				node["flipVertical"].push_back(flip);
 			}
+			return node;
+		}
+
+		YAML::Node WriteEnvironmentSettings(const EnvironmentSettings& settings)
+		{
+			YAML::Node node;
+			node["timeOfDay"] = settings.timeOfDay;
+			node["latitude"] = settings.latitude;
+			node["animateTime"] = settings.animateTime;
+			node["timeScale"] = settings.timeScale;
+			node["sunAngularSize"] = settings.sunAngularSize;
+			node["sunColor"] = Vec3Node(settings.sunColor);
+			node["sunIlluminance"] = settings.sunIlluminance;
+			node["skyTint"] = Vec3Node(settings.skyTint);
+			node["atmosphereDensity"] = settings.atmosphereDensity;
+			node["haze"] = settings.haze;
+			node["groundAlbedo"] = Vec3Node(settings.groundAlbedo);
+			node["useSkyboxBlend"] = settings.useSkyboxBlend;
+			node["skyboxBlend"] = settings.skyboxBlend;
+			node["exposure"] = settings.exposure;
+			node["whitePoint"] = settings.whitePoint;
+			node["bloomStrength"] = settings.bloomStrength;
+			node["fogDensity"] = settings.fogDensity;
+			node["bloomEnabled"] = settings.bloomEnabled;
+			node["fxaaEnabled"] = settings.fxaaEnabled;
+			node["shadowsEnabled"] = settings.shadowsEnabled;
+			node["shadowResolution"] = settings.shadowResolution;
+			node["shadowDistance"] = settings.shadowDistance;
+			node["shadowStrength"] = settings.shadowStrength;
+			node["shadowBias"] = settings.shadowBias;
+			node["shadowNormalBias"] = settings.shadowNormalBias;
+			node["skyAmbient"] = settings.skyAmbient;
+			node["groundAmbient"] = settings.groundAmbient;
+			node["normalStrength"] = settings.normalStrength;
+			node["snowHeight"] = settings.snowHeight;
+			node["snowSoftness"] = settings.snowSoftness;
+			node["wetnessStrength"] = settings.wetnessStrength;
+			node["waterAlpha"] = settings.waterAlpha;
 			return node;
 		}
 
@@ -244,6 +283,74 @@ namespace pwg
 				node["y"] ? node["y"].as<float>() : fallback.y,
 				node["z"] ? node["z"].as<float>() : fallback.z
 			};
+		}
+
+		void ReadEnvironmentSettings(const YAML::Node& node, EnvironmentSettings& settings)
+		{
+			if (!node)
+			{
+				return;
+			}
+
+			ReadValue(node, "timeOfDay", settings.timeOfDay);
+			ReadValue(node, "latitude", settings.latitude);
+			ReadValue(node, "animateTime", settings.animateTime);
+			ReadValue(node, "timeScale", settings.timeScale);
+			ReadValue(node, "sunAngularSize", settings.sunAngularSize);
+			settings.sunColor = ReadVec3(node["sunColor"], settings.sunColor);
+			ReadValue(node, "sunIlluminance", settings.sunIlluminance);
+			settings.skyTint = ReadVec3(node["skyTint"], settings.skyTint);
+			ReadValue(node, "atmosphereDensity", settings.atmosphereDensity);
+			ReadValue(node, "haze", settings.haze);
+			settings.groundAlbedo = ReadVec3(node["groundAlbedo"], settings.groundAlbedo);
+			ReadValue(node, "useSkyboxBlend", settings.useSkyboxBlend);
+			ReadValue(node, "skyboxBlend", settings.skyboxBlend);
+			ReadValue(node, "exposure", settings.exposure);
+			ReadValue(node, "whitePoint", settings.whitePoint);
+			ReadValue(node, "bloomStrength", settings.bloomStrength);
+			ReadValue(node, "fogDensity", settings.fogDensity);
+			ReadValue(node, "bloomEnabled", settings.bloomEnabled);
+			ReadValue(node, "fxaaEnabled", settings.fxaaEnabled);
+			ReadValue(node, "shadowsEnabled", settings.shadowsEnabled);
+			ReadValue(node, "shadowResolution", settings.shadowResolution);
+			ReadValue(node, "shadowDistance", settings.shadowDistance);
+			ReadValue(node, "shadowStrength", settings.shadowStrength);
+			ReadValue(node, "shadowBias", settings.shadowBias);
+			ReadValue(node, "shadowNormalBias", settings.shadowNormalBias);
+			ReadValue(node, "skyAmbient", settings.skyAmbient);
+			ReadValue(node, "groundAmbient", settings.groundAmbient);
+			ReadValue(node, "normalStrength", settings.normalStrength);
+			ReadValue(node, "snowHeight", settings.snowHeight);
+			ReadValue(node, "snowSoftness", settings.snowSoftness);
+			ReadValue(node, "wetnessStrength", settings.wetnessStrength);
+			ReadValue(node, "waterAlpha", settings.waterAlpha);
+		}
+
+		void ReadLegacyLighting(const YAML::Node& lightNode, const YAML::Node& sunNode, EnvironmentSettings& settings)
+		{
+			if (lightNode)
+			{
+				settings.sunColor = ReadVec3(lightNode["color"], settings.sunColor);
+				ReadValue(lightNode, "intensivity", settings.sunIlluminance);
+				ReadValue(lightNode, "exposure", settings.exposure);
+				ReadValue(lightNode, "skyAmbient", settings.skyAmbient);
+				ReadValue(lightNode, "groundAmbient", settings.groundAmbient);
+				ReadValue(lightNode, "normalStrength", settings.normalStrength);
+				ReadValue(lightNode, "snowHeight", settings.snowHeight);
+				ReadValue(lightNode, "snowSoftness", settings.snowSoftness);
+				ReadValue(lightNode, "wetnessStrength", settings.wetnessStrength);
+				ReadValue(lightNode, "waterAlpha", settings.waterAlpha);
+			}
+			if (sunNode)
+			{
+				float legacyTime = settings.timeOfDay;
+				ReadValue(sunNode, "time", legacyTime);
+				settings.timeOfDay = std::fmod(std::abs(legacyTime), 360.0f) / 360.0f * 24.0f;
+				bool stopTime = true;
+				ReadValue(sunNode, "stopTime", stopTime);
+				settings.animateTime = !stopTime;
+				ReadValue(sunNode, "orbitSpeed", settings.timeScale);
+			}
 		}
 
 		void WriteParameter(YAML::Node& parent, const UIParameters& param)
@@ -605,6 +712,7 @@ namespace pwg
 			root["terrainMaterials"] = WriteTerrainMaterials(*scene.GetTerrainMaterialLibrary());
 		}
 		root["environment"]["skybox"] = WriteSkybox(scene.GetSkyboxDefinition());
+		root["environment"]["settings"] = WriteEnvironmentSettings(scene.GetEnvironmentSystem()->GetSettings());
 
 		YAML::Node passes;
 		for (const auto& pass : pipeline->GetGraph()->GetPasses())
@@ -617,26 +725,6 @@ namespace pwg
 			passes[pass->GetName()] = passNode;
 		}
 		root["terrainGraph"] = passes;
-
-		auto& light = scene.GetSunObject()->GetLight();
-		auto& sun = scene.GetSunObject()->GetSunObjectProperties();
-		root["light"]["position"] = Vec3Node(light.position);
-		root["light"]["direction"] = Vec3Node(light.direction);
-		root["light"]["color"] = Vec3Node(light.color);
-		root["light"]["intensivity"] = light.intensivity;
-		root["light"]["exposure"] = light.exposure;
-		root["light"]["skyAmbient"] = light.skyAmbient;
-		root["light"]["groundAmbient"] = light.groundAmbient;
-		root["light"]["normalStrength"] = light.normalStrength;
-		root["light"]["snowHeight"] = light.snowHeight;
-		root["light"]["snowSoftness"] = light.snowSoftness;
-		root["light"]["wetnessStrength"] = light.wetnessStrength;
-		root["light"]["waterAlpha"] = light.waterAlpha;
-		root["sun"]["orbitRadius"] = sun.orbitRadius;
-		root["sun"]["orbitSpeed"] = sun.orbitSpeed;
-		root["sun"]["time"] = sun.time;
-		root["sun"]["color"] = Vec3Node(sun.color);
-		root["sun"]["stopTime"] = sun.stopTime;
 
 		root["camera"]["activeType"] = static_cast<int>(scene.GetCameraManager()->GetActiveCameraType());
 		root["camera"]["position"] = Vec3Node(scene.GetCameraManager()->GetCameraPosition());
@@ -677,6 +765,15 @@ namespace pwg
 			ReadTerrainMaterials(root["terrainMaterials"], *scene.GetTerrainMaterialLibrary());
 		}
 		ReadSkybox(root["environment"]["skybox"], scene);
+		auto& environmentSettings = scene.GetEnvironmentSystem()->GetSettings();
+		if (root["environment"]["settings"])
+		{
+			ReadEnvironmentSettings(root["environment"]["settings"], environmentSettings);
+		}
+		else
+		{
+			ReadLegacyLighting(root["light"], root["sun"], environmentSettings);
+		}
 
 		auto graphNode = root["terrainGraph"];
 		if (graphNode)
@@ -689,35 +786,6 @@ namespace pwg
 					ReadParameter(passNode, param);
 				}
 			}
-		}
-
-		auto& light = scene.GetSunObject()->GetLight();
-		auto lightNode = root["light"];
-		if (lightNode)
-		{
-			light.position = ReadVec3(lightNode["position"], light.position);
-			light.direction = ReadVec3(lightNode["direction"], light.direction);
-			light.color = ReadVec3(lightNode["color"], light.color);
-			ReadValue(lightNode, "intensivity", light.intensivity);
-			ReadValue(lightNode, "exposure", light.exposure);
-			ReadValue(lightNode, "skyAmbient", light.skyAmbient);
-			ReadValue(lightNode, "groundAmbient", light.groundAmbient);
-			ReadValue(lightNode, "normalStrength", light.normalStrength);
-			ReadValue(lightNode, "snowHeight", light.snowHeight);
-			ReadValue(lightNode, "snowSoftness", light.snowSoftness);
-			ReadValue(lightNode, "wetnessStrength", light.wetnessStrength);
-			ReadValue(lightNode, "waterAlpha", light.waterAlpha);
-		}
-
-		auto& sun = scene.GetSunObject()->GetSunObjectProperties();
-		auto sunNode = root["sun"];
-		if (sunNode)
-		{
-			ReadValue(sunNode, "orbitRadius", sun.orbitRadius);
-			ReadValue(sunNode, "orbitSpeed", sun.orbitSpeed);
-			ReadValue(sunNode, "time", sun.time);
-			sun.color = ReadVec3(sunNode["color"], sun.color);
-			ReadValue(sunNode, "stopTime", sun.stopTime);
 		}
 
 		auto cameraNode = root["camera"];

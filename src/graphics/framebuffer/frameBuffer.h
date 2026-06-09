@@ -22,7 +22,7 @@ namespace pwg
 		* @param height Height of the framebuffer in pixels.
 		* @param useRBO If true, creates a Render Buffer Object for depth/stencil attachments.
 		*/
-		FrameBuffer(int width, int height, bool useRBO);
+		FrameBuffer(int width, int height, bool useRBO, TextureType colorType = TextureType::ALBEDO);
 
 		/**
 		* @brief Copy constructor. Creates a new framebuffer with the same configuration as another.
@@ -97,6 +97,7 @@ namespace pwg
 		int m_width{ 800 };									/**< Framebuffer width in pixels. */
 		int m_height{ 800 };								/**< Framebuffer height in pixels. */
 		bool m_useRBO{ false };								/**< Indicates whether a Render Buffer Object is used. */
+		TextureType m_colorType{ TextureType::ALBEDO };		/**< Color attachment texture type. */
 
 	private:
 

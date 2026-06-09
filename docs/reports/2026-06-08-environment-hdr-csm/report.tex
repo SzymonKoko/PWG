@@ -1,0 +1,536 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{booktabs}
+
+\geometry{margin=2.5cm}
+
+\lstdefinestyle{cppstyle}{
+    language=C++,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue!60!black},
+    commentstyle=\color{green!40!black},
+    stringstyle=\color{orange!70!black},
+    numbers=left,
+    numberstyle=\tiny,
+    stepnumber=1,
+    numbersep=8pt,
+    frame=single,
+    breaklines=true,
+    tabsize=4,
+    showstringspaces=false
+}
+
+\lstdefinestyle{glslstyle}{
+    language=C,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{purple!70!black},
+    commentstyle=\color{green!40!black},
+    stringstyle=\color{orange!70!black},
+    numbers=left,
+    numberstyle=\tiny,
+    stepnumber=1,
+    numbersep=8pt,
+    frame=single,
+    breaklines=true,
+    tabsize=4,
+    showstringspaces=false
+}
+
+\title{Sprawozdanie techniczne: system środowiska, HDR i kaskadowe mapowanie cieni w proceduralnym generatorze świata}
+\author{Autor: \textit{do uzupełnienia}}
+\date{8 czerwca 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Niniejsze sprawozdanie opisuje etap rozwoju modułu renderowania w projekcie proceduralnego generatora świata. Zakres obejmuje zastąpienie prostego modelu światła systemem środowiska, dodanie renderowania HDR i postprocessingu, proceduralnego nieba, atmosferycznego wygaszania odległego terenu oraz implementację mapowania cieni dla światła słonecznego. Ostatnim krokiem było rozszerzenie pojedynczej mapy cienia do uproszczonego wariantu kaskadowego mapowania cieni (Cascaded Shadow Maps, CSM), które poprawia jakość cieni w dużej scenie terenowej.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Cel pracy i zakres zmian}
+
+Celem implementacji było zwiększenie realizmu wizualnego generowanego świata przy zachowaniu rasteryzacyjnego potoku OpenGL. Dotychczasowy model opierał się na renderowanym obiekcie słońca oraz prostym zestawie parametrów światła. Taki model był łatwy do kontroli, ale słabo skalował się do realistycznego oświetlenia terenu, ponieważ obiekt wizualny słońca był jednocześnie nośnikiem logiki oświetlenia.
+
+Wprowadzono następujące elementy:
+
+\begin{itemize}
+    \item centralny system środowiska \texttt{EnvironmentSystem},
+    \item proceduralne niebo z tarczą słońca,
+    \item renderowanie sceny do bufora HDR,
+    \item postprocessing z tonemappingiem ACES, ekspozycją, prostym bloomem oraz FXAA,
+    \item atmosferyczny fog dla odległego terenu,
+    \item mapowanie cieni dla kierunkowego światła słonecznego,
+    \item wariant CSM z trzema kaskadami.
+\end{itemize}
+
+Najważniejszą zmianą architektoniczną było rozdzielenie pojęcia środowiska od pojęcia obiektu sceny. Słońce przestało być renderowanym meshem w kolejce głównego renderingu, a stało się kierunkowym źródłem światła, którego wizualna reprezentacja jest tworzona w shaderze nieba.
+
+\section{Kontekst techniczny}
+
+Projekt renderuje duży proceduralny teren dzielony na chunki. Wysokość terenu nie jest zapisana bezpośrednio w statycznej siatce wierzchołków, lecz jest odczytywana w shaderze wierzchołków z tekstury wysokości. Oznacza to, że każdy dodatkowy pass renderujący geometrię terenu, w tym pass do cieni, musi odtworzyć ten sam mechanizm przesunięcia wierzchołków.
+
+W praktyce zwykły shader terenu wykonuje:
+
+\begin{equation}
+    \mathbf{p}_{world} = M \cdot
+    \begin{bmatrix}
+    x \\
+    h(u,v) \\
+    z \\
+    1
+    \end{bmatrix},
+\end{equation}
+
+gdzie:
+
+\begin{itemize}
+    \item $M$ oznacza macierz modelu chunka,
+    \item $h(u,v)$ jest wartością wysokości odczytaną z tekstury \texttt{u\_Heightmap},
+    \item $(u,v)$ to współrzędne tekstury wyliczone z offsetu i skali chunka.
+\end{itemize}
+
+Ten sam wzór musi zostać użyty w shaderze generującym shadow mapę. W przeciwnym razie mapa cienia odpowiadałaby płaskiej siatce, a nie rzeczywistej geometrii terenu.
+
+\section{System środowiska}
+
+\subsection{Opis teoretyczny}
+
+W realistycznym renderingu światło słoneczne jest zwykle modelowane jako światło kierunkowe (directional light). Wynika to z faktu, że odległość Słońca od Ziemi jest bardzo duża w porównaniu ze skalą sceny. Promienie docierające do obserwatora można więc traktować jako równoległe.
+
+Kierunkowe światło słoneczne opisuje wektor:
+
+\begin{equation}
+    \mathbf{l} = \frac{\mathbf{p}_{scene} - \mathbf{p}_{sun}}{\|\mathbf{p}_{scene} - \mathbf{p}_{sun}\|}.
+\end{equation}
+
+W implementacji przechowywany jest kierunek padania światła, natomiast wektor do słońca jest przeciwny:
+
+\begin{equation}
+    \mathbf{d}_{sun} = -\mathbf{l}.
+\end{equation}
+
+Pozycja słońca nie musi być renderowana jako osobny obiekt. Tarcza słoneczna może być obliczana proceduralnie w shaderze nieba przez porównanie kierunku patrzenia z kierunkiem do słońca:
+
+\begin{equation}
+    c = \mathbf{v} \cdot \mathbf{d}_{sun},
+\end{equation}
+
+gdzie $\mathbf{v}$ oznacza kierunek promienia w skyboxie. Jeżeli $c$ jest bliskie $1$, piksel znajduje się blisko tarczy słonecznej.
+
+\subsection{Opis praktyczny}
+
+W projekcie wprowadzono struktury \texttt{EnvironmentSettings} i \texttt{EnvironmentLighting}. Pierwsza przechowuje ustawienia edytowalne w UI, druga jest przygotowaną do renderingu postacią danych. Dzięki temu renderer nie zależy już od obiektu sceny reprezentującego słońce, lecz od stanu środowiska.
+
+Przykład pól odpowiedzialnych za cienie i światło:
+
+\begin{lstlisting}[style=cppstyle,caption={Fragment struktury ustawień środowiska.}]
+bool shadowsEnabled{ true };
+int shadowResolution{ 2048 };
+float shadowDistance{ 2500.0f };
+float shadowStrength{ 0.55f };
+float shadowBias{ 0.0015f };
+float shadowNormalBias{ 0.006f };
+\end{lstlisting}
+
+W panelu edytora dodano sekcję \texttt{Environment}, która steruje czasem dnia, atmosferą, postprocessingiem oraz cieniami słonecznymi. Pozwala to traktować oświetlenie jako cechę środowiska, a nie jako zwykły obiekt sceny.
+
+\section{Renderowanie HDR i postprocessing}
+
+\subsection{Opis teoretyczny}
+
+Renderowanie HDR (High Dynamic Range) polega na przechowywaniu koloru sceny w formacie zmiennoprzecinkowym. Pozwala to zachować wartości większe od $1.0$, które odpowiadają bardzo jasnym obszarom, np. tarczy słońca albo silnie oświetlonym powierzchniom.
+
+Scena jest najpierw renderowana do tekstury HDR:
+
+\begin{equation}
+    C_{HDR} \in \mathbb{R}^{3}, \quad C_{HDR} \geq 0.
+\end{equation}
+
+Dopiero później wykonywany jest tonemapping:
+
+\begin{equation}
+    C_{SDR} = T(E \cdot C_{HDR}),
+\end{equation}
+
+gdzie:
+
+\begin{itemize}
+    \item $T$ oznacza operator tonemappingu,
+    \item $E$ oznacza ekspozycję,
+    \item $C_{SDR}$ to wynik gotowy do wyświetlenia.
+\end{itemize}
+
+W projekcie użyto praktycznej aproksymacji krzywej ACES:
+
+\begin{equation}
+    T(x) =
+    \frac{x(a x + b)}{x(c x + d) + e},
+\end{equation}
+
+gdzie w implementacji przyjęto współczynniki:
+
+\begin{equation}
+    a=2.51,\quad b=0.03,\quad c=2.43,\quad d=0.59,\quad e=0.14.
+\end{equation}
+
+\subsection{Opis praktyczny}
+
+Dodano typ tekstury \texttt{HDR\_COLOR}, który używa formatu \texttt{GL\_RGBA16F}. Scena renderowana jest do HDR framebuffer, a następnie pełnoekranowy pass postprocessingu zapisuje wynik do bufora SDR używanego przez viewport ImGui.
+
+Przepływ renderowania wygląda następująco:
+
+\begin{enumerate}
+    \item shadow pass do depth texture,
+    \item scena do HDR framebuffer,
+    \item postprocess HDR $\rightarrow$ SDR,
+    \item wyświetlenie tekstury SDR w oknie edytora.
+\end{enumerate}
+
+W shaderze postprocessingu zaimplementowano ekspozycję, uproszczony bloom, ACES oraz gamma output. Jest to praktyczna pierwsza wersja, nie pełny produkcyjny pipeline z mip-chain bloomem i automatyczną ekspozycją.
+
+\section{Mapowanie cieni}
+
+\subsection{Opis teoretyczny}
+
+Mapowanie cieni (shadow mapping) jest dwuetapową techniką generowania cieni w rasteryzacji. Najpierw scena renderowana jest z punktu widzenia źródła światła do mapy głębokości. Następnie podczas normalnego renderowania sprawdza się, czy fragment widoczny z kamery jest również widoczny z perspektywy światła.
+
+Dla światła kierunkowego stosuje się macierz:
+
+\begin{equation}
+    L = P_{light} V_{light},
+\end{equation}
+
+gdzie:
+
+\begin{itemize}
+    \item $V_{light}$ jest macierzą widoku światła,
+    \item $P_{light}$ jest ortograficzną macierzą projekcji światła.
+\end{itemize}
+
+Pozycja fragmentu w przestrzeni światła jest dana wzorem:
+
+\begin{equation}
+    \mathbf{p}_{light} = L \cdot
+    \begin{bmatrix}
+    \mathbf{p}_{world} \\
+    1
+    \end{bmatrix}.
+\end{equation}
+
+Po dzieleniu perspektywicznym i przeskalowaniu do zakresu $[0,1]$ otrzymuje się współrzędne mapy cienia:
+
+\begin{equation}
+    \mathbf{q} = 0.5 \cdot
+    \left(
+    \frac{\mathbf{p}_{light.xyz}}{p_{light.w}}
+    \right)
+    + 0.5.
+\end{equation}
+
+Fragment jest zacieniony, gdy jego głębokość w przestrzeni światła jest większa niż głębokość zapisana w shadow mapie:
+
+\begin{equation}
+    s =
+    \begin{cases}
+    1, & q_z - b > D(q_x,q_y), \\
+    0, & \text{w przeciwnym razie},
+    \end{cases}
+\end{equation}
+
+gdzie $b$ jest biasem ograniczającym artefakt zwany \textit{shadow acne}.
+
+\subsection{Filtrowanie PCF}
+
+Zamiast pojedynczego odczytu z mapy cienia zastosowano filtr PCF (Percentage-Closer Filtering). Dla siatki $3 \times 3$:
+
+\begin{equation}
+    S =
+    \frac{1}{9}
+    \sum_{i=-1}^{1}
+    \sum_{j=-1}^{1}
+    \mathbb{I}
+    \left[
+    q_z - b > D(q_x + i\Delta_x,\; q_y + j\Delta_y)
+    \right],
+\end{equation}
+
+gdzie $\mathbb{I}$ jest funkcją wskaźnikową, a $\Delta_x,\Delta_y$ oznaczają rozmiar teksela w shadow mapie. Wynik $S$ opisuje stopień zacienienia.
+
+\subsection{Opis praktyczny}
+
+Depth texture i framebuffer tworzony jest w klasie \texttt{DirectionalShadowMap}. Tekstura ma format \texttt{GL\_DEPTH\_COMPONENT32F}, a kolor nie jest zapisywany:
+
+\begin{lstlisting}[style=cppstyle,caption={Tworzenie depth texture i podpięcie jej do FBO.}]
+glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
+             m_resolution, m_resolution, 0,
+             GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[i]);
+glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                       GL_TEXTURE_2D, m_depthTextures[i], 0);
+glDrawBuffer(GL_NONE);
+glReadBuffer(GL_NONE);
+\end{lstlisting}
+
+Shadow pass rysuje teren bez koloru:
+
+\begin{lstlisting}[style=cppstyle,caption={Rozpoczęcie renderowania jednej kaskady shadow mapy.}]
+void DirectionalShadowMap::BeginCascade(
+    int cascadeIndex,
+    const EnvironmentLighting& lighting,
+    std::shared_ptr<ICamera> camera)
+{
+    m_lightSpaceMatrices[cascadeIndex] =
+        BuildLightSpaceMatrix(lighting, camera, cascadeIndex);
+
+    glViewport(0, 0, m_resolution, m_resolution);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[cascadeIndex]);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+}
+\end{lstlisting}
+
+W \texttt{ChunkManager::DrawShadowMap} powtórzono logikę rysowania chunków, ale bez materiału PBR. Shader cienia odczytuje tę samą heightmapę:
+
+\begin{lstlisting}[style=glslstyle,caption={Vertex shader shadow passu dla terenu.}]
+vec2 uv = u_uvOffset + a_TextureCoordinates * u_uvScale;
+vec3 pos = a_Pos;
+pos.y = texture(u_Heightmap, uv).r;
+gl_Position = u_lightSpaceMatrix * u_model * vec4(pos, 1.0);
+\end{lstlisting}
+
+Dzięki temu shadow mapa zawiera rzeczywistą geometrię terenu po displacement, a nie płaską siatkę.
+
+\section{Kaskadowe mapowanie cieni}
+
+\subsection{Problem pojedynczej shadow mapy}
+
+Pojedyncza shadow mapa musi objąć cały zakres widocznego terenu. Dla dużego świata oznacza to kompromis:
+
+\begin{itemize}
+    \item duży zasięg daje cienie daleko od kamery, ale rozmywa szczegóły blisko,
+    \item mały zasięg daje ostre cienie blisko, ale ucina cienie w oddali.
+\end{itemize}
+
+Przy stałej rozdzielczości $N \times N$ rozmiar jednego teksela w świecie można przybliżyć jako:
+
+\begin{equation}
+    r = \frac{2d}{N},
+\end{equation}
+
+gdzie $d$ jest połową zakresu ortograficznej projekcji światła. Im większy zakres, tym większy obszar świata przypada na jeden teksel, a więc cień staje się mniej szczegółowy.
+
+\subsection{Zasada CSM}
+
+Kaskadowe mapowanie cieni dzieli zakres widzenia kamery na kilka przedziałów. Każdy przedział ma osobną mapę cienia:
+
+\begin{equation}
+    [0, d_1], \quad (d_1, d_2], \quad (d_2, d_3].
+\end{equation}
+
+W implementacji użyto trzech kaskad ze splitami:
+
+\begin{equation}
+    \lambda = (0.18,\;0.45,\;1.0).
+\end{equation}
+
+Dla maksymalnego dystansu cieni $D$ granice kaskad wynoszą:
+
+\begin{equation}
+    d_i = \lambda_i D.
+\end{equation}
+
+Shader wybiera kaskadę na podstawie odległości fragmentu od kamery:
+
+\begin{lstlisting}[style=glslstyle,caption={Wybór kaskady w shaderze terenu.}]
+int SelectShadowCascade(float cameraDistance)
+{
+    float normalizedDistance = cameraDistance / max(u_shadowDistance, 1.0);
+    if (normalizedDistance <= u_shadowCascadeSplits.x)
+        return 0;
+    if (normalizedDistance <= u_shadowCascadeSplits.y)
+        return 1;
+    return 2;
+}
+\end{lstlisting}
+
+\subsection{Opis praktyczny implementacji CSM}
+
+Klasa \texttt{DirectionalShadowMap} przechowuje tablice framebufferów, tekstur głębi i macierzy:
+
+\begin{lstlisting}[style=cppstyle,caption={Dane trzech kaskad w DirectionalShadowMap.}]
+static constexpr int CascadeCount = 3;
+std::array<unsigned int, CascadeCount> m_framebuffers{};
+std::array<unsigned int, CascadeCount> m_depthTextures{};
+std::array<glm::mat4, CascadeCount> m_lightSpaceMatrices{};
+std::array<float, CascadeCount> m_cascadeSplits{ 0.18f, 0.45f, 1.0f };
+\end{lstlisting}
+
+W \texttt{EditorScene::Draw} shadow pass wykonywany jest dla każdej kaskady:
+
+\begin{lstlisting}[style=cppstyle,caption={Renderowanie trzech kaskad shadow mapy.}]
+for (int cascade = 0; cascade < DirectionalShadowMap::CascadeCount; ++cascade)
+{
+    m_shadowMap->BeginCascade(cascade, environmentLighting, activeCamera);
+    m_terrain->DrawShadowMap(
+        m_terrainShadowShader,
+        m_shadowMap->GetLightSpaceMatrix(cascade));
+    m_shadowMap->End(width, height);
+}
+\end{lstlisting}
+
+Renderer przekazuje do shaderów trzy macierze i trzy tekstury:
+
+\begin{lstlisting}[style=cppstyle,caption={Bindowanie trzech shadow map w rendererze.}]
+const int firstShadowSlot = 12;
+for (int i = 0; i < 3; ++i)
+{
+    glActiveTexture(GL_TEXTURE0 + firstShadowSlot + i);
+    glBindTexture(GL_TEXTURE_2D, m_shadowTextureIDs[i]);
+}
+shader->SetUniformInt("u_shadowMap0", firstShadowSlot);
+shader->SetUniformInt("u_shadowMap1", firstShadowSlot + 1);
+shader->SetUniformInt("u_shadowMap2", firstShadowSlot + 2);
+\end{lstlisting}
+
+W shaderze fragmentów odczyt mapy jest wybierany na podstawie indeksu kaskady:
+
+\begin{lstlisting}[style=glslstyle,caption={Odczyt właściwej shadow mapy.}]
+float SampleShadowMap(int cascadeIndex, vec2 uv)
+{
+    if (cascadeIndex == 0)
+        return texture(u_shadowMap0, uv).r;
+    if (cascadeIndex == 1)
+        return texture(u_shadowMap1, uv).r;
+    return texture(u_shadowMap2, uv).r;
+}
+\end{lstlisting}
+
+\section{Integracja w architekturze}
+
+Nowy potok renderowania można przedstawić jako sekwencję:
+
+\begin{enumerate}
+    \item aktualizacja kamery, terenu i systemu środowiska,
+    \item obliczenie kierunku słońca i parametrów oświetlenia,
+    \item renderowanie trzech kaskad shadow mapy,
+    \item renderowanie sceny do HDR framebuffer,
+    \item zastosowanie postprocessingu,
+    \item pokazanie wyniku w viewport edytora.
+\end{enumerate}
+
+Ważne jest, że shadow pass nie jest oddzielnym systemem geometrii. Korzysta z istniejącego \texttt{ChunkManager}, LOD i tekstur wysokości. Dzięki temu implementacja jest spójna z proceduralnym charakterem terenu.
+
+\section{Testy i walidacja}
+
+Wykonano następujące testy:
+
+\begin{itemize}
+    \item kompilacja projektu poleceniem \texttt{cmake --build build --config Release},
+    \item smoke test uruchomienia aplikacji po dodaniu directional shadow map v1,
+    \item smoke test uruchomienia aplikacji po przejściu na trzy kaskady CSM,
+    \item kontrola kompilacji shaderów przez start aplikacji.
+\end{itemize}
+
+Wynik:
+
+\begin{itemize}
+    \item build Release zakończył się sukcesem,
+    \item aplikacja uruchamiała się i pozostawała aktywna przez 8 sekund w testach smoke,
+    \item nie wykryto crasha inicjalizacji framebufferów, depth texture ani shaderów.
+\end{itemize}
+
+Należy jednak zaznaczyć, że smoke test nie zastępuje pełnej oceny wizualnej. Dalsza walidacja powinna obejmować:
+
+\begin{itemize}
+    \item ocenę jakości cieni przy różnych porach dnia,
+    \item strojenie biasu,
+    \item obserwację przejść między kaskadami,
+    \item sprawdzenie migotania cieni podczas ruchu kamery,
+    \item porównanie kosztu GPU dla różnych rozdzielczości shadow map.
+\end{itemize}
+
+\section{Ograniczenia obecnej wersji}
+
+Obecna wersja CSM jest praktycznym fundamentem, ale nie jest jeszcze finalną implementacją produkcyjną. Najważniejsze ograniczenia:
+
+\begin{itemize}
+    \item granice kaskad są stałe i oparte na odległości od kamery,
+    \item macierze kaskad nie są jeszcze stabilizowane do siatki tekseli, co może powodować shimmering,
+    \item cienie są stosowane jako przyciemnienie całego wyniku oświetlenia, a nie tylko składowej bezpośredniej,
+    \item nie ma blendowania między kaskadami,
+    \item shadow pass renderuje wszystkie chunki, bez osobnego cullingu pod frustum światła.
+\end{itemize}
+
+\section{Jak opisać to w pracy inżynierskiej}
+
+Ten etap można opisać jako przejście od prostego modelu światła do wieloetapowego systemu renderowania środowiska. W pracy warto podkreślić trzy poziomy:
+
+\begin{enumerate}
+    \item \textbf{Poziom fizyczny}: słońce jako światło kierunkowe, HDR jako reprezentacja szerokiego zakresu luminancji, tonemapping jako odwzorowanie na ekran.
+    \item \textbf{Poziom algorytmiczny}: shadow mapping, PCF oraz CSM jako rozwiązanie problemu ograniczonej rozdzielczości mapy cienia.
+    \item \textbf{Poziom implementacyjny}: integracja z chunkowanym terenem, heightmap displacement, framebufferami OpenGL i shaderami GLSL.
+\end{enumerate}
+
+Proponowany opis rozdziału:
+
+\begin{quote}
+W celu zwiększenia realizmu generowanych światów zaimplementowano system środowiska odpowiedzialny za parametry słońca, atmosfery i postprocessingu. Scena renderowana jest do bufora HDR, a następnie przekształcana do zakresu wyświetlania za pomocą tonemappingu ACES. Dla światła słonecznego dodano kaskadowe mapowanie cieni. Technika ta dzieli zakres widzenia kamery na trzy przedziały, z których każdy posiada własną mapę głębokości renderowaną z perspektywy światła. Dzięki temu bliskie cienie zachowują większą szczegółowość, a jednocześnie możliwe jest pokrycie większego obszaru terenu.
+\end{quote}
+
+\section{Wnioski i dalsze prace}
+
+Wprowadzone zmiany znacząco rozszerzają realizm renderingu. System środowiska porządkuje dane o świetle, HDR umożliwia poprawne operowanie jasnymi wartościami, a CSM rozwiązuje podstawowy problem jakości cieni w dużych scenach terenowych.
+
+Kolejne kroki:
+
+\begin{itemize}
+    \item stabilizacja kaskad do texel grid,
+    \item blendowanie przejść między kaskadami,
+    \item rozdzielenie cienia od składowej ambient w modelu PBR,
+    \item debug view dla shadow map i granic kaskad,
+    \item docelowo IBL, SSAO/GTAO oraz bardziej fizyczna atmosfera.
+\end{itemize}
+
+\begin{thebibliography}{9}
+
+\bibitem{learnopengl-shadow}
+LearnOpenGL, \textit{Shadow Mapping}. Dostęp online:
+\url{https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping}
+
+\bibitem{learnopengl-csm}
+LearnOpenGL, \textit{Cascaded Shadow Mapping}. Dostęp online:
+\url{https://learnopengl.com/Guest-Articles/2021/CSM}
+
+\bibitem{khronos-fbo}
+Khronos OpenGL Wiki, \textit{Framebuffer Object}. Dostęp online:
+\url{https://wikis.khronos.org/opengl/Framebuffer_Object}
+
+\bibitem{pbrt}
+Pharr, M., Jakob, W., Humphreys, G., \textit{Physically Based Rendering: From Theory to Implementation}. Dostęp online:
+\url{https://www.pbr-book.org/}
+
+\bibitem{aces}
+ACES Documentation, \textit{Tone Mapping}. Dostęp online:
+\url{https://docs.acescentral.com/system-components/output-transforms/technical-details/tone-mapping/}
+
+\end{thebibliography}
+
+\end{document}

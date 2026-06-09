@@ -9,7 +9,9 @@
 #include "scene/iscene.h"
 #include "resources/resourceManager.h"
 #include "terrain/terrain.h"
-#include "objects/sunObject.h"
+#include "scene/environment/environmentSystem.h"
+#include "graphics/postprocess/postProcessor.h"
+#include "graphics/shadow/directionalShadowMap.h"
 #include "cameras/cameraManager.h"
 #include "terrain/gpu/terrainComputePipeline.h"
 #include "terrain/materials/terrainMaterialLibrary.h"
@@ -68,7 +70,7 @@ namespace pwg
 
 		void NewProject();
 		std::shared_ptr<Terrain> GetTerrain();
-		std::shared_ptr<SunObject> GetSunObject();
+		std::shared_ptr<EnvironmentSystem> GetEnvironmentSystem();
 		CameraManager* GetCameraManager();
 		std::shared_ptr<TerrainMaterialLibrary> GetTerrainMaterialLibrary();
 		const SkyboxDefinition& GetSkyboxDefinition() const;
@@ -105,11 +107,15 @@ namespace pwg
 		std::shared_ptr<ResourceManager> m_resourceManager;		/**< Shared pointer to the resource manager. */
 
 		std::unique_ptr<FrameBuffer> m_frameBuffer;				/**< Framebuffer used for editor rendering. */
+		std::unique_ptr<FrameBuffer> m_hdrFrameBuffer;			/**< HDR scene framebuffer before postprocessing. */
 		std::shared_ptr<Terrain> m_terrain;						/**< Terrain instance in the scene. */
 		//std::shared_ptr<TerrainComputePipeline> m_terrainComputePipeline;
 		std::unique_ptr<MeshManager> m_meshManager;				/**< Manages procedural and loaded meshes. */
 		std::unique_ptr<CameraManager> m_cameraManager;			/**< Handles active camera and switching between cameras. */
-		std::shared_ptr<SunObject> m_sunObject;					/**< Sun object providing lighting. */
+		std::shared_ptr<EnvironmentSystem> m_environment;		/**< World lighting, sky and postprocess settings. */
+		std::shared_ptr<PostProcessor> m_postProcessor;			/**< HDR to viewport postprocess pass. */
+		std::shared_ptr<DirectionalShadowMap> m_shadowMap;		/**< Directional sunlight shadow map. */
+		std::shared_ptr<Shader> m_terrainShadowShader;			/**< Depth-only terrain shader for shadow pass. */
 		std::shared_ptr<SkyBox> m_skybox;
 		std::shared_ptr<TerrainMaterialLibrary> m_terrainMaterialLibrary;
 		SkyboxDefinition m_skyboxDefinition;

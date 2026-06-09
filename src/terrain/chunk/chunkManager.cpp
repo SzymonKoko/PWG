@@ -333,6 +333,46 @@ namespace pwg
 		}
 	}
 
+	void ChunkManager::DrawShadowMap(std::shared_ptr<Shader> shader, const glm::mat4& lightSpaceMatrix)
+	{
+		if (!shader)
+		{
+			return;
+		}
+
+		auto heightMask = m_globalMasks.find("FinalHeight");
+		if (heightMask == m_globalMasks.end() || !heightMask->second || !heightMask->second->texture)
+		{
+			return;
+		}
+
+		float worldHalfSize = (m_worldSize - 1) * 0.5f;
+		shader->ActivateShader();
+		shader->SetUniformMat4("u_lightSpaceMatrix", lightSpaceMatrix);
+		shader->SetUniformInt("u_Heightmap", 0);
+		heightMask->second->texture->Bind(0);
+
+		for (int i = 0; i < m_chunkCount; i++)
+		{
+			for (int j = 0; j < m_chunkCount; j++)
+			{
+				auto& chunk = m_chunks[static_cast<size_t>(j) * m_chunkCount + i];
+				auto mesh = m_lodManager->GetMesh(chunk.lod);
+				glm::vec2 uvOffset = glm::vec2(chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1), chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1)) / glm::vec2(m_worldSize);
+				glm::vec2 uvScale = glm::vec2(m_terrainSettings.chunkSize - 1) / glm::vec2(m_worldSize);
+				float chunkWorldX = chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1);
+				float chunkWorldZ = chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1);
+
+				mesh->SetPosition(glm::vec3(chunkWorldX - worldHalfSize, 0, chunkWorldZ - worldHalfSize));
+				shader->SetUniformMat4("u_model", mesh->GetModelMatrix());
+				shader->SetUniformVec2("u_uvOffset", uvOffset);
+				shader->SetUniformVec2("u_uvScale", uvScale);
+				mesh->Draw();
+			}
+		}
+		heightMask->second->texture->Unbind();
+	}
+
 	void ChunkManager::Draw()
 	{
 		if (m_terrainDebug->GetEntries().empty())

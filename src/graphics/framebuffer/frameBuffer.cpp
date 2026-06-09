@@ -1,20 +1,21 @@
 ﻿#include <glad/glad.h>
 #include "frameBuffer.h"
 
-pwg::FrameBuffer::FrameBuffer(int width, int height, bool useRBO)
-	: m_width(width), m_height(height), m_useRBO(useRBO)
+pwg::FrameBuffer::FrameBuffer(int width, int height, bool useRBO, TextureType colorType)
+	: m_width(width), m_height(height), m_useRBO(useRBO), m_colorType(colorType)
 {
-	m_fboTexture = std::make_shared<Texture>(m_width, m_height, TextureType::ALBEDO);
+	m_fboTexture = std::make_shared<Texture>(m_width, m_height, m_colorType);
 	InitializeFrameBuffer();
 	PWG_INFO("Framebuffer created ({0}x{1})", width, height);
 }
 
 pwg::FrameBuffer::FrameBuffer(const pwg::FrameBuffer& otherFBO)
 	: m_width(otherFBO.m_width),
-	  m_height(otherFBO.m_height),
-	  m_useRBO(otherFBO.m_useRBO)
+	m_height(otherFBO.m_height),
+	m_useRBO(otherFBO.m_useRBO),
+	m_colorType(otherFBO.m_colorType)
 {
-	m_fboTexture = std::make_shared<Texture>(m_width, m_height, TextureType::ALBEDO);
+	m_fboTexture = std::make_shared<Texture>(m_width, m_height, m_colorType);
 
 	InitializeFrameBuffer();
 }
@@ -31,8 +32,9 @@ pwg::FrameBuffer& pwg::FrameBuffer::operator=(const FrameBuffer& otherFBO)
 	m_width = otherFBO.m_width;
 	m_height = otherFBO.m_height;
 	m_useRBO = otherFBO.m_useRBO;
+	m_colorType = otherFBO.m_colorType;
 
-	m_fboTexture = std::make_shared<Texture>(m_width, m_height, TextureType::ALBEDO);
+	m_fboTexture = std::make_shared<Texture>(m_width, m_height, m_colorType);
 
 	InitializeFrameBuffer();
 
@@ -73,13 +75,17 @@ void pwg::FrameBuffer::CleanUp()
 	{
 		glDeleteRenderbuffers(1, &m_renderBufferObjectID);
 	}
-	GLuint textureID = m_fboTexture->GetTextureID();
-	glDeleteTextures(1, &textureID);
+	if (m_fboTexture)
+	{
+		GLuint textureID = m_fboTexture->GetTextureID();
+		glDeleteTextures(1, &textureID);
+	}
 }
 
 void pwg::FrameBuffer::Bind()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, m_frameBufferObjectID);
+	glViewport(0, 0, m_width, m_height);
 }
 
 void pwg::FrameBuffer::Unbind()
@@ -103,7 +109,7 @@ void pwg::FrameBuffer::Resize(int width, int height)
 
 	CleanUp(); 
 
-	m_fboTexture = std::make_shared<Texture>(m_width, m_height, TextureType::ALBEDO);
+	m_fboTexture = std::make_shared<Texture>(m_width, m_height, m_colorType);
 
 	InitializeFrameBuffer();  
 	PWG_DEBUG("Changed framebuffer size to {0}x{1}", m_width, m_height);

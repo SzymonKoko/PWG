@@ -2,7 +2,7 @@
 #define SRC_GRAPHICS_RENDERER_LIGHTING_UPLOADER_H_
 
 #include "graphics/material/material.h"
-#include "scene/lights/light.h"
+#include "scene/environment/environmentSettings.h"
 
 namespace pwg
 {
@@ -29,7 +29,7 @@ namespace pwg
 		* @param light Reference to the light whose properties will be uploaded.
 		* @param cameraPosition World-space position of the camera for specular calculations.
 		*/
-		void Upload(std::shared_ptr<Material> material, Light& light, glm::vec3 cameraPosition);
+		void Upload(std::shared_ptr<Material> material, const EnvironmentLighting& lighting, glm::vec3 cameraPosition);
 
 	private:
 		// No private members currently

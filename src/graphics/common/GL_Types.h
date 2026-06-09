@@ -50,8 +50,10 @@ namespace pwg
 	enum class TextureType : uint8_t
 	{
 		ALBEDO,
+		SDR_COLOR,
 		NORMAL,
 		NORMAL16F,
+		HDR_COLOR,
 		DATA,
 		HEIGHT,
 		HEIGHT2,

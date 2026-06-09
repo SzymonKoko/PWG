@@ -9,6 +9,7 @@
 #include "scene/cameras/icamera.h"
 #include "resources/resourceManager.h"
 #include "graphics/texture/texture.h"
+#include "graphics/shader/shader.h"
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -37,6 +38,7 @@ namespace pwg
 
 		void Update(std::shared_ptr<ICamera> camera, float dt);
 		void Draw();
+		void DrawShadowMap(std::shared_ptr<Shader> shader, const glm::mat4& lightSpaceMatrix);
 		void Regenerate();
 		void StepSimulation();
 		void StepWaterSimulation();

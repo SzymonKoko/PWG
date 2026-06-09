@@ -16,6 +16,9 @@ uniform sampler2D u_Depositmap;
 uniform sampler2D u_FlowAccumulationmap;
 uniform sampler2D u_RiverChannelmap;
 uniform sampler2D u_SceneColor;
+uniform sampler2D u_shadowMap0;
+uniform sampler2D u_shadowMap1;
+uniform sampler2D u_shadowMap2;
 uniform int u_debugMode;
 uniform bool u_debugEnabled;
 uniform int u_worldSize;
@@ -32,6 +35,16 @@ uniform float u_snowHeight;
 uniform float u_snowSoftness;
 uniform float u_wetnessStrength;
 uniform float u_waterAlpha;
+uniform float u_fogDensity;
+uniform mat4 u_lightSpaceMatrix0;
+uniform mat4 u_lightSpaceMatrix1;
+uniform mat4 u_lightSpaceMatrix2;
+uniform int u_shadowsEnabled;
+uniform float u_shadowStrength;
+uniform float u_shadowBias;
+uniform float u_shadowNormalBias;
+uniform float u_shadowDistance;
+uniform vec3 u_shadowCascadeSplits;
 uniform float u_materialTiling[32];
 uniform float u_materialNormalStrength[32];
 uniform float u_materialRoughnessScale[32];
@@ -40,6 +53,91 @@ uniform float u_materialHeightStrength[32];
 int DataRoughnessIndex(int layer) { return layer; }
 int DataAoIndex(int layer) { return layer + 32; }
 int DataHeightIndex(int layer) { return layer + 64; }
+
+float SampleShadowMap(int cascadeIndex, vec2 uv)
+{
+    if (cascadeIndex == 0)
+    {
+        return texture(u_shadowMap0, uv).r;
+    }
+    if (cascadeIndex == 1)
+    {
+        return texture(u_shadowMap1, uv).r;
+    }
+    return texture(u_shadowMap2, uv).r;
+}
+
+vec2 ShadowMapTexelSize(int cascadeIndex)
+{
+    if (cascadeIndex == 0)
+    {
+        return 1.0 / vec2(textureSize(u_shadowMap0, 0));
+    }
+    if (cascadeIndex == 1)
+    {
+        return 1.0 / vec2(textureSize(u_shadowMap1, 0));
+    }
+    return 1.0 / vec2(textureSize(u_shadowMap2, 0));
+}
+
+mat4 CascadeLightMatrix(int cascadeIndex)
+{
+    if (cascadeIndex == 0)
+    {
+        return u_lightSpaceMatrix0;
+    }
+    if (cascadeIndex == 1)
+    {
+        return u_lightSpaceMatrix1;
+    }
+    return u_lightSpaceMatrix2;
+}
+
+int SelectShadowCascade(float cameraDistance)
+{
+    float normalizedDistance = cameraDistance / max(u_shadowDistance, 1.0);
+    if (normalizedDistance <= u_shadowCascadeSplits.x)
+    {
+        return 0;
+    }
+    if (normalizedDistance <= u_shadowCascadeSplits.y)
+    {
+        return 1;
+    }
+    return 2;
+}
+
+float ComputeShadow(vec3 worldPos, vec3 normal, float cameraDistance)
+{
+    if (u_shadowsEnabled == 0)
+    {
+        return 0.0;
+    }
+
+    int cascadeIndex = SelectShadowCascade(cameraDistance);
+    vec3 L = SafeNormalize(-u_lightDirection, vec3(0.0, 1.0, 0.0));
+    vec4 lightSpacePos = CascadeLightMatrix(cascadeIndex) * vec4(worldPos + normal * u_shadowNormalBias, 1.0);
+    vec3 projCoords = lightSpacePos.xyz / max(lightSpacePos.w, 0.0001);
+    projCoords = projCoords * 0.5 + 0.5;
+
+    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0)
+    {
+        return 0.0;
+    }
+
+    float normalBias = max(u_shadowBias * (1.0 - dot(normal, L)), u_shadowBias * 0.35);
+    vec2 texelSize = ShadowMapTexelSize(cascadeIndex);
+    float shadow = 0.0;
+    for (int x = -1; x <= 1; ++x)
+    {
+        for (int y = -1; y <= 1; ++y)
+        {
+            float closestDepth = SampleShadowMap(cascadeIndex, projCoords.xy + vec2(x, y) * texelSize);
+            shadow += (projCoords.z - normalBias > closestDepth) ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
+}
 
 struct SurfaceSample
 {
@@ -226,6 +324,8 @@ void main()
 
     // ===== LIGHTING
     vec3 litColor = ApplyLighting(N, V, albedo, metallic, roughness, ao, f_Pos);
+    float shadow = ComputeShadow(f_Pos, N, cameraDistance);
+    litColor *= 1.0 - shadow * clamp(u_shadowStrength, 0.0, 1.0);
 
     float visibleWater = smoothstep(0.008, 0.12, waterDepth);
     float riverTrace = max(smoothstep(0.08, 0.45, flowAccumulation), smoothstep(0.12, 0.6, riverChannel)) * smoothstep(0.01, 0.08, waterDepth);
@@ -266,6 +366,8 @@ void main()
         transparentWater += fresnel * 0.28;
 
         float alpha = clamp((0.16 + visibleWater * 0.24 + deepWater * 0.26 + riverTrace * 0.12) * u_waterAlpha, 0.08, 0.82);
+        float fogAmount = 1.0 - exp(-cameraDistance * max(u_fogDensity, 0.0));
+        transparentWater = mix(transparentWater, u_skyTint, clamp(fogAmount, 0.0, 0.85));
         FragColor = vec4(transparentWater, alpha);
         return;
     }
@@ -379,5 +481,7 @@ void main()
         }
     }
 
+    float fogAmount = 1.0 - exp(-cameraDistance * max(u_fogDensity, 0.0));
+    litColor = mix(litColor, u_skyTint, clamp(fogAmount, 0.0, 0.85));
     FragColor = vec4(litColor, 1.0);
 }

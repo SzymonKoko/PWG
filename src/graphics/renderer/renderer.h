@@ -8,7 +8,9 @@
 #include "lightingUploader.h"
 #include "scene/cameras/icamera.h"
 #include "scene/skybox/skybox.h"
+#include "scene/environment/environmentSettings.h"
 #include "terrain/debug/terrainDebug.h"
+#include <array>
 //#include <main.cpp>
 
 namespace pwg
@@ -70,7 +72,8 @@ namespace pwg
 		* @brief Adds a light to the scene for lighting calculations.
 		* @param light Reference to the light to add.
 		*/
-		void AddLight(Light& light);
+		void SetEnvironmentLighting(const EnvironmentLighting& lighting);
+		void SetShadowMaps(const std::array<glm::mat4, 3>& lightSpaceMatrices, const std::array<unsigned int, 3>& shadowTextureIDs, const std::array<float, 3>& cascadeSplits, bool enabled);
 
 		void AddSkyBox(std::shared_ptr<SkyBox> skybox);
 
@@ -96,7 +99,11 @@ namespace pwg
 		glm::mat4 m_projectionMatrix{ 1.0f };					/**< Cached projection matrix from the active camera */
 		glm::vec3 m_cameraPosition{ 0.0f };						/**< World-space position of the camera */
 
-		Light m_light;											/**< Single scene light (extendable for multiple lights) */
+		EnvironmentLighting m_environmentLighting;				/**< Environment lighting used by scene shaders. */
+		std::array<glm::mat4, 3> m_lightSpaceMatrices{ glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f) };
+		std::array<unsigned int, 3> m_shadowTextureIDs{};
+		std::array<float, 3> m_shadowCascadeSplits{ 0.18f, 0.45f, 1.0f };
+		bool m_shadowMapEnabled{ false };
 		std::shared_ptr<SkyBox> m_skybox;
 		DebugSettings m_debugSettings;
 	};

@@ -2,7 +2,7 @@
 #include "imgui.h"
 #include "editorScene.h"
 #include "controls/noiseControls.h"
-#include "controls/lightControls.h"
+#include "controls/environmentControls.h"
 #include "platform/nativeDialogs.h"
 
 #include <algorithm>
@@ -393,12 +393,11 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
       m_resourceManager(resourceManager),
       m_renderer(renderer)
 {
-	m_frameBuffer = std::make_unique<FrameBuffer>(600, 600, true);
+	m_frameBuffer = std::make_unique<FrameBuffer>(600, 600, true, TextureType::SDR_COLOR);
+	m_hdrFrameBuffer = std::make_unique<FrameBuffer>(600, 600, true, TextureType::HDR_COLOR);
+	m_environment = std::make_shared<EnvironmentSystem>();
 
     m_cameraManager = std::make_unique<CameraManager>(m_mouseInput, m_keyboardInput);
-
-    /*== CREATING MESH ==*/
-    m_resourceManager->GetMeshManager()->CreateSphereMesh(128.0f, 36, 72, "SunMesh");
 
     auto shaderManager = m_resourceManager->GetShaderManager();
     auto textureManager = m_resourceManager->GetTextureManager();
@@ -406,19 +405,19 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     /*== SHADER LOADING ==*/
     std::string terrainShadersPath = "../assets/shaders/terrainShaders/";
-    std::string unlitShadersPath = "../assets/shaders/unlit/";
     std::string skyboxShadersPath = "../assets/shaders/skybox/";
+    std::string postprocessShadersPath = "../assets/shaders/postprocess/";
+    std::string shadowShadersPath = "../assets/shaders/shadow/";
 
     shaderManager->Load("terrainShader", terrainShadersPath + "terrain.vert", terrainShadersPath + "terrain.frag");
-    shaderManager->Load("unlitShader", unlitShadersPath + "unlit.vert", unlitShadersPath + "unlit.frag");
     shaderManager->Load("skyboxShader", skyboxShadersPath + "skybox.vert", skyboxShadersPath + "skybox.frag");
+    shaderManager->Load("postprocessShader", postprocessShadersPath + "postprocess.vert", postprocessShadersPath + "postprocess.frag");
+    shaderManager->Load("terrainShadowShader", shadowShadersPath + "terrain_shadow.vert", shadowShadersPath + "terrain_shadow.frag");
 
     auto terrainShader = shaderManager->GetShader<pwg::Shader>("terrainShader");
-    auto unlitShader = shaderManager->GetShader<pwg::Shader>("unlitShader");
     auto skyboxShader = shaderManager->GetShader<pwg::Shader>("skyboxShader");
-
-    /*== MESH LOADING ==*/
-    auto sunMesh = m_resourceManager->GetMeshManager()->GetMesh("SunMesh");
+    auto postprocessShader = shaderManager->GetShader<pwg::Shader>("postprocessShader");
+    m_terrainShadowShader = shaderManager->GetShader<pwg::Shader>("terrainShadowShader");
 
     /*== TEXTURE LOADING ==*/
     std::string terrainTexturesPath = "../assets/textures/";
@@ -428,15 +427,15 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 
     /*== CREATING MATERIALS ==*/
     auto terrainMaterial = materialManager->CreateMaterial("TerrainMaterial", terrainShader);
-    auto unlitMaterial = materialManager->CreateMaterial("UnlitMaterial", unlitShader);
     auto skyboxMaterial = materialManager->CreateMaterial("SkyboxMaterial", skyboxShader);
 
     m_terrainMaterialLibrary = std::make_shared<TerrainMaterialLibrary>(m_resourceManager, terrainMaterial);
     auto skybox = textureManager->GetCubeMapTexture("Skybox");
 
     m_terrain = std::make_shared<Terrain>(m_resourceManager);
-    m_sunObject = std::make_shared<SunObject>(sunMesh, unlitMaterial);
     m_skybox = std::make_shared<SkyBox>(skybox, skyboxMaterial);
+    m_postProcessor = std::make_shared<PostProcessor>(postprocessShader);
+    m_shadowMap = std::make_shared<DirectionalShadowMap>();
 
     m_cameraManager->SetCamera(CameraType::EDITOR);
     m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
@@ -473,7 +472,7 @@ void pwg::EditorScene::Update(const float& dt)
     m_cameraManager->Update(dt);
     auto activeCamera = m_cameraManager->GetActiveCamera();
     m_terrain->Update(dt ,activeCamera);
-    m_sunObject->Update(dt, activeCamera);
+    m_environment->Update(dt);
 
 }
 
@@ -499,6 +498,10 @@ void pwg::EditorScene::Draw()
     {
         m_frameBuffer->Resize(width, height);
     }
+    if (m_hdrFrameBuffer->GetWidth() != width || m_hdrFrameBuffer->GetHeight() != height)
+    {
+        m_hdrFrameBuffer->Resize(width, height);
+    }
 
     if (height > 0)
     {
@@ -507,15 +510,50 @@ void pwg::EditorScene::Draw()
 
     m_renderer.SetDebugSettings(m_terrain->GetTerrainDebug()->GetDebugSettings());
 
-    m_frameBuffer->Bind();
+    auto environmentLighting = m_environment->GetLighting();
+    auto activeCamera = m_cameraManager->GetActiveCamera();
+    bool shadowsEnabled = environmentLighting.shadowsEnabled && environmentLighting.sunIntensity > 0.001f;
+    if (shadowsEnabled)
+    {
+        m_shadowMap->Resize(environmentLighting.shadowResolution);
+        for (int cascade = 0; cascade < DirectionalShadowMap::CascadeCount; ++cascade)
+        {
+            m_shadowMap->BeginCascade(cascade, environmentLighting, activeCamera);
+            m_terrain->DrawShadowMap(m_terrainShadowShader, m_shadowMap->GetLightSpaceMatrix(cascade));
+            m_shadowMap->End(width, height);
+        }
+    }
+
+    std::array<glm::mat4, 3> shadowMatrices{
+        m_shadowMap->GetLightSpaceMatrix(0),
+        m_shadowMap->GetLightSpaceMatrix(1),
+        m_shadowMap->GetLightSpaceMatrix(2)
+    };
+    std::array<unsigned int, 3> shadowTextures{
+        m_shadowMap->GetDepthTextureID(0),
+        m_shadowMap->GetDepthTextureID(1),
+        m_shadowMap->GetDepthTextureID(2)
+    };
+    std::array<float, 3> cascadeSplits{
+        m_shadowMap->GetCascadeSplit(0),
+        m_shadowMap->GetCascadeSplit(1),
+        m_shadowMap->GetCascadeSplit(2)
+    };
+
+    m_hdrFrameBuffer->Bind();
     m_renderer.BeginFrame();
-    m_renderer.SetCamera(m_cameraManager->GetActiveCamera());
-    m_renderer.AddLight(m_sunObject->GetLight());
+    m_renderer.SetCamera(activeCamera);
+    m_renderer.SetEnvironmentLighting(environmentLighting);
+    m_renderer.SetShadowMaps(shadowMatrices, shadowTextures, cascadeSplits, shadowsEnabled);
     m_renderer.AddSkyBox(m_skybox);
     m_renderer.AddToQueue(m_terrain.get());
-    m_renderer.AddToQueue(m_sunObject.get());
     m_renderer.DrawAll();
     m_renderer.EndFrame();
+    m_hdrFrameBuffer->Unbind();
+
+    m_frameBuffer->Bind();
+    glClear(GL_COLOR_BUFFER_BIT);
+    m_postProcessor->Render(m_hdrFrameBuffer->GetTextureID(), m_environment->GetSettings(), width, height);
     m_frameBuffer->Unbind();
 
     ImGui::Image(
@@ -588,15 +626,7 @@ void pwg::EditorScene::NewProject()
 {
     m_terrain->GetChunkManager()->ConfigureTerrain(31, 129);
 
-    Light defaultLight;
-    defaultLight.color = glm::vec3(1.0f);
-    defaultLight.intensivity = 1.0f;
-    m_sunObject->SetLight(defaultLight);
-
-    SunObjectProperties defaultSun;
-    defaultSun.orbitSpeed = 0.05f;
-    defaultSun.orbitRadius = 5000.0f;
-    m_sunObject->SetSunObjectProperties(defaultSun);
+    m_environment->ResetToDefaults();
 
     ResetSkyboxToDefault();
     m_terrain->GetChunkManager()->Regenerate();
@@ -611,9 +641,9 @@ std::shared_ptr<pwg::Terrain> pwg::EditorScene::GetTerrain()
     return m_terrain;
 }
 
-std::shared_ptr<pwg::SunObject> pwg::EditorScene::GetSunObject()
+std::shared_ptr<pwg::EnvironmentSystem> pwg::EditorScene::GetEnvironmentSystem()
 {
-    return m_sunObject;
+    return m_environment;
 }
 
 pwg::CameraManager* pwg::EditorScene::GetCameraManager()
@@ -868,10 +898,10 @@ void pwg::EditorScene::DrawWorldWindow()
             DrawSkyboxControls();
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Sun"))
+        if (ImGui::BeginTabItem("Environment"))
         {
-            controls::LightControls::ShowControl(m_sunObject);
-            if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+            bool changed = controls::EnvironmentControls::ShowControl(m_environment);
+            if (changed || (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && ImGui::IsMouseReleased(ImGuiMouseButton_Left)))
             {
                 m_dirty = true;
             }

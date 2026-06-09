@@ -6,6 +6,8 @@ uniform float u_lightIntensity;
 uniform float u_exposure;
 uniform float u_skyAmbient;
 uniform float u_groundAmbient;
+uniform vec3 u_skyTint;
+uniform vec3 u_groundAlbedo;
 
 const float PI = 3.14159265359;
 
@@ -110,15 +112,12 @@ vec3 ApplyLighting(vec3 N, vec3 V, vec3 albedo, float metallic, float roughness,
     Lo += (kD * albedo / PI + specular) * radiance * NdotL;
 
     float skyAmount = clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 skyColor = vec3(0.58, 0.68, 0.82) * u_skyAmbient;
-    vec3 groundColor = vec3(0.28, 0.24, 0.20) * u_groundAmbient;
+    vec3 skyColor = max(u_skyTint, vec3(0.0)) * u_skyAmbient;
+    vec3 groundColor = max(u_groundAlbedo, vec3(0.0)) * u_groundAmbient;
     vec3 ambientLight = mix(groundColor, skyColor, skyAmount);
     vec3 ambient = ambientLight * albedo * ao;
     
     vec3 color = ambient + Lo;
-
-    color *= max(u_exposure, 0.01);
-    color = color / (color + vec3(1.0));
 
     return color;
 
