@@ -1,0 +1,41 @@
+#engine_include "../FastNoiseLite.glsl"
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (r32f, binding = 0) writeonly uniform image2D u_output;
+
+uniform int u_noiseType;
+uniform int u_fractalType;
+uniform int u_octaves;
+uniform float u_lacunarity;
+uniform float u_gain;
+uniform float u_weightedStrength;
+uniform float u_pingPongStrength;
+uniform float u_frequency;
+uniform float u_scale;
+uniform int u_seed;
+uniform int u_size;
+uniform vec2 u_offset;
+
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    if (texelCoord.x >= u_size || texelCoord.y >= u_size)
+        return;
+
+    vec2 uv = vec2(texelCoord) / vec2(u_size);
+    vec2 worldPos = vec2(uv * u_scale * u_frequency) + u_offset;
+
+    fnl_state noise = fnlCreateState(u_seed);
+    noise.noise_type = u_noiseType;
+    noise.fractal_type = u_fractalType;
+    noise.octaves = max(u_octaves, 1);
+    noise.lacunarity = u_lacunarity;
+    noise.gain = u_gain;
+    noise.weighted_strength = u_weightedStrength;
+    noise.ping_pong_strength = u_pingPongStrength;
+
+    float n = fnlGetNoise2D(noise, worldPos.x, worldPos.y);
+    n = (n + 1.0) * 0.5;
+
+    imageStore(u_output, texelCoord, vec4(n, 0.0, 0.0, 1.0));
+}

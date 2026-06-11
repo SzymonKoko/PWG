@@ -1,0 +1,111 @@
+project:
+  type: PWG
+  version: 1
+terrain:
+  chunkCount: 15
+  chunkSize: 97
+terrainGraphV2:
+  useUniversalGraph: true
+  pan:
+    x: 80
+    y: 70
+  zoom: 0.85
+  nextNodeId: 12
+  nextLinkId: 6
+  nodes:
+    - id: 1
+      typeId: noiseHeight
+      displayName: Base Fractal Height
+      enabled: true
+      position: { x: 0, y: 0 }
+      parameters:
+        - { id: noiseType, int: 0 }
+        - { id: fractalType, int: 1 }
+        - { id: seed, int: 42 }
+        - { id: frequency, float: 1.15, min: 0.01, max: 8 }
+        - { id: scale, float: 180, min: 1, max: 512 }
+        - { id: octaves, int: 5 }
+        - { id: lacunarity, float: 2.05, min: 0.1, max: 5 }
+        - { id: gain, float: 0.48, min: 0, max: 1 }
+    - id: 2
+      typeId: fitRange
+      displayName: Height Amplitude
+      enabled: true
+      position: { x: 310, y: 10 }
+      parameters:
+        - { id: inMin, float: 0, min: -20000, max: 20000 }
+        - { id: inMax, float: 1, min: -20000, max: 20000 }
+        - { id: outMin, float: 0, min: -20000, max: 20000 }
+        - { id: outMax, float: 520, min: -20000, max: 20000 }
+    - id: 3
+      typeId: outputHeight
+      displayName: Output Height
+      enabled: true
+      position: { x: 640, y: 20 }
+    - id: 4
+      typeId: noiseMask
+      displayName: Detail Mask Noise
+      enabled: true
+      position: { x: 0, y: 190 }
+      parameters:
+        - { id: noiseType, int: 3 }
+        - { id: fractalType, int: 1 }
+        - { id: seed, int: 1337 }
+        - { id: frequency, float: 2.2, min: 0.01, max: 8 }
+        - { id: scale, float: 96, min: 1, max: 512 }
+    - id: 5
+      typeId: heightBandMask
+      displayName: High Ground Mask
+      enabled: true
+      position: { x: 310, y: 220 }
+      parameters:
+        - { id: min, float: 180, min: -20000, max: 20000 }
+        - { id: max, float: 520, min: -20000, max: 20000 }
+    - id: 6
+      typeId: blurMask
+      displayName: Softened Mask
+      enabled: true
+      position: { x: 640, y: 220 }
+      parameters:
+        - { id: radius, int: 3, min: 1, max: 8 }
+    - id: 7
+      typeId: outputMask
+      displayName: Output HighGroundMask
+      enabled: true
+      position: { x: 960, y: 220 }
+      parameters:
+        - { id: target, string: HighGroundMask }
+    - id: 8
+      typeId: hydraulicSimulation
+      displayName: Hydraulic Simulation
+      enabled: true
+      position: { x: 0, y: 430 }
+    - id: 9
+      typeId: streamErosion
+      displayName: Stream Erosion
+      enabled: true
+      position: { x: 330, y: 430 }
+    - id: 10
+      typeId: particleErosion
+      displayName: Particle Erosion
+      enabled: true
+      position: { x: 660, y: 430 }
+    - id: 11
+      typeId: lakeCleanup
+      displayName: Lake Cleanup
+      enabled: true
+      position: { x: 990, y: 430 }
+  links:
+    - { id: 1, fromNodeId: 1, fromPortId: height, toNodeId: 2, toPortId: value }
+    - { id: 2, fromNodeId: 2, fromPortId: result, toNodeId: 3, toPortId: height }
+    - { id: 3, fromNodeId: 2, fromPortId: result, toNodeId: 5, toPortId: height }
+    - { id: 4, fromNodeId: 5, fromPortId: mask, toNodeId: 6, toPortId: mask }
+    - { id: 5, fromNodeId: 6, fromPortId: mask, toNodeId: 7, toPortId: mask }
+editorUi:
+  showMainView: true
+  showTerrainControls: false
+  showTerrainGraph: true
+  showWorld: true
+  showOutliner: true
+  showDebugWindow: true
+  showMaterialLibrary: true

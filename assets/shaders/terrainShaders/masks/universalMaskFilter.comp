@@ -1,0 +1,75 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (r32f, binding = 0) writeonly uniform image2D u_output;
+
+uniform sampler2D u_value;
+uniform int u_size;
+uniform int u_operation; // 0 slope, 1 curvature, 2 blur
+uniform int u_radius;
+uniform int u_mode; // curvature: 0 both, 1 ridges, 2 valleys
+uniform float u_scale;
+uniform float u_min;
+uniform float u_max;
+uniform float u_bias;
+
+float ReadValue(ivec2 coord)
+{
+    ivec2 p = clamp(coord, ivec2(0), ivec2(u_size - 1));
+    return texelFetch(u_value, p, 0).r;
+}
+
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    if (texelCoord.x >= u_size || texelCoord.y >= u_size)
+        return;
+
+    float result = ReadValue(texelCoord);
+
+    if (u_operation == 0)
+    {
+        float hL = ReadValue(texelCoord + ivec2(-1, 0));
+        float hR = ReadValue(texelCoord + ivec2(1, 0));
+        float hD = ReadValue(texelCoord + ivec2(0, -1));
+        float hU = ReadValue(texelCoord + ivec2(0, 1));
+        float slope = length(vec2(hR - hL, hU - hD)) * max(u_scale, 0.0001);
+        result = smoothstep(u_min, u_max, clamp(slope, 0.0, 1.0));
+    }
+    else if (u_operation == 1)
+    {
+        float hC = ReadValue(texelCoord);
+        float hL = ReadValue(texelCoord + ivec2(-1, 0));
+        float hR = ReadValue(texelCoord + ivec2(1, 0));
+        float hD = ReadValue(texelCoord + ivec2(0, -1));
+        float hU = ReadValue(texelCoord + ivec2(0, 1));
+        float laplacian = (hL + hR + hD + hU - hC * 4.0) * max(u_scale, 0.0001);
+
+        if (u_mode == 1)
+            result = clamp(max(-laplacian, 0.0) + u_bias, 0.0, 1.0);
+        else if (u_mode == 2)
+            result = clamp(max(laplacian, 0.0) + u_bias, 0.0, 1.0);
+        else
+            result = clamp(abs(laplacian) + u_bias, 0.0, 1.0);
+    }
+    else if (u_operation == 2)
+    {
+        int radius = clamp(u_radius, 1, 8);
+        float sum = 0.0;
+        float weight = 0.0;
+        for (int y = -8; y <= 8; ++y)
+        {
+            for (int x = -8; x <= 8; ++x)
+            {
+                if (abs(x) <= radius && abs(y) <= radius)
+                {
+                    sum += ReadValue(texelCoord + ivec2(x, y));
+                    weight += 1.0;
+                }
+            }
+        }
+        result = sum / max(weight, 1.0);
+    }
+
+    imageStore(u_output, texelCoord, vec4(result, 0.0, 0.0, 1.0));
+}

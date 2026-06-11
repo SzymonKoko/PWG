@@ -132,7 +132,7 @@ namespace pwg
 		float m_aspectRatio = 16.0f / 9.0f;						/**< Aspect ratio of the viewport. */
 		bool m_showMainView{ true };
 		bool m_showOutliner{ true };
-		bool m_showTerrainControls{ true };
+		bool m_showTerrainControls{ false };
 		bool m_showWorld{ true };
 		bool m_showDebugWindow{ true };
 		bool m_showMaterialLibrary{ true };

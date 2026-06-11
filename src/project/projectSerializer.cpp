@@ -5,6 +5,7 @@
 #include "terrain/materials/terrainMaterialLibrary.h"
 #include "terrain/graph/passes/terrainPass.h"
 #include "terrain/graph/terrainPassContext.h"
+#include "terrain/graph/universalTerrainGraph.h"
 #include "terrain/chunk/chunkManager.h"
 #include "yaml-cpp/yaml.h"
 
@@ -13,6 +14,7 @@
 #include <filesystem>
 #include <cstdint>
 #include <cmath>
+#include <algorithm>
 
 namespace pwg
 {
@@ -484,6 +486,157 @@ namespace pwg
 			}
 		}
 
+		YAML::Node WriteGraphParameter(const TerrainGraphParameter& param)
+		{
+			YAML::Node node;
+			node["id"] = param.id;
+			node["type"] = static_cast<int>(param.type);
+			node["float"] = param.floatValue;
+			node["min"] = param.minValue;
+			node["max"] = param.maxValue;
+			node["int"] = param.intValue;
+			node["bool"] = param.boolValue;
+			node["string"] = param.stringValue;
+			return node;
+		}
+
+		void ReadGraphParameter(const YAML::Node& node, TerrainGraphParameter& param)
+		{
+			if (!node)
+			{
+				return;
+			}
+			if (node["float"]) param.floatValue = node["float"].as<float>();
+			if (node["min"]) param.minValue = node["min"].as<float>();
+			if (node["max"]) param.maxValue = node["max"].as<float>();
+			if (node["int"]) param.intValue = node["int"].as<int>();
+			if (node["bool"]) param.boolValue = node["bool"].as<bool>();
+			if (node["string"]) param.stringValue = node["string"].as<std::string>();
+		}
+
+		YAML::Node WriteUniversalTerrainGraph(const TerrainGraphAsset& asset)
+		{
+			YAML::Node node;
+			node["useUniversalGraph"] = asset.useUniversalGraph;
+			node["pan"] = Vec2Node(asset.pan);
+			node["zoom"] = asset.zoom;
+			node["nextNodeId"] = asset.nextNodeId;
+			node["nextLinkId"] = asset.nextLinkId;
+			for (const auto& graphNode : asset.nodes)
+			{
+				YAML::Node nodeData;
+				nodeData["id"] = graphNode.id;
+				nodeData["typeId"] = graphNode.typeId;
+				nodeData["displayName"] = graphNode.displayName;
+				nodeData["enabled"] = graphNode.enabled;
+				nodeData["position"] = Vec2Node(graphNode.position);
+				for (const auto& param : graphNode.parameters)
+				{
+					nodeData["parameters"].push_back(WriteGraphParameter(param));
+				}
+				node["nodes"].push_back(nodeData);
+			}
+			for (const auto& link : asset.links)
+			{
+				YAML::Node linkData;
+				linkData["id"] = link.id;
+				linkData["fromNodeId"] = link.fromNodeId;
+				linkData["fromPortId"] = link.fromPortId;
+				linkData["toNodeId"] = link.toNodeId;
+				linkData["toPortId"] = link.toPortId;
+				node["links"].push_back(linkData);
+			}
+			return node;
+		}
+
+		void ReadUniversalTerrainGraph(const YAML::Node& node, TerrainGraphAsset& asset)
+		{
+			if (!node)
+			{
+				return;
+			}
+
+			asset.Clear();
+			asset.useUniversalGraph = node["useUniversalGraph"] ? node["useUniversalGraph"].as<bool>() : false;
+			asset.pan = ReadVec2(node["pan"], asset.pan);
+			if (node["zoom"]) asset.zoom = std::clamp(node["zoom"].as<float>(), 0.30f, 2.75f);
+			if (node["nextNodeId"]) asset.nextNodeId = node["nextNodeId"].as<int>();
+			if (node["nextLinkId"]) asset.nextLinkId = node["nextLinkId"].as<int>();
+
+			auto nodes = node["nodes"];
+			if (nodes && nodes.IsSequence())
+			{
+				for (const auto& nodeData : nodes)
+				{
+					if (!nodeData["id"] || !nodeData["typeId"])
+					{
+						continue;
+					}
+					const auto* type = FindTerrainGraphNodeType(nodeData["typeId"].as<std::string>());
+					if (!type)
+					{
+						continue;
+					}
+					TerrainGraphNodeInstance graphNode;
+					graphNode.id = nodeData["id"].as<int>();
+					graphNode.typeId = type->typeId;
+					graphNode.displayName = nodeData["displayName"] ? nodeData["displayName"].as<std::string>() : type->displayName;
+					graphNode.enabled = nodeData["enabled"] ? nodeData["enabled"].as<bool>() : true;
+					graphNode.position = ReadVec2(nodeData["position"], graphNode.position);
+					graphNode.parameters = type->parameters;
+					auto params = nodeData["parameters"];
+					if (params && params.IsSequence())
+					{
+						for (const auto& paramNode : params)
+						{
+							if (!paramNode["id"])
+							{
+								continue;
+							}
+							std::string id = paramNode["id"].as<std::string>();
+							auto paramIt = std::find_if(graphNode.parameters.begin(), graphNode.parameters.end(), [&](const TerrainGraphParameter& param)
+							{
+								return param.id == id;
+							});
+							if (paramIt != graphNode.parameters.end())
+							{
+								ReadGraphParameter(paramNode, *paramIt);
+							}
+						}
+					}
+					asset.nodes.push_back(std::move(graphNode));
+				}
+			}
+
+			auto links = node["links"];
+			if (links && links.IsSequence())
+			{
+				for (const auto& linkData : links)
+				{
+					if (!linkData["fromNodeId"] || !linkData["fromPortId"] || !linkData["toNodeId"] || !linkData["toPortId"])
+					{
+						continue;
+					}
+					TerrainGraphLink link;
+					link.id = linkData["id"] ? linkData["id"].as<int>() : asset.nextLinkId++;
+					link.fromNodeId = linkData["fromNodeId"].as<int>();
+					link.fromPortId = linkData["fromPortId"].as<std::string>();
+					link.toNodeId = linkData["toNodeId"].as<int>();
+					link.toPortId = linkData["toPortId"].as<std::string>();
+					asset.links.push_back(std::move(link));
+				}
+			}
+
+			for (const auto& graphNode : asset.nodes)
+			{
+				asset.nextNodeId = std::max(asset.nextNodeId, graphNode.id + 1);
+			}
+			for (const auto& link : asset.links)
+			{
+				asset.nextLinkId = std::max(asset.nextLinkId, link.id + 1);
+			}
+		}
+
 		YAML::Node WriteHydraulicSettings(const HydraulicSimulationSettings& settings)
 		{
 			YAML::Node node;
@@ -813,6 +966,7 @@ namespace pwg
 			passes[pass->GetName()] = passNode;
 		}
 		root["terrainGraph"] = passes;
+		root["terrainGraphV2"] = WriteUniversalTerrainGraph(pipeline->GetUniversalGraphAsset());
 
 		root["camera"]["activeType"] = static_cast<int>(scene.GetCameraManager()->GetActiveCameraType());
 		root["camera"]["position"] = Vec3Node(scene.GetCameraManager()->GetCameraPosition());
@@ -875,6 +1029,7 @@ namespace pwg
 				}
 			}
 		}
+		ReadUniversalTerrainGraph(root["terrainGraphV2"], pipeline->GetUniversalGraphAsset());
 
 		auto cameraNode = root["camera"];
 		if (cameraNode)

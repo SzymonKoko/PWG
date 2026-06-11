@@ -5,6 +5,7 @@
 #include "graphics/shader/computeShader.h"
 #include "graphics/shader/shaderManager.h"
 #include "terrain/graph/terrainGraph.h"
+#include "terrain/graph/universalTerrainGraph.h"
 #include "terrain/graph/passes/elevationPass.h"
 #include "terrain/graph/passes/finalMaskPass.h"
 #include "terrain/graph/passes/mountainMaskPass.h"
@@ -40,6 +41,8 @@ namespace pwg
 		void GenerateWorld(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void ResetWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void ResetErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		bool ExecuteUniversalGraph(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void ApplyUniversalGraphSimulationSettings();
 
 		TerrainPassContext& GetPassContext();
 
@@ -48,6 +51,9 @@ namespace pwg
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> CreateMasks();
 		void ClearTextures();
 		std::shared_ptr<TerrainGraph> GetGraph();
+		TerrainGraphAsset& GetUniversalGraphAsset();
+		const TerrainGraphAsset& GetUniversalGraphAsset() const;
+		void ResetUniversalGraphToDefault();
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& GetMasks();
 		HydraulicSimulationSettings& GetHydraulicSettings();
 		int GetSize();
@@ -59,6 +65,7 @@ namespace pwg
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> m_terrainMasks;
 		std::unordered_map<std::string, std::shared_ptr<Texture>> m_finalTerrainMasks;
 		std::shared_ptr<TerrainGraph> m_graph;
+		TerrainGraphAsset m_universalGraphAsset;
 		std::shared_ptr<ShaderManager> m_shaderManager;
 		std::shared_ptr<TerrainDebug> m_terrainDebug;
 

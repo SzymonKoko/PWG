@@ -619,7 +619,7 @@ void pwg::EditorScene::Draw()
     {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.08f, 0.09f, 0.10f, 0.72f));
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.06f, 0.07f, 0.08f, 0.26f));
-    ImGui::Begin("Terrain Graph", &m_showTerrainGraph, ImGuiWindowFlags_NoMove);
+    ImGui::Begin("Terrain Graph", &m_showTerrainGraph);
     bool terrainGraphInputCaptured = false;
     bool terrainGraphViewChanged = false;
     if (controls::TerrainGraphEditor::Show(m_terrain->GetChunkManager(), m_terrainGraphViewState, &terrainGraphInputCaptured, &terrainGraphViewChanged))
@@ -657,6 +657,11 @@ void pwg::EditorScene::Draw()
 void pwg::EditorScene::NewProject()
 {
     m_terrain->GetChunkManager()->ConfigureTerrain(31, 129);
+    if (auto terrainPipeline = m_terrain->GetChunkManager()->GetTerrainComputePipeline())
+    {
+        terrainPipeline->ResetUniversalGraphToDefault();
+    }
+    m_terrainGraphViewState = controls::TerrainGraphViewState{};
 
     m_environment->ResetToDefaults();
 
@@ -905,7 +910,7 @@ void pwg::EditorScene::ResetEditorWindows()
 {
     m_showMainView = true;
     m_showOutliner = true;
-    m_showTerrainControls = true;
+    m_showTerrainControls = false;
     m_showWorld = true;
     m_showDebugWindow = true;
     m_showMaterialLibrary = true;
@@ -925,7 +930,6 @@ void pwg::EditorScene::DrawOutliner()
         ImGui::Checkbox("Main View", &m_showMainView);
         if (ImGui::TreeNodeEx("Terrain", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Checkbox("Terrain Controls", &m_showTerrainControls);
             ImGui::Checkbox("Terrain Graph", &m_showTerrainGraph);
             ImGui::Checkbox("Debug", &m_showDebugWindow);
             ImGui::TreePop();

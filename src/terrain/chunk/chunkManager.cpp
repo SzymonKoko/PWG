@@ -86,6 +86,7 @@ namespace pwg
 			Regenerate();
 		}
 
+		m_terrainComputePipeline->ApplyUniversalGraphSimulationSettings();
 		auto& hydraulicSettings = m_terrainComputePipeline->GetHydraulicSettings();
 		if (hydraulicSettings.autoWaterSimulation)
 		{
@@ -533,6 +534,7 @@ namespace pwg
 
 	void ChunkManager::StartParticleBake()
 	{
+		m_terrainComputePipeline->ApplyUniversalGraphSimulationSettings();
 		auto& settings = m_terrainComputePipeline->GetHydraulicSettings();
 		m_particleBakeTotal = std::max(settings.bakeParticleSteps, 1);
 		m_particleBakeStep = 0;
@@ -587,8 +589,12 @@ namespace pwg
 		// pipeline rebuild so changing the map size does not reset the user's terrain settings.
 		struct SavedParam { ParameterType type; double value; };
 		std::unordered_map<std::string, std::unordered_map<std::string, SavedParam>> savedParams;
+		TerrainGraphAsset savedUniversalGraph;
+		bool hasSavedUniversalGraph = false;
 		if (m_terrainComputePipeline)
 		{
+			savedUniversalGraph = m_terrainComputePipeline->GetUniversalGraphAsset();
+			hasSavedUniversalGraph = true;
 			for (const auto& pass : m_terrainComputePipeline->GetGraph()->GetPasses())
 			{
 				for (const auto& p : pass->GetParameters())
@@ -606,6 +612,10 @@ namespace pwg
 		m_terrainSettings.chunkSize = chunkSize;
 		m_worldSize = m_terrainSettings.chunkSize * m_chunkCount;
 		m_terrainComputePipeline = std::make_shared<TerrainComputePipeline>(m_worldSize, m_resourceManager->GetShaderManager(), m_terrainDebug);
+		if (hasSavedUniversalGraph)
+		{
+			m_terrainComputePipeline->GetUniversalGraphAsset() = savedUniversalGraph;
+		}
 		m_lodManager = std::make_unique<LODManager>(m_terrainSettings.chunkSize);
 		m_lodManager->GenerateLODMeshes();
 		m_globalMasks = m_terrainComputePipeline->CreateMasks();
@@ -787,6 +797,19 @@ namespace pwg
 		m_terrainComputePipeline->GenerateWorld(m_globalMasks);
 		UpdateHeightCache();
 		m_needRegenerate = false;
+	}
+
+	bool ChunkManager::RunUniversalGraph()
+	{
+		m_particleBakeActive = false;
+		bool executed = m_terrainComputePipeline->ExecuteUniversalGraph(m_globalMasks);
+		if (executed)
+		{
+			m_globalMasks["BaseHeight"]->texture->CopyFrom(*m_globalMasks["FinalHeight"]->texture);
+			UpdateHeightCache();
+			m_needRegenerate = false;
+		}
+		return executed;
 	}
 
 	void ChunkManager::BakeErosionAfterWorldGen()
