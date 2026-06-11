@@ -53,6 +53,7 @@ namespace pwg
 		void ConfigureTerrain(int chunkCount, int chunkSize);
 
 		void GenerateWorld();
+		bool RunUniversalGraph();
 		void BakeErosionAfterWorldGen();
 
 		SimulationStateSnapshot CaptureSimulationState();

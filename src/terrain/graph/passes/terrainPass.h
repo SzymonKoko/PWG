@@ -1,7 +1,10 @@
 #ifndef SRC_TERRAIN_GRAPH_TERRAIN_PASS_H_
 #define SRC_TERRAIN_GRAPH_TERRAIN_PASS_H_
 
+#include <memory>
 #include <string>
+#include <unordered_map>
+#include <vector>
 #include "graphics/shader/computeShader.h"
 #include "graphics/texture/texture.h"
 #include "terrain/masks/mask.h"
@@ -47,6 +50,16 @@ namespace pwg
 		virtual std::vector<UIParameters> GetParameters() = 0;
 		virtual TerrainPassTypes GetPassType() = 0;
 		virtual std::string GetName() = 0;
+		virtual const std::vector<std::string>& GetInputMasks() const
+		{
+			static const std::vector<std::string> empty;
+			return empty;
+		}
+		virtual const std::vector<std::string>& GetOutputMasks() const
+		{
+			static const std::vector<std::string> empty;
+			return empty;
+		}
 	};
 }
 

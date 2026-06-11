@@ -24,6 +24,8 @@ namespace pwg
 	ParticleErosionPass::ParticleErosionPass(int terrainSize)
 		: m_terrainSize(terrainSize)
 	{
+		m_inputTextures = { "FinalHeight", "BaseHeight" };
+		m_outputTextures = { "FinalHeight", "ErodedHeight", "DepositMask", "WaterMask", "SedimentMask", "FlowAccumulationMask", "RiverChannelMask", "ErosionDelta" };
 	}
 
 	void ParticleErosionPass::SetHydraulicSettings(HydraulicSimulationSettings* settings)

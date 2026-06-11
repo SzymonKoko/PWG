@@ -1,0 +1,16 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (r32f, binding = 0) writeonly uniform image2D u_output;
+
+uniform int u_size;
+uniform float u_value;
+
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    if (texelCoord.x >= u_size || texelCoord.y >= u_size)
+        return;
+
+    imageStore(u_output, texelCoord, vec4(u_value, 0.0, 0.0, 1.0));
+}

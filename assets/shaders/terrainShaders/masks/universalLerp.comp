@@ -1,0 +1,23 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (r32f, binding = 0) writeonly uniform image2D u_output;
+
+uniform sampler2D u_a;
+uniform sampler2D u_b;
+uniform sampler2D u_t;
+uniform int u_size;
+uniform float u_defaultT;
+uniform int u_useTextureT;
+
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    if (texelCoord.x >= u_size || texelCoord.y >= u_size)
+        return;
+
+    float a = texelFetch(u_a, texelCoord, 0).r;
+    float b = texelFetch(u_b, texelCoord, 0).r;
+    float t = u_useTextureT != 0 ? texelFetch(u_t, texelCoord, 0).r : u_defaultT;
+    imageStore(u_output, texelCoord, vec4(mix(a, b, clamp(t, 0.0, 1.0)), 0.0, 0.0, 1.0));
+}

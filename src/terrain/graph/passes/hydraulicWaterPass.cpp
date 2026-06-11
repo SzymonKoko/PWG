@@ -6,6 +6,9 @@ namespace pwg
 		: m_computeShader(computeShader),
 		  m_terrainSize(terrainSize)
 	{
+		m_inputTextures = { "FinalHeight", "WaterMask", "WaterFlux", "WaterFluxDiagonal", "FlowAccumulationMask", "RiverChannelMask" };
+		m_outputTextures = { "WaterMask", "FlowAccumulationMask", "RiverChannelMask" };
+
 		m_tempWater = std::make_shared<TerrainMask>("WaterTemp", std::make_shared<Texture>(m_terrainSize, m_terrainSize, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		m_tempFlowAccumulation = std::make_shared<TerrainMask>("FlowAccumulationTemp", std::make_shared<Texture>(m_terrainSize, m_terrainSize, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		m_tempRiverChannels = std::make_shared<TerrainMask>("RiverChannelTemp", std::make_shared<Texture>(m_terrainSize, m_terrainSize, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);

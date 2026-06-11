@@ -1,0 +1,32 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (r32f, binding = 0) writeonly uniform image2D u_output;
+
+uniform sampler2D u_a;
+uniform sampler2D u_b;
+uniform int u_size;
+uniform int u_operation; // 0 add, 1 subtract, 2 multiply, 3 divide, 4 min, 5 max
+
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    if (texelCoord.x >= u_size || texelCoord.y >= u_size)
+        return;
+
+    float a = texelFetch(u_a, texelCoord, 0).r;
+    float b = texelFetch(u_b, texelCoord, 0).r;
+    float result = a + b;
+    if (u_operation == 1)
+        result = a - b;
+    else if (u_operation == 2)
+        result = a * b;
+    else if (u_operation == 3)
+        result = a / (abs(b) < 0.0001 ? 0.0001 : b);
+    else if (u_operation == 4)
+        result = min(a, b);
+    else if (u_operation == 5)
+        result = max(a, b);
+
+    imageStore(u_output, texelCoord, vec4(result, 0.0, 0.0, 1.0));
+}

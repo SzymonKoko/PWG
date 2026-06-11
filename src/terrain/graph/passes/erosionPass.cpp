@@ -7,7 +7,7 @@ namespace pwg
 		  m_terrainSize(terrainSize)
 	{
 		m_inputTextures = { "FinalHeight", "BaseHeight", "WaterMask", "SedimentMask", "DepositMask", "WaterFlux", "WaterFluxDiagonal", "RiverChannelMask", "FlowAccumulationMask" };
-		m_outputTextures = { "ErodedHeight", "SedimentMask", "DepositMask", "ErosionDelta" };
+		m_outputTextures = { "FinalHeight", "ErodedHeight", "SedimentMask", "DepositMask", "ErosionDelta" };
 
 		m_tempHeight = std::make_shared<TerrainMask>("HeightTemp", std::make_shared<Texture>(m_terrainSize, m_terrainSize, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		m_tempSediment = std::make_shared<TerrainMask>("SedimentTemp", std::make_shared<Texture>(m_terrainSize, m_terrainSize, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);

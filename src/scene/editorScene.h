@@ -15,6 +15,7 @@
 #include "cameras/cameraManager.h"
 #include "terrain/gpu/terrainComputePipeline.h"
 #include "terrain/materials/terrainMaterialLibrary.h"
+#include "scene/controls/terrainGraphEditor.h"
 
 #include <array>
 #include <memory>
@@ -79,12 +80,16 @@ namespace pwg
 		bool ImportSkyboxImage(const std::string& imagePath);
 		const std::string& GetProjectLayoutIni() const;
 		void SetProjectLayoutIni(const std::string& layoutIni);
+		controls::TerrainGraphViewState& GetTerrainGraphViewState();
+		const controls::TerrainGraphViewState& GetTerrainGraphViewState() const;
+		void SetTerrainGraphViewState(const controls::TerrainGraphViewState& viewState);
 		void ResetEditorWindows();
 		bool ConsumeDirtyFlag();
 		bool& ShowMainView();
 		bool& ShowTerrainControls();
 		bool& ShowDebugWindow();
 		bool& ShowMaterialLibrary();
+		bool& ShowTerrainGraph();
 		bool& ShowWorld();
 		bool& ShowOutliner();
 
@@ -121,15 +126,18 @@ namespace pwg
 		SkyboxDefinition m_skyboxDefinition;
 		std::string m_skyboxStatus{ "Ready" };
 		std::string m_projectLayoutIni;
+		controls::TerrainGraphViewState m_terrainGraphViewState;
 
 
 		float m_aspectRatio = 16.0f / 9.0f;						/**< Aspect ratio of the viewport. */
 		bool m_showMainView{ true };
 		bool m_showOutliner{ true };
-		bool m_showTerrainControls{ true };
+		bool m_showTerrainControls{ false };
 		bool m_showWorld{ true };
 		bool m_showDebugWindow{ true };
 		bool m_showMaterialLibrary{ true };
+		bool m_showTerrainGraph{ true };
+		bool m_terrainGraphInputCaptured{ false };
 		bool m_dirty{ false };
 	};
 } // namespace pwg
