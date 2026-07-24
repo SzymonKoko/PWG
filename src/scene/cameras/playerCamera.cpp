@@ -29,6 +29,11 @@ void pwg::PlayerCamera::SetCameraPosition(float x, float y, float z)
 	UpdateMatrices();
 }
 
+void pwg::PlayerCamera::SetAspectRatio(float aspectRatio)
+{
+	m_cameraProperties.aspectRatio = glm::max(aspectRatio, 0.01f);
+	UpdateMatrices();
+}
 glm::mat4& pwg::PlayerCamera::GetViewMatrix()
 {
 	return m_cameraProperties.viewMatrix;

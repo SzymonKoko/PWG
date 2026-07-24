@@ -8,7 +8,10 @@ namespace pwg::platform
 	std::string OpenProjectDialog();
 	std::string SaveProjectDialog();
 	std::string OpenImageDialog();
+	std::string OpenObjDialog();
 	std::string PickFolderDialog(const char* title);
 }
 
 #endif // !SRC_PLATFORM_NATIVE_DIALOGS_H_
+
+

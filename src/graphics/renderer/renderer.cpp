@@ -1,4 +1,4 @@
-﻿#include <glad/glad.h>
+#include <glad/glad.h>
 #include "renderer.h"
 #include "core/logger/logger.h"
 #include "graphics/renderer/irenderable.h"
@@ -35,7 +35,20 @@ void pwg::Renderer::Draw(IRenderable* renderable)
 {
 	renderable->Draw(*this);
 }
+void pwg::Renderer::DrawMesh(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, const glm::mat4& model)
+{
+	if (!mesh || !material)
+	{
+		return;
+	}
 
+	m_lightingUploader->Upload(material, m_environmentLighting, m_cameraPosition);
+	material->SetUniformMat4("u_model", model);
+	material->SetUniformMat4("u_view", m_viewMatrix);
+	material->SetUniformMat4("u_projection", m_projectionMatrix);
+	material->Apply();
+	mesh->Draw();
+}
 void pwg::Renderer::DrawAll()
 {
 	if (m_debugSettings.wireframe)
@@ -158,5 +171,6 @@ void pwg::Renderer::SetDebugSettings(DebugSettings& settings)
 	
 	m_debugSettings = settings;
 }
+
 
 
