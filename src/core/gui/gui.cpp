@@ -1,4 +1,4 @@
-﻿#include <glad/glad.h>              
+#include <glad/glad.h>              
 #include "core/window/window.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -253,6 +253,7 @@ void pwg::Gui::DrawMainMenuBar()
 		ImGui::MenuItem("Terrain Graph", nullptr, &editor->ShowTerrainGraph());
 		ImGui::MenuItem("Material Library", nullptr, &editor->ShowMaterialLibrary());
 		ImGui::MenuItem("World", nullptr, &editor->ShowWorld());
+		ImGui::MenuItem("Objects", nullptr, &editor->ShowObjects());
 		ImGui::MenuItem("Debug", nullptr, &editor->ShowDebugWindow());
 		ImGui::EndMenu();
 	}
@@ -956,3 +957,4 @@ std::string pwg::Gui::SaveProjectDialog()
 {
 	return platform::SaveProjectDialog();
 }
+

@@ -30,6 +30,11 @@ namespace pwg
 		UpdateMatrices();
 	}
 
+		void FlyoverCamera::SetAspectRatio(float aspectRatio)
+	{
+		m_cameraProperties.aspectRatio = glm::max(aspectRatio, 0.01f);
+		UpdateMatrices();
+	}
 	glm::mat4& FlyoverCamera::GetViewMatrix()
 	{
 		return m_cameraProperties.viewMatrix;

@@ -16,6 +16,7 @@
 #include "terrain/gpu/terrainComputePipeline.h"
 #include "terrain/materials/terrainMaterialLibrary.h"
 #include "scene/controls/terrainGraphEditor.h"
+#include "world/worldObjectManager.h"
 
 #include <array>
 #include <memory>
@@ -31,6 +32,17 @@ namespace pwg
 		std::array<int, 6> rotations{};
 		std::array<bool, 6> flipHorizontal{};
 		std::array<bool, 6> flipVertical{};
+	};
+
+	struct ViewportPlacementInput
+	{
+		ImVec2 viewportMin{ 0.0f, 0.0f };
+		ImVec2 viewportSize{ 0.0f, 0.0f };
+		ImVec2 mousePos{ 0.0f, 0.0f };
+		bool mouseInViewport{ false };
+		bool leftClicked{ false };
+		bool rightClicked{ false };
+		bool escapePressed{ false };
 	};
 
 	/**
@@ -92,6 +104,8 @@ namespace pwg
 		bool& ShowTerrainGraph();
 		bool& ShowWorld();
 		bool& ShowOutliner();
+		bool& ShowObjects();
+		std::shared_ptr<WorldObjectManager> GetWorldObjectManager();
 
 	private:
 
@@ -101,6 +115,10 @@ namespace pwg
 		void HandleKeyboardInputs();
 		void DrawOutliner();
 		void DrawWorldWindow();
+		void DrawObjectsWindow();
+		ViewportPlacementInput GetViewportPlacementInput(const ImVec2& viewportMin, const ImVec2& viewportSize) const;
+		void BeginObjectPlacement(int assetId);
+		void UpdateObjectPlacement(const ViewportPlacementInput& input, std::shared_ptr<ICamera> camera);
 		void DrawSkyboxControls();
 		bool LoadSkyboxFolder(const std::string& folder);
 		void ResetSkyboxToDefault();
@@ -123,6 +141,7 @@ namespace pwg
 		std::shared_ptr<Shader> m_terrainShadowShader;			/**< Depth-only terrain shader for shadow pass. */
 		std::shared_ptr<SkyBox> m_skybox;
 		std::shared_ptr<TerrainMaterialLibrary> m_terrainMaterialLibrary;
+		std::shared_ptr<WorldObjectManager> m_worldObjectManager;
 		SkyboxDefinition m_skyboxDefinition;
 		std::string m_skyboxStatus{ "Ready" };
 		std::string m_projectLayoutIni;
@@ -134,12 +153,21 @@ namespace pwg
 		bool m_showOutliner{ true };
 		bool m_showTerrainControls{ false };
 		bool m_showWorld{ true };
+		bool m_showObjects{ true };
 		bool m_showDebugWindow{ true };
 		bool m_showMaterialLibrary{ true };
 		bool m_showTerrainGraph{ true };
 		bool m_terrainGraphInputCaptured{ false };
 		bool m_dirty{ false };
+		bool m_viewportInputCaptured{ false };
+		bool m_objectPlacementActive{ false };
+		int m_placementAssetId{ 0 };
+		Transform m_placementPreviewTransform{};
+		bool m_placementPreviewValid{ false };
+		bool m_placementMouseArmed{ false };
 	};
 } // namespace pwg
 
 #endif // !SRC_SCENE_EDITOR_SCENE_H_
+
+

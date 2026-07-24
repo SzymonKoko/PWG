@@ -8,10 +8,14 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <cmath>
 #include <filesystem>
 #include <map>
+#include <limits>
 #include <numbers>
 #include <vector>
+#include <glm/gtc/matrix_transform.hpp>
 #include <stb/stb_image.h>
 #include <stb/stb_image_write.h>
 
@@ -409,16 +413,19 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     std::string skyboxShadersPath = "../assets/shaders/skybox/";
     std::string postprocessShadersPath = "../assets/shaders/postprocess/";
     std::string shadowShadersPath = "../assets/shaders/shadow/";
+    std::string objectShadersPath = "../assets/shaders/object/";
 
     shaderManager->Load("terrainShader", terrainShadersPath + "terrain.vert", terrainShadersPath + "terrain.frag");
     shaderManager->Load("skyboxShader", skyboxShadersPath + "skybox.vert", skyboxShadersPath + "skybox.frag");
     shaderManager->Load("postprocessShader", postprocessShadersPath + "postprocess.vert", postprocessShadersPath + "postprocess.frag");
     shaderManager->Load("terrainShadowShader", shadowShadersPath + "terrain_shadow.vert", shadowShadersPath + "terrain_shadow.frag");
+    shaderManager->Load("objectShader", objectShadersPath + "object.vert", objectShadersPath + "object.frag");
 
     auto terrainShader = shaderManager->GetShader<pwg::Shader>("terrainShader");
     auto skyboxShader = shaderManager->GetShader<pwg::Shader>("skyboxShader");
     auto postprocessShader = shaderManager->GetShader<pwg::Shader>("postprocessShader");
     m_terrainShadowShader = shaderManager->GetShader<pwg::Shader>("terrainShadowShader");
+    auto objectShader = shaderManager->GetShader<pwg::Shader>("objectShader");
 
     /*== TEXTURE LOADING ==*/
     std::string terrainTexturesPath = "../assets/textures/";
@@ -429,8 +436,10 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     /*== CREATING MATERIALS ==*/
     auto terrainMaterial = materialManager->CreateMaterial("TerrainMaterial", terrainShader);
     auto skyboxMaterial = materialManager->CreateMaterial("SkyboxMaterial", skyboxShader);
+    auto objectMaterial = materialManager->CreateMaterial("ObjectMaterial", objectShader);
 
     m_terrainMaterialLibrary = std::make_shared<TerrainMaterialLibrary>(m_resourceManager, terrainMaterial);
+    m_worldObjectManager = std::make_shared<WorldObjectManager>(objectMaterial);
     auto skybox = textureManager->GetCubeMapTexture("Skybox");
 
     m_terrain = std::make_shared<Terrain>(m_resourceManager);
@@ -470,7 +479,7 @@ void pwg::EditorScene::Update(const float& dt)
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    if (m_terrainGraphInputCaptured)
+    if (m_terrainGraphInputCaptured || m_viewportInputCaptured)
     {
         m_mouseInput.ResetScrollOffset();
     }
@@ -479,7 +488,15 @@ void pwg::EditorScene::Update(const float& dt)
         m_cameraManager->Update(dt);
     }
     auto activeCamera = m_cameraManager->GetActiveCamera();
+    if (activeCamera)
+    {
+        activeCamera->SetAspectRatio(m_aspectRatio);
+    }
     m_terrain->Update(dt ,activeCamera);
+    if (m_worldObjectManager)
+    {
+        m_worldObjectManager->UpdateTerrainSnap(m_terrain);
+    }
     m_environment->Update(dt);
 
 }
@@ -487,6 +504,7 @@ void pwg::EditorScene::Update(const float& dt)
 void pwg::EditorScene::Draw()
 {
     DrawOutliner();
+    m_viewportInputCaptured = false;
 
     m_showMainView = true;
     {
@@ -520,6 +538,11 @@ void pwg::EditorScene::Draw()
 
     auto environmentLighting = m_environment->GetLighting();
     auto activeCamera = m_cameraManager->GetActiveCamera();
+    if (activeCamera)
+    {
+        activeCamera->SetAspectRatio(m_aspectRatio);
+    }
+
     bool shadowsEnabled = environmentLighting.shadowsEnabled && environmentLighting.sunIntensity > 0.001f;
     if (shadowsEnabled)
     {
@@ -556,6 +579,14 @@ void pwg::EditorScene::Draw()
     m_renderer.AddSkyBox(m_skybox);
     m_renderer.AddToQueue(m_terrain.get());
     m_renderer.DrawAll();
+    if (m_worldObjectManager)
+    {
+        m_worldObjectManager->Draw(m_renderer);
+        if (m_objectPlacementActive)
+        {
+            m_worldObjectManager->DrawPreview(m_renderer, m_placementAssetId, m_placementPreviewTransform, m_placementPreviewValid);
+        }
+    }
     m_renderer.EndFrame();
     m_hdrFrameBuffer->Unbind();
 
@@ -569,6 +600,15 @@ void pwg::EditorScene::Draw()
         windowSize,
         ImVec2(0, 1), ImVec2(1, 0)
     );
+
+    ImVec2 viewportMin = ImGui::GetItemRectMin();
+    ImVec2 viewportSize = ImGui::GetItemRectSize();
+    ViewportPlacementInput placementInput = GetViewportPlacementInput(viewportMin, viewportSize);
+    UpdateObjectPlacement(placementInput, activeCamera);
+    if (m_objectPlacementActive)
+    {
+        m_viewportInputCaptured = true;
+    }
 
 
     ImGui::EndChild();
@@ -652,6 +692,7 @@ void pwg::EditorScene::Draw()
     }
 
     DrawWorldWindow();
+    DrawObjectsWindow();
 }
 
 void pwg::EditorScene::NewProject()
@@ -664,6 +705,10 @@ void pwg::EditorScene::NewProject()
     m_terrainGraphViewState = controls::TerrainGraphViewState{};
 
     m_environment->ResetToDefaults();
+    if (m_worldObjectManager)
+    {
+        m_worldObjectManager->Clear();
+    }
 
     ResetSkyboxToDefault();
     m_terrain->GetChunkManager()->Regenerate();
@@ -865,7 +910,15 @@ bool& pwg::EditorScene::ShowOutliner()
 {
     return m_showOutliner;
 }
+bool& pwg::EditorScene::ShowObjects()
+{
+    return m_showObjects;
+}
 
+std::shared_ptr<pwg::WorldObjectManager> pwg::EditorScene::GetWorldObjectManager()
+{
+    return m_worldObjectManager;
+}
 bool& pwg::EditorScene::ShowDebugWindow()
 {
     return m_showDebugWindow;
@@ -912,6 +965,7 @@ void pwg::EditorScene::ResetEditorWindows()
     m_showOutliner = true;
     m_showTerrainControls = false;
     m_showWorld = true;
+    m_showObjects = true;
     m_showDebugWindow = true;
     m_showMaterialLibrary = true;
     m_showTerrainGraph = true;
@@ -936,8 +990,257 @@ void pwg::EditorScene::DrawOutliner()
         }
         ImGui::Checkbox("Material Library", &m_showMaterialLibrary);
         ImGui::Checkbox("World", &m_showWorld);
+        ImGui::Checkbox("Objects", &m_showObjects);
         ImGui::TreePop();
     }
+    ImGui::End();
+}
+
+pwg::ViewportPlacementInput pwg::EditorScene::GetViewportPlacementInput(const ImVec2& viewportMin, const ImVec2& viewportSize) const
+{
+    ViewportPlacementInput input;
+    input.viewportMin = viewportMin;
+    input.viewportSize = viewportSize;
+    input.mousePos = ImGui::GetIO().MousePos;
+    input.mouseInViewport = input.mousePos.x >= viewportMin.x && input.mousePos.x <= viewportMin.x + viewportSize.x &&
+        input.mousePos.y >= viewportMin.y && input.mousePos.y <= viewportMin.y + viewportSize.y;
+    input.leftClicked = input.mouseInViewport && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+    input.rightClicked = input.mouseInViewport && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+    input.escapePressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+    return input;
+}
+
+void pwg::EditorScene::BeginObjectPlacement(int assetId)
+{
+    if (!m_worldObjectManager || !m_terrain)
+    {
+        return;
+    }
+
+    ModelAsset* asset = m_worldObjectManager->FindAsset(assetId);
+    if (!asset || !asset->loaded)
+    {
+        m_worldObjectManager->SetStatus("Select a loaded asset before placing an object");
+        return;
+    }
+
+    m_placementPreviewTransform = Transform{};
+    m_placementPreviewTransform.position = { 0.0f, m_terrain->GetTerrainHeightAt(0.0f, 0.0f) - 4.0f, 0.0f };
+    m_placementPreviewTransform.scale = asset->defaultScale;
+    m_placementAssetId = assetId;
+    m_placementPreviewValid = true;
+    m_placementMouseArmed = false;
+    m_objectPlacementActive = true;
+    m_viewportInputCaptured = true;
+    m_worldObjectManager->SelectObject(0);
+    m_worldObjectManager->SetStatus("Placement: move cursor into viewport");
+}
+
+void pwg::EditorScene::UpdateObjectPlacement(const ViewportPlacementInput& input, std::shared_ptr<ICamera> camera)
+{
+    (void)camera;
+    if (!m_objectPlacementActive || !m_worldObjectManager)
+    {
+        return;
+    }
+
+    if (input.rightClicked || input.escapePressed)
+    {
+        m_objectPlacementActive = false;
+        m_placementAssetId = 0;
+        m_placementPreviewValid = false;
+        m_placementMouseArmed = false;
+        m_worldObjectManager->SetStatus("Placement cancelled");
+        return;
+    }
+
+    if (!input.mouseInViewport)
+    {
+        if (!m_placementMouseArmed)
+        {
+            m_worldObjectManager->SetStatus("Placement: move cursor into viewport");
+        }
+        return;
+    }
+
+    if (!m_placementMouseArmed)
+    {
+        m_placementMouseArmed = true;
+        m_worldObjectManager->SetStatus("Placement: LMB place, RMB/Esc cancel");
+    }
+
+    if (m_terrain && camera && input.viewportSize.x > 1.0f && input.viewportSize.y > 1.0f)
+    {
+        constexpr float groundOffset = -4.0f;
+        float worldHalfSize = (static_cast<float>(m_terrain->GetSize()) - 1.0f) * 0.5f;
+        float u = glm::clamp((input.mousePos.x - input.viewportMin.x) / input.viewportSize.x, 0.0f, 1.0f);
+        float v = glm::clamp((input.mousePos.y - input.viewportMin.y) / input.viewportSize.y, 0.0f, 1.0f);
+        float screenX = (u - 0.5f) * 2.0f;
+        float screenY = (0.5f - v) * 2.0f;
+
+        glm::mat4 inverseView = glm::inverse(camera->GetViewMatrix());
+        glm::vec3 cameraRight = glm::vec3(inverseView[0]);
+        glm::vec3 cameraForward = -glm::vec3(inverseView[2]);
+        glm::vec3 planarRight(cameraRight.x, 0.0f, cameraRight.z);
+        glm::vec3 planarForward(cameraForward.x, 0.0f, cameraForward.z);
+        if (glm::length(planarRight) < 0.0001f)
+        {
+            planarRight = { 1.0f, 0.0f, 0.0f };
+        }
+        if (glm::length(planarForward) < 0.0001f)
+        {
+            planarForward = { 0.0f, 0.0f, -1.0f };
+        }
+        planarRight = glm::normalize(planarRight);
+        planarForward = glm::normalize(planarForward);
+
+        glm::vec3 terrainPosition = planarRight * (screenX * worldHalfSize) + planarForward * (screenY * worldHalfSize);
+        terrainPosition.x = glm::clamp(terrainPosition.x, -worldHalfSize, worldHalfSize);
+        terrainPosition.z = glm::clamp(terrainPosition.z, -worldHalfSize, worldHalfSize);
+        terrainPosition.y = m_terrain->GetTerrainHeightAt(terrainPosition.x, terrainPosition.z) + groundOffset;
+        m_placementPreviewTransform.position = terrainPosition;
+        m_placementPreviewValid = true;
+    }
+
+    if (input.leftClicked && m_placementPreviewValid)
+    {
+        WorldObject* object = m_worldObjectManager->CreateObject(m_placementAssetId, m_placementPreviewTransform.position);
+        if (object)
+        {
+            object->transform = m_placementPreviewTransform;
+            object->snapToTerrain = true;
+            object->freeTransform = false;
+            m_dirty = true;
+        }
+        m_objectPlacementActive = false;
+        m_placementAssetId = 0;
+        m_placementPreviewValid = false;
+        m_placementMouseArmed = false;
+    }
+}
+
+void pwg::EditorScene::DrawObjectsWindow()
+{
+    if (!m_showObjects || !m_worldObjectManager)
+    {
+        return;
+    }
+
+    ImGui::Begin("Objects", &m_showObjects);
+    ImGui::TextWrapped("Status: %s", m_worldObjectManager->GetStatus().c_str());
+    if (m_objectPlacementActive)
+    {
+        ImGui::TextUnformatted(m_placementMouseArmed ? "Placement: LMB place, RMB/Esc cancel" : "Placement: move cursor into viewport");
+    }
+
+    if (ImGui::Button("Import Model..."))
+    {
+        std::string path = platform::OpenObjDialog();
+        if (!path.empty())
+        {
+            if (auto* asset = m_worldObjectManager->ImportObj(path))
+            {
+                BeginObjectPlacement(asset->id);
+            }
+            m_dirty = true;
+        }
+    }
+
+    ImGui::SeparatorText("Assets");
+    for (const auto& asset : m_worldObjectManager->GetAssets())
+    {
+        ImGui::PushID(asset.id);
+        bool selected = asset.id == m_worldObjectManager->GetSelectedAssetId();
+        std::string label = asset.name + (asset.loaded ? "" : " (missing)");
+        if (!asset.submeshes.empty())
+        {
+            label += " [" + std::to_string(asset.submeshes.size()) + " parts]";
+        }
+        if (ImGui::Selectable(label.c_str(), selected))
+        {
+            m_worldObjectManager->SelectAsset(asset.id);
+        }
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted(asset.path.c_str());
+            if (!asset.submeshes.empty())
+            {
+                ImGui::Separator();
+                for (const auto& submesh : asset.submeshes)
+                {
+                    ImGui::Text("%s", submesh.name.c_str());
+                    if (!submesh.albedoPath.empty())
+                    {
+                        ImGui::TextDisabled("  %s", submesh.albedoPath.c_str());
+                    }
+                }
+            }
+            ImGui::EndTooltip();
+        }
+        ImGui::PopID();
+    }
+
+    if (ImGui::Button("Place"))
+    {
+        BeginObjectPlacement(m_worldObjectManager->GetSelectedAssetId());
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Duplicate"))
+    {
+        if (m_worldObjectManager->DuplicateSelected())
+        {
+            m_dirty = true;
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Delete"))
+    {
+        m_worldObjectManager->DeleteSelected();
+        m_dirty = true;
+    }
+
+    ImGui::SeparatorText("Instances");
+    for (const auto& object : m_worldObjectManager->GetObjects())
+    {
+        ImGui::PushID(object.id);
+        if (ImGui::Selectable(object.name.c_str(), object.selected))
+        {
+            m_worldObjectManager->SelectObject(object.id);
+        }
+        ImGui::PopID();
+    }
+
+    if (auto* object = m_worldObjectManager->GetSelectedObject())
+    {
+        ImGui::SeparatorText("Transform");
+        char nameBuffer[128] = {};
+        std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", object->name.c_str());
+        if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
+        {
+            object->name = nameBuffer;
+            m_dirty = true;
+        }
+
+        bool changed = false;
+        changed = ImGui::Checkbox("Visible", &object->visible) || changed;
+        changed = ImGui::Checkbox("Snap to terrain", &object->snapToTerrain) || changed;
+        ImGui::SameLine();
+        changed = ImGui::Checkbox("Free transform", &object->freeTransform) || changed;
+        changed = ImGui::Checkbox("Align to normal (reserved)", &object->alignToNormal) || changed;
+        changed = ImGui::DragFloat3("Position", &object->transform.position.x, 0.25f) || changed;
+        changed = ImGui::DragFloat3("Rotation", &object->transform.rotation.x, 0.01f) || changed;
+        changed = ImGui::DragFloat3("Scale", &object->transform.scale.x, 0.01f, 0.001f, 100.0f) || changed;
+        if (object->snapToTerrain && !object->freeTransform)
+        {
+            object->transform.position.y = m_terrain->GetTerrainHeightAt(object->transform.position.x, object->transform.position.z) - 4.0f;
+        }
+        if (changed)
+        {
+            m_dirty = true;
+        }
+    }
+
     ImGui::End();
 }
 
@@ -1120,3 +1423,12 @@ void pwg::EditorScene::HandleKeyboardInputs()
         m_cameraManager->SetCamera(CameraType::PLAYER);
     }
 }
+
+
+
+
+
+
+
+
+

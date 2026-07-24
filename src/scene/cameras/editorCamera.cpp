@@ -44,6 +44,11 @@ void pwg::EditorCamera::SetCameraPosition(float x, float y, float z)
     m_transform.position = { x, y, z };
 }
 
+void pwg::EditorCamera::SetAspectRatio(float aspectRatio)
+{
+    m_cameraProperties.aspectRatio = glm::max(aspectRatio, 0.01f);
+    m_cameraProperties.projectionMatrix = glm::perspective(glm::radians(m_cameraProperties.fov), m_cameraProperties.aspectRatio, m_cameraProperties.nearPlane, m_cameraProperties.farPlane);
+}
 glm::mat4& pwg::EditorCamera::GetViewMatrix()
 {
     return m_cameraProperties.viewMatrix;

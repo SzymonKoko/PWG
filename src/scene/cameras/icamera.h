@@ -59,6 +59,7 @@ namespace pwg
 		* @param z Z coordinate.
 		*/
 		virtual void SetCameraPosition(float x, float y, float z) = 0;
+		virtual void SetAspectRatio(float aspectRatio) = 0;
 
 		/**
 		* @brief Returns the current view matrix for rendering.

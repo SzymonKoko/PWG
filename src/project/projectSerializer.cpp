@@ -8,6 +8,7 @@
 #include "terrain/graph/universalTerrainGraph.h"
 #include "terrain/chunk/chunkManager.h"
 #include "yaml-cpp/yaml.h"
+#include "world/objModelImporter.h"
 
 #include <fstream>
 #include <unordered_map>
@@ -833,6 +834,119 @@ namespace pwg
 			ReadValue(node, "lakeMaxDepth", settings.lakeMaxDepth);
 		}
 	}
+		YAML::Node WriteWorldObjects(const WorldObjectManager& manager)
+		{
+			YAML::Node node;
+			for (const auto& asset : manager.GetAssets())
+			{
+				YAML::Node assetNode;
+				assetNode["id"] = asset.id;
+				assetNode["name"] = asset.name;
+				assetNode["path"] = asset.path;
+				assetNode["defaultScale"] = Vec3Node(asset.defaultScale);
+				assetNode["pivotOffset"] = Vec3Node(asset.pivotOffset);
+				assetNode["diffuseColor"] = Vec3Node(asset.diffuseColor);
+				assetNode["albedoPath"] = asset.albedoPath;
+				for (const auto& submesh : asset.submeshes)
+				{
+					YAML::Node submeshNode;
+					submeshNode["name"] = submesh.name;
+					submeshNode["diffuseColor"] = Vec3Node(submesh.diffuseColor);
+					submeshNode["albedoPath"] = submesh.albedoPath;
+					assetNode["submeshes"].push_back(submeshNode);
+				}
+				assetNode["surfaceMode"] = static_cast<int>(asset.defaultSurfaceMode);
+				node["assets"].push_back(assetNode);
+			}
+
+			for (const auto& object : manager.GetObjects())
+			{
+				YAML::Node objectNode;
+				objectNode["id"] = object.id;
+				objectNode["assetId"] = object.assetId;
+				objectNode["name"] = object.name;
+				objectNode["position"] = Vec3Node(object.transform.position);
+				objectNode["rotation"] = Vec3Node(object.transform.rotation);
+				objectNode["scale"] = Vec3Node(object.transform.scale);
+				objectNode["snapToTerrain"] = object.snapToTerrain;
+				objectNode["freeTransform"] = object.freeTransform;
+				objectNode["alignToNormal"] = object.alignToNormal;
+				objectNode["visible"] = object.visible;
+				objectNode["selected"] = object.selected;
+				node["instances"].push_back(objectNode);
+			}
+			return node;
+		}
+
+		void ReadWorldObjects(const YAML::Node& node, EditorScene& scene)
+		{
+			auto manager = scene.GetWorldObjectManager();
+			if (!manager)
+			{
+				return;
+			}
+			manager->Clear();
+			if (!node)
+			{
+				return;
+			}
+
+			auto assets = node["assets"];
+			if (assets && assets.IsSequence())
+			{
+				for (const auto& assetNode : assets)
+				{
+					ModelAsset asset;
+					ReadValue(assetNode, "id", asset.id);
+					ReadValue(assetNode, "name", asset.name);
+					ReadValue(assetNode, "path", asset.path);
+					asset.defaultScale = ReadVec3(assetNode["defaultScale"], asset.defaultScale);
+					asset.pivotOffset = ReadVec3(assetNode["pivotOffset"], asset.pivotOffset);
+					asset.diffuseColor = ReadVec3(assetNode["diffuseColor"], asset.diffuseColor);
+					ReadValue(assetNode, "albedoPath", asset.albedoPath);
+					int surfaceMode = static_cast<int>(asset.defaultSurfaceMode);
+					ReadValue(assetNode, "surfaceMode", surfaceMode);
+					asset.defaultSurfaceMode = static_cast<ObjectSurfaceMode>(std::clamp(surfaceMode, 0, 2));
+
+					auto imported = ObjModelImporter::Load(asset.path);
+					asset.submeshes = imported.submeshes;
+					asset.mesh = imported.mesh;
+					if (asset.albedoPath.empty())
+					{
+						asset.albedoPath = imported.albedoPath;
+					}
+					asset.loaded = imported.success;
+					asset.status = imported.message;
+					if (!asset.loaded)
+					{
+						asset.status = "Missing OBJ: " + asset.path;
+					}
+					manager->AddAssetRecord(asset);
+				}
+			}
+
+			auto instances = node["instances"];
+			if (instances && instances.IsSequence())
+			{
+				for (const auto& objectNode : instances)
+				{
+					WorldObject object;
+					ReadValue(objectNode, "id", object.id);
+					ReadValue(objectNode, "assetId", object.assetId);
+					ReadValue(objectNode, "name", object.name);
+					object.transform.position = ReadVec3(objectNode["position"], object.transform.position);
+					object.transform.rotation = ReadVec3(objectNode["rotation"], object.transform.rotation);
+					object.transform.scale = ReadVec3(objectNode["scale"], object.transform.scale);
+					ReadValue(objectNode, "snapToTerrain", object.snapToTerrain);
+					ReadValue(objectNode, "freeTransform", object.freeTransform);
+					ReadValue(objectNode, "alignToNormal", object.alignToNormal);
+					ReadValue(objectNode, "visible", object.visible);
+					ReadValue(objectNode, "selected", object.selected);
+					manager->AddObjectRecord(object);
+				}
+			}
+			manager->MarkCleanSelection();
+		}
 
 	namespace
 	{
@@ -971,6 +1085,10 @@ namespace pwg
 		root["camera"]["activeType"] = static_cast<int>(scene.GetCameraManager()->GetActiveCameraType());
 		root["camera"]["position"] = Vec3Node(scene.GetCameraManager()->GetCameraPosition());
 		root["editorUi"] = WriteEditorUi(scene);
+		if (scene.GetWorldObjectManager())
+		{
+			root["worldObjects"] = WriteWorldObjects(*scene.GetWorldObjectManager());
+		}
 
 		std::ofstream stream(path);
 		if (!stream.is_open())
@@ -1040,6 +1158,7 @@ namespace pwg
 			scene.GetCameraManager()->SetCameraPosition(position.x, position.y, position.z);
 		}
 		ReadEditorUi(root["editorUi"], scene);
+		ReadWorldObjects(root["worldObjects"], scene);
 
 		chunkManager->GenerateWorld();
 
@@ -1052,3 +1171,6 @@ namespace pwg
 		return true;
 	}
 }
+
+
+

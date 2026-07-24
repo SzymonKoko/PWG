@@ -27,6 +27,7 @@ namespace pwg
 		void Update(float dt, MouseInput& mouseInput, KeyboardInput& keyboardInput) override;
 		void SetDefaultCameraPosition(int size) override;
 		void SetCameraPosition(float x, float y, float z) override;
+		void SetAspectRatio(float aspectRatio) override;
 		glm::mat4& GetViewMatrix() override;
 		glm::mat4& GetProjectionMatrix() override;
 		glm::vec3 GetCameraPosition() override;

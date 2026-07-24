@@ -60,6 +60,7 @@ namespace pwg
 		* @param z Z coordinate.
 		*/
 		void SetCameraPosition(float x, float y, float z) override;
+		void SetAspectRatio(float aspectRatio) override;
 
 		/**
 		* @brief Returns the current view matrix for rendering.
