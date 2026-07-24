@@ -845,6 +845,7 @@ namespace pwg
 				assetNode["path"] = asset.path;
 				assetNode["defaultScale"] = Vec3Node(asset.defaultScale);
 				assetNode["pivotOffset"] = Vec3Node(asset.pivotOffset);
+				assetNode["importRotation"] = Vec3Node(asset.importRotation);
 				assetNode["diffuseColor"] = Vec3Node(asset.diffuseColor);
 				assetNode["albedoPath"] = asset.albedoPath;
 				for (const auto& submesh : asset.submeshes)
@@ -861,6 +862,10 @@ namespace pwg
 
 			for (const auto& object : manager.GetObjects())
 			{
+				if (object.generated)
+				{
+					continue;
+				}
 				YAML::Node objectNode;
 				objectNode["id"] = object.id;
 				objectNode["assetId"] = object.assetId;
@@ -873,7 +878,59 @@ namespace pwg
 				objectNode["alignToNormal"] = object.alignToNormal;
 				objectNode["visible"] = object.visible;
 				objectNode["selected"] = object.selected;
+				objectNode["terrainOffset"] = object.terrainOffset;
 				node["instances"].push_back(objectNode);
+			}
+
+			for (const auto& ruleSet : manager.GetRuleSets())
+			{
+				YAML::Node ruleNode;
+				ruleNode["id"] = ruleSet.id;
+				ruleNode["name"] = ruleSet.name;
+				ruleNode["seed"] = ruleSet.seed;
+				ruleNode["enabled"] = ruleSet.enabled;
+				ruleNode["density"] = ruleSet.density;
+				ruleNode["spacing"] = ruleSet.spacing;
+				ruleNode["minHeight"] = ruleSet.minHeight;
+				ruleNode["maxHeight"] = ruleSet.maxHeight;
+				ruleNode["minSlopeDegrees"] = ruleSet.minSlopeDegrees;
+				ruleNode["maxSlopeDegrees"] = ruleSet.maxSlopeDegrees;
+				ruleNode["maskName"] = ruleSet.maskName;
+				ruleNode["minMaskValue"] = ruleSet.minMaskValue;
+				ruleNode["maxMaskValue"] = ruleSet.maxMaskValue;
+				ruleNode["avoidWaterDistance"] = ruleSet.avoidWaterDistance;
+				ruleNode["waterThreshold"] = ruleSet.waterThreshold;
+				ruleNode["avoidRiverDistance"] = ruleSet.avoidRiverDistance;
+				ruleNode["riverThreshold"] = ruleSet.riverThreshold;
+				ruleNode["minScale"] = ruleSet.minScale;
+				ruleNode["maxScale"] = ruleSet.maxScale;
+				ruleNode["minRotationDegrees"] = Vec3Node(ruleSet.minRotationDegrees);
+				ruleNode["maxRotationDegrees"] = Vec3Node(ruleSet.maxRotationDegrees);
+				ruleNode["randomYaw"] = ruleSet.randomYaw;
+				ruleNode["alignToNormal"] = ruleSet.alignToNormal;
+				for (const auto& entry : ruleSet.assets)
+				{
+					YAML::Node entryNode;
+					entryNode["assetId"] = entry.assetId;
+					entryNode["weight"] = entry.weight;
+					ruleNode["assets"].push_back(entryNode);
+				}
+				node["ruleSets"].push_back(ruleNode);
+			}
+			for (const auto& zone : manager.GetExclusionZones())
+			{
+				YAML::Node zoneNode;
+				zoneNode["id"] = zone.id;
+				zoneNode["name"] = zone.name;
+				zoneNode["enabled"] = zone.enabled;
+				zoneNode["ruleSetId"] = zone.ruleSetId;
+				zoneNode["shape"] = static_cast<int>(zone.shape);
+				zoneNode["center"]["x"] = zone.center.x;
+				zoneNode["center"]["y"] = zone.center.y;
+				zoneNode["halfExtents"]["x"] = zone.halfExtents.x;
+				zoneNode["halfExtents"]["y"] = zone.halfExtents.y;
+				zoneNode["radius"] = zone.radius;
+				node["exclusionZones"].push_back(zoneNode);
 			}
 			return node;
 		}
@@ -902,6 +959,7 @@ namespace pwg
 					ReadValue(assetNode, "path", asset.path);
 					asset.defaultScale = ReadVec3(assetNode["defaultScale"], asset.defaultScale);
 					asset.pivotOffset = ReadVec3(assetNode["pivotOffset"], asset.pivotOffset);
+					asset.importRotation = ReadVec3(assetNode["importRotation"], asset.importRotation);
 					asset.diffuseColor = ReadVec3(assetNode["diffuseColor"], asset.diffuseColor);
 					ReadValue(assetNode, "albedoPath", asset.albedoPath);
 					int surfaceMode = static_cast<int>(asset.defaultSurfaceMode);
@@ -925,6 +983,85 @@ namespace pwg
 				}
 			}
 
+			auto ruleSets = node["ruleSets"];
+			if (ruleSets && ruleSets.IsSequence())
+			{
+				for (const auto& ruleNode : ruleSets)
+				{
+					ObjectRuleSet ruleSet;
+					ReadValue(ruleNode, "id", ruleSet.id);
+					ReadValue(ruleNode, "name", ruleSet.name);
+					ReadValue(ruleNode, "seed", ruleSet.seed);
+					ReadValue(ruleNode, "enabled", ruleSet.enabled);
+					ReadValue(ruleNode, "density", ruleSet.density);
+					ReadValue(ruleNode, "spacing", ruleSet.spacing);
+					ReadValue(ruleNode, "minHeight", ruleSet.minHeight);
+					ReadValue(ruleNode, "maxHeight", ruleSet.maxHeight);
+					ReadValue(ruleNode, "minSlopeDegrees", ruleSet.minSlopeDegrees);
+					ReadValue(ruleNode, "maxSlopeDegrees", ruleSet.maxSlopeDegrees);
+					ReadValue(ruleNode, "maskName", ruleSet.maskName);
+					ReadValue(ruleNode, "minMaskValue", ruleSet.minMaskValue);
+					ReadValue(ruleNode, "maxMaskValue", ruleSet.maxMaskValue);
+					ReadValue(ruleNode, "avoidWaterDistance", ruleSet.avoidWaterDistance);
+					ReadValue(ruleNode, "waterThreshold", ruleSet.waterThreshold);
+					ReadValue(ruleNode, "avoidRiverDistance", ruleSet.avoidRiverDistance);
+					ReadValue(ruleNode, "riverThreshold", ruleSet.riverThreshold);
+					ReadValue(ruleNode, "minScale", ruleSet.minScale);
+					ReadValue(ruleNode, "maxScale", ruleSet.maxScale);
+					ReadValue(ruleNode, "randomYaw", ruleSet.randomYaw);
+					if (ruleNode["minRotationDegrees"] && ruleNode["maxRotationDegrees"])
+					{
+						ruleSet.minRotationDegrees = ReadVec3(ruleNode["minRotationDegrees"], ruleSet.minRotationDegrees);
+						ruleSet.maxRotationDegrees = ReadVec3(ruleNode["maxRotationDegrees"], ruleSet.maxRotationDegrees);
+					}
+					else
+					{
+						ruleSet.minRotationDegrees = glm::vec3(0.0f);
+						ruleSet.maxRotationDegrees = glm::vec3(0.0f, ruleSet.randomYaw ? 360.0f : 0.0f, 0.0f);
+					}
+					ReadValue(ruleNode, "alignToNormal", ruleSet.alignToNormal);
+					auto entries = ruleNode["assets"];
+					if (entries && entries.IsSequence())
+					{
+						for (const auto& entryNode : entries)
+						{
+							ObjectRuleAsset entry;
+							ReadValue(entryNode, "assetId", entry.assetId);
+							ReadValue(entryNode, "weight", entry.weight);
+							ruleSet.assets.push_back(entry);
+						}
+					}
+					manager->AddRuleSetRecord(ruleSet);
+				}
+			}
+
+			auto exclusionZones = node["exclusionZones"];
+			if (exclusionZones && exclusionZones.IsSequence())
+			{
+				for (const auto& zoneNode : exclusionZones)
+				{
+					ObjectExclusionZone zone;
+					ReadValue(zoneNode, "id", zone.id);
+					ReadValue(zoneNode, "name", zone.name);
+					ReadValue(zoneNode, "enabled", zone.enabled);
+					ReadValue(zoneNode, "ruleSetId", zone.ruleSetId);
+					int shape = static_cast<int>(zone.shape);
+					ReadValue(zoneNode, "shape", shape);
+					zone.shape = static_cast<ObjectExclusionShape>(std::clamp(shape, 0, 1));
+					if (auto center = zoneNode["center"])
+					{
+						ReadValue(center, "x", zone.center.x);
+						ReadValue(center, "y", zone.center.y);
+					}
+					if (auto halfExtents = zoneNode["halfExtents"])
+					{
+						ReadValue(halfExtents, "x", zone.halfExtents.x);
+						ReadValue(halfExtents, "y", zone.halfExtents.y);
+					}
+					ReadValue(zoneNode, "radius", zone.radius);
+					manager->AddExclusionZoneRecord(zone);
+				}
+			}
 			auto instances = node["instances"];
 			if (instances && instances.IsSequence())
 			{
@@ -942,6 +1079,7 @@ namespace pwg
 					ReadValue(objectNode, "alignToNormal", object.alignToNormal);
 					ReadValue(objectNode, "visible", object.visible);
 					ReadValue(objectNode, "selected", object.selected);
+					ReadValue(objectNode, "terrainOffset", object.terrainOffset);
 					manager->AddObjectRecord(object);
 				}
 			}
@@ -1167,6 +1305,19 @@ namespace pwg
 		if (ReadSimulationSidecar(SimulationSidecarPath(path), snapshot))
 		{
 			chunkManager->RestoreSimulationState(snapshot);
+		}
+		auto objectManager = scene.GetWorldObjectManager();
+		if (objectManager)
+		{
+			std::vector<int> ruleSetIds;
+			for (const auto& ruleSet : objectManager->GetRuleSets())
+			{
+				ruleSetIds.push_back(ruleSet.id);
+			}
+			for (int ruleSetId : ruleSetIds)
+			{
+				objectManager->GenerateRuleSet(ruleSetId, scene.GetTerrain());
+			}
 		}
 		return true;
 	}

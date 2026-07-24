@@ -61,6 +61,8 @@ namespace pwg
 		void DrawAll();
 
 		void DrawMesh(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, const glm::mat4& model);
+		void DrawMeshInstanced(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, const std::vector<glm::mat4>& transforms);
+		bool IsSphereVisible(const glm::vec3& center, float radius, float maxDistance) const;
 
 		void DrawSkyBox();
 

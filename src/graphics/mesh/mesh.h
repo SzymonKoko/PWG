@@ -55,6 +55,7 @@ namespace pwg
 		* @brief Renders the mesh using currently bound shader and buffers.
 		*/
 		void Draw();
+		void DrawInstanced(const std::vector<glm::mat4>& transforms);
 
 		/**
 		* @brief Replaces the mesh vertex data.
@@ -110,6 +111,7 @@ namespace pwg
 		unsigned int m_vaoID{ 0 };           /**< OpenGL Vertex Array Object ID */
 		unsigned int m_vboID{ 0 };           /**< OpenGL Vertex Buffer Object ID */
 		unsigned int m_eboID{ 0 };           /**< OpenGL Element Buffer Object ID */
+		unsigned int m_instanceVboID{ 0 };      /**< Per-instance model matrices */
 
 		int m_modelUniformLocation{ -1 };    /**< Cached model matrix uniform location */
 

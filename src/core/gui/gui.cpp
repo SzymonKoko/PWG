@@ -496,6 +496,7 @@ void pwg::Gui::DrawWelcomeScreen()
 		ImGui::InvisibleButton(id, buttonSize);
 		bool hovered = ImGui::IsItemHovered();
 		bool active = ImGui::IsItemActive();
+		bool clicked = ImGui::IsItemClicked();
 		ImU32 fill = hovered ? IM_COL32(20, 56, 82, active ? 150 : 118) : IM_COL32(8, 18, 28, 82);
 		ImU32 border = hovered ? IM_COL32(105, 200, 255, 190) : IM_COL32(120, 170, 210, 86);
 		ImVec2 max(cursor.x + buttonSize.x, cursor.y + buttonSize.y);
@@ -505,7 +506,8 @@ void pwg::Gui::DrawWelcomeScreen()
 		drawList->AddText(ImVec2(cursor.x + 18.0f, cursor.y + 35.0f), IM_COL32(158, 180, 194, 230), subtitle);
 		drawList->AddText(ImVec2(cursor.x + buttonSize.x - 34.0f, cursor.y + 22.0f), hovered ? IM_COL32(130, 215, 255, 255) : IM_COL32(170, 190, 205, 190), hint);
 		ImGui::SetCursorScreenPos(ImVec2(cursor.x, cursor.y + buttonSize.y + 10.0f));
-		return ImGui::IsItemClicked();
+		ImGui::Dummy(ImVec2(0.0f, 0.0f));
+		return clicked;
 	};
 
 	if (glassButton("welcome_new_world", "NEW WORLD", "Generate a fresh procedural terrain", ">"))
