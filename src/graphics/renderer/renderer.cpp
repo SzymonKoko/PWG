@@ -46,8 +46,59 @@ void pwg::Renderer::DrawMesh(std::shared_ptr<Mesh> mesh, std::shared_ptr<Materia
 	material->SetUniformMat4("u_model", model);
 	material->SetUniformMat4("u_view", m_viewMatrix);
 	material->SetUniformMat4("u_projection", m_projectionMatrix);
+	material->SetUniformInt("u_instanced", 0);
 	material->Apply();
 	mesh->Draw();
+}
+
+void pwg::Renderer::DrawMeshInstanced(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material, const std::vector<glm::mat4>& transforms)
+{
+	if (!mesh || !material || transforms.empty())
+	{
+		return;
+	}
+
+	m_lightingUploader->Upload(material, m_environmentLighting, m_cameraPosition);
+	material->SetUniformMat4("u_view", m_viewMatrix);
+	material->SetUniformMat4("u_projection", m_projectionMatrix);
+	material->SetUniformInt("u_instanced", 1);
+	material->Apply();
+	mesh->DrawInstanced(transforms);
+}
+
+bool pwg::Renderer::IsSphereVisible(const glm::vec3& center, float radius, float maxDistance) const
+{
+	if (maxDistance > 0.0f && glm::length(center - m_cameraPosition) > maxDistance + radius)
+	{
+		return false;
+	}
+
+	glm::mat4 clip = m_projectionMatrix * m_viewMatrix;
+	auto row = [&](int index)
+	{
+		return glm::vec4(clip[0][index], clip[1][index], clip[2][index], clip[3][index]);
+	};
+	glm::vec4 rows[4] = { row(0), row(1), row(2), row(3) };
+	glm::vec4 planes[6] =
+	{
+		rows[3] + rows[0], rows[3] - rows[0],
+		rows[3] + rows[1], rows[3] - rows[1],
+		rows[3] + rows[2], rows[3] - rows[2]
+	};
+	for (glm::vec4 plane : planes)
+	{
+		float normalLength = glm::length(glm::vec3(plane));
+		if (normalLength <= 0.00001f)
+		{
+			continue;
+		}
+		plane /= normalLength;
+		if (glm::dot(glm::vec3(plane), center) + plane.w < -radius)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 void pwg::Renderer::DrawAll()
 {

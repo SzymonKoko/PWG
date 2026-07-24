@@ -29,6 +29,7 @@ namespace pwg
 		glDeleteVertexArrays(1, &m_vaoID);
 		glDeleteBuffers(1, &m_vboID);
 		glDeleteBuffers(1, &m_eboID);
+		glDeleteBuffers(1, &m_instanceVboID);
 	}
 
 	void Mesh::Update()
@@ -53,6 +54,38 @@ namespace pwg
 		}
 
 		glBindVertexArray(0);
+	}
+
+	void Mesh::DrawInstanced(const std::vector<glm::mat4>& transforms)
+	{
+		if (transforms.empty())
+		{
+			return;
+		}
+
+		glBindVertexArray(m_vaoID);
+		glBindBuffer(GL_ARRAY_BUFFER, m_instanceVboID);
+		glBufferData(GL_ARRAY_BUFFER, transforms.size() * sizeof(glm::mat4), transforms.data(), GL_DYNAMIC_DRAW);
+		for (unsigned int location = 4; location < 8; ++location)
+		{
+			glEnableVertexAttribArray(location);
+		}
+
+		if (!m_indices.empty())
+		{
+			glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(transforms.size()));
+		}
+		else
+		{
+			glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(m_vertices.size()), static_cast<GLsizei>(transforms.size()));
+		}
+
+		for (unsigned int location = 4; location < 8; ++location)
+		{
+			glDisableVertexAttribArray(location);
+		}
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
 	std::vector<Vertex>& Mesh::GetVertices()
@@ -116,6 +149,7 @@ namespace pwg
 		glGenVertexArrays(1, &m_vaoID);
 		glGenBuffers(1, &m_vboID);
 		glGenBuffers(1, &m_eboID);
+		glGenBuffers(1, &m_instanceVboID);
 
 		glBindVertexArray(m_vaoID);
 
@@ -137,6 +171,17 @@ namespace pwg
 		glEnableVertexAttribArray(3);
 		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
 
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_instanceVboID);
+		glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+		for (unsigned int column = 0; column < 4; ++column)
+		{
+			unsigned int location = 4 + column;
+			glEnableVertexAttribArray(location);
+			glVertexAttribPointer(location, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), reinterpret_cast<void*>(sizeof(glm::vec4) * column));
+			glVertexAttribDivisor(location, 1);
+			glDisableVertexAttribArray(location);
+		}
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

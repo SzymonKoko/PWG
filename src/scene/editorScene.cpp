@@ -503,6 +503,11 @@ void pwg::EditorScene::Update(const float& dt)
 
 void pwg::EditorScene::Draw()
 {
+    if (m_assetImportActive)
+    {
+        DrawAssetImportWorkspace();
+        return;
+    }
     DrawOutliner();
     m_viewportInputCaptured = false;
 
@@ -709,6 +714,9 @@ void pwg::EditorScene::NewProject()
     {
         m_worldObjectManager->Clear();
     }
+    m_selectedRuleSetId = 0;
+    m_selectedExclusionZoneId = 0;
+    CloseAssetImport();
 
     ResetSkyboxToDefault();
     m_terrain->GetChunkManager()->Regenerate();
@@ -1099,6 +1107,11 @@ void pwg::EditorScene::UpdateObjectPlacement(const ViewportPlacementInput& input
         terrainPosition.z = glm::clamp(terrainPosition.z, -worldHalfSize, worldHalfSize);
         terrainPosition.y = m_terrain->GetTerrainHeightAt(terrainPosition.x, terrainPosition.z) + groundOffset;
         m_placementPreviewTransform.position = terrainPosition;
+        WorldObject groundedPreview;
+        groundedPreview.assetId = m_placementAssetId;
+        groundedPreview.transform = m_placementPreviewTransform;
+        m_worldObjectManager->GroundObjectToTerrain(groundedPreview, m_terrain);
+        m_placementPreviewTransform = groundedPreview.transform;
         m_placementPreviewValid = true;
     }
 
@@ -1110,6 +1123,7 @@ void pwg::EditorScene::UpdateObjectPlacement(const ViewportPlacementInput& input
             object->transform = m_placementPreviewTransform;
             object->snapToTerrain = true;
             object->freeTransform = false;
+            m_worldObjectManager->GroundObjectToTerrain(*object, m_terrain);
             m_dirty = true;
         }
         m_objectPlacementActive = false;
@@ -1119,6 +1133,282 @@ void pwg::EditorScene::UpdateObjectPlacement(const ViewportPlacementInput& input
     }
 }
 
+void pwg::EditorScene::BeginAssetImport(int assetId, bool newlyImported)
+{
+    ModelAsset* asset = m_worldObjectManager ? m_worldObjectManager->FindAsset(assetId) : nullptr;
+    if (!asset)
+    {
+        return;
+    }
+    m_assetImportId = assetId;
+    m_assetImportOriginal = *asset;
+    m_assetImportDraft = *asset;
+    m_assetImportNew = newlyImported;
+    m_assetImportDirty = false;
+    m_assetImportCloseRequested = false;
+    m_assetImportActive = true;
+    m_objectPlacementActive = false;
+    m_cameraManager->SetCamera(CameraType::EDITOR);
+    m_cameraManager->SetDefaultCameraPosition(300);
+}
+
+void pwg::EditorScene::ApplyAssetImport()
+{
+    ModelAsset* asset = m_worldObjectManager ? m_worldObjectManager->FindAsset(m_assetImportId) : nullptr;
+    if (!asset)
+    {
+        CloseAssetImport();
+        return;
+    }
+    asset->importRotation = m_assetImportDraft.importRotation;
+    asset->defaultScale = m_assetImportDraft.defaultScale;
+    asset->pivotOffset = m_assetImportDraft.pivotOffset;
+    asset->defaultSurfaceMode = m_assetImportDraft.defaultSurfaceMode;
+    m_worldObjectManager->RefreshAssetInstances(asset->id, m_terrain);
+    m_dirty = true;
+    CloseAssetImport();
+}
+
+void pwg::EditorScene::CloseAssetImport()
+{
+    m_assetImportActive = false;
+    m_assetImportDirty = false;
+    m_assetImportNew = false;
+    m_assetImportCloseRequested = false;
+    m_assetImportId = 0;
+}
+
+void pwg::EditorScene::DrawAssetImportWorkspace()
+{
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 workPos = viewport->WorkPos;
+    ImVec2 workSize = viewport->WorkSize;
+    float settingsWidth = std::clamp(workSize.x * 0.28f, 340.0f, 480.0f);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDocking;
+
+    ImGui::SetNextWindowPos(workPos);
+    ImGui::SetNextWindowSize(ImVec2(workSize.x - settingsWidth, workSize.y));
+    ImGui::Begin("Asset Preview", nullptr, flags);
+    ImVec2 previewSize = ImGui::GetContentRegionAvail();
+    int width = std::max(1, static_cast<int>(previewSize.x));
+    int height = std::max(1, static_cast<int>(previewSize.y));
+    if (m_frameBuffer->GetWidth() != width || m_frameBuffer->GetHeight() != height)
+    {
+        m_frameBuffer->Resize(width, height);
+        m_hdrFrameBuffer->Resize(width, height);
+    }
+    m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    auto camera = m_cameraManager->GetActiveCamera();
+    if (camera)
+    {
+        camera->SetAspectRatio(m_aspectRatio);
+    }
+
+    EnvironmentLighting lighting = m_environment->GetLighting();
+    lighting.shadowsEnabled = false;
+    m_hdrFrameBuffer->Bind();
+    m_renderer.BeginFrame();
+    m_renderer.SetCamera(camera);
+    m_renderer.SetEnvironmentLighting(lighting);
+    m_renderer.SetShadowMaps({}, {}, {}, false);
+    if (m_worldObjectManager)
+    {
+        m_worldObjectManager->DrawAssetPreview(m_renderer, m_assetImportDraft);
+    }
+    m_renderer.EndFrame();
+    m_hdrFrameBuffer->Unbind();
+    m_frameBuffer->Bind();
+    glClear(GL_COLOR_BUFFER_BIT);
+    m_postProcessor->Render(m_hdrFrameBuffer->GetTextureID(), m_environment->GetSettings(), width, height);
+    m_frameBuffer->Unbind();
+
+    ImGui::Image((ImTextureID)(intptr_t)m_frameBuffer->GetTextureID(), previewSize, ImVec2(0, 1), ImVec2(1, 0));
+    ImVec2 imageMin = ImGui::GetItemRectMin();
+    ImVec2 imageMax = ImGui::GetItemRectMax();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    for (int i = 1; i < 12; ++i)
+    {
+        float t = static_cast<float>(i) / 12.0f;
+        drawList->AddLine(ImVec2(glm::mix(imageMin.x, imageMax.x, t), imageMin.y),
+            ImVec2(glm::mix(imageMin.x, imageMax.x, t), imageMax.y), IM_COL32(100, 120, 135, 28));
+        drawList->AddLine(ImVec2(imageMin.x, glm::mix(imageMin.y, imageMax.y, t)),
+            ImVec2(imageMax.x, glm::mix(imageMin.y, imageMax.y, t)), IM_COL32(100, 120, 135, 28));
+    }
+    drawList->AddLine(ImVec2(imageMin.x, (imageMin.y + imageMax.y) * 0.5f),
+        ImVec2(imageMax.x, (imageMin.y + imageMax.y) * 0.5f), IM_COL32(90, 190, 120, 95), 2.0f);
+
+    if (m_assetImportShowBounds && camera)
+    {
+        glm::mat4 model(1.0f);
+        model = glm::translate(model, m_assetImportDraft.pivotOffset);
+        model = glm::rotate(model, m_assetImportDraft.importRotation.x, glm::vec3(1, 0, 0));
+        model = glm::rotate(model, m_assetImportDraft.importRotation.y, glm::vec3(0, 1, 0));
+        model = glm::rotate(model, m_assetImportDraft.importRotation.z, glm::vec3(0, 0, 1));
+        model = glm::scale(model, m_assetImportDraft.defaultScale);
+        glm::mat4 viewProjection = camera->GetProjectionMatrix() * camera->GetViewMatrix();
+        ImVec2 points[8];
+        bool visible[8]{};
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            glm::vec3 local((corner & 1) ? m_assetImportDraft.boundsMax.x : m_assetImportDraft.boundsMin.x,
+                (corner & 2) ? m_assetImportDraft.boundsMax.y : m_assetImportDraft.boundsMin.y,
+                (corner & 4) ? m_assetImportDraft.boundsMax.z : m_assetImportDraft.boundsMin.z);
+            glm::vec4 clip = viewProjection * model * glm::vec4(local, 1.0f);
+            visible[corner] = clip.w > 0.001f;
+            if (visible[corner])
+            {
+                glm::vec3 ndc = glm::vec3(clip) / clip.w;
+                points[corner] = ImVec2(imageMin.x + (ndc.x * 0.5f + 0.5f) * previewSize.x,
+                    imageMin.y + (1.0f - (ndc.y * 0.5f + 0.5f)) * previewSize.y);
+            }
+        }
+        constexpr int edges[12][2] = { {0,1},{2,3},{4,5},{6,7},{0,2},{1,3},{4,6},{5,7},{0,4},{1,5},{2,6},{3,7} };
+        for (const auto& edge : edges)
+        {
+            if (visible[edge[0]] && visible[edge[1]])
+            {
+                drawList->AddLine(points[edge[0]], points[edge[1]], IM_COL32(255, 190, 65, 210), 1.5f);
+            }
+        }
+    }
+    ImGui::End();
+
+    ImGui::SetNextWindowPos(ImVec2(workPos.x + workSize.x - settingsWidth, workPos.y));
+    ImGui::SetNextWindowSize(ImVec2(settingsWidth, workSize.y));
+    ImGui::Begin("Asset Import Settings", nullptr, flags);
+    ImGui::TextUnformatted(m_assetImportDraft.name.c_str());
+    ImGui::TextWrapped("%s", m_assetImportDraft.path.c_str());
+    ImGui::Separator();
+
+    bool changed = false;
+    glm::vec3 degrees = glm::degrees(m_assetImportDraft.importRotation);
+    if (ImGui::DragFloat3("Import Rotation", &degrees.x, 0.5f, -360.0f, 360.0f, "%.1f deg"))
+    {
+        m_assetImportDraft.importRotation = glm::radians(degrees);
+        changed = true;
+    }
+    const struct { const char* label; int axis; float amount; } presets[] = {
+        { "X +90", 0, 90.0f }, { "X -90", 0, -90.0f }, { "Y +90", 1, 90.0f },
+        { "Y -90", 1, -90.0f }, { "Z +90", 2, 90.0f }, { "Z -90", 2, -90.0f }
+    };
+    for (int i = 0; i < 6; ++i)
+    {
+        if (i > 0 && i % 2 != 0) ImGui::SameLine();
+        if (ImGui::Button(presets[i].label))
+        {
+            m_assetImportDraft.importRotation[presets[i].axis] += glm::radians(presets[i].amount);
+            changed = true;
+        }
+    }
+    if (ImGui::Button("Reset Rotation"))
+    {
+        m_assetImportDraft.importRotation = glm::vec3(0.0f);
+        changed = true;
+    }
+
+    float uniformScale = m_assetImportDraft.defaultScale.x;
+    if (ImGui::DragFloat("Uniform Scale", &uniformScale, 0.01f, 0.001f, 1000.0f))
+    {
+        uniformScale = std::max(uniformScale, 0.001f);
+        m_assetImportDraft.defaultScale = glm::vec3(uniformScale);
+        changed = true;
+    }
+    changed = ImGui::DragFloat3("Pivot", &m_assetImportDraft.pivotOffset.x, 0.1f) || changed;
+
+    auto orientedBounds = [&]()
+    {
+        glm::mat4 transform(1.0f);
+        transform = glm::rotate(transform, m_assetImportDraft.importRotation.x, glm::vec3(1, 0, 0));
+        transform = glm::rotate(transform, m_assetImportDraft.importRotation.y, glm::vec3(0, 1, 0));
+        transform = glm::rotate(transform, m_assetImportDraft.importRotation.z, glm::vec3(0, 0, 1));
+        transform = glm::scale(transform, m_assetImportDraft.defaultScale);
+        glm::vec3 minimum(std::numeric_limits<float>::max());
+        glm::vec3 maximum(std::numeric_limits<float>::lowest());
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            glm::vec3 local((corner & 1) ? m_assetImportDraft.boundsMax.x : m_assetImportDraft.boundsMin.x,
+                (corner & 2) ? m_assetImportDraft.boundsMax.y : m_assetImportDraft.boundsMin.y,
+                (corner & 4) ? m_assetImportDraft.boundsMax.z : m_assetImportDraft.boundsMin.z);
+            glm::vec3 point = glm::vec3(transform * glm::vec4(local, 1.0f));
+            minimum = glm::min(minimum, point);
+            maximum = glm::max(maximum, point);
+        }
+        return std::pair<glm::vec3, glm::vec3>(minimum, maximum);
+    };
+    if (ImGui::Button("Center XZ"))
+    {
+        auto [minimum, maximum] = orientedBounds();
+        m_assetImportDraft.pivotOffset.x = -(minimum.x + maximum.x) * 0.5f;
+        m_assetImportDraft.pivotOffset.z = -(minimum.z + maximum.z) * 0.5f;
+        changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Place Bottom On Ground"))
+    {
+        auto [minimum, maximum] = orientedBounds();
+        m_assetImportDraft.pivotOffset.y = -minimum.y;
+        changed = true;
+    }
+
+    int surfaceMode = static_cast<int>(m_assetImportDraft.defaultSurfaceMode);
+    const char* surfaceLabels[] = { "Snap to Terrain", "Free Transform", "Align to Normal" };
+    if (ImGui::Combo("Surface Mode", &surfaceMode, surfaceLabels, 3))
+    {
+        m_assetImportDraft.defaultSurfaceMode = static_cast<ObjectSurfaceMode>(surfaceMode);
+        changed = true;
+    }
+    changed = ImGui::Checkbox("Show Bounds", &m_assetImportShowBounds) || changed;
+    m_assetImportDirty = m_assetImportDirty || changed;
+
+    ImGui::Separator();
+    if (ImGui::Button("Apply", ImVec2(90, 0)))
+    {
+        ApplyAssetImport();
+        ImGui::End();
+        return;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(90, 0)))
+    {
+        CloseAssetImport();
+        ImGui::End();
+        return;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Back", ImVec2(90, 0)))
+    {
+        if (m_assetImportDirty) m_assetImportCloseRequested = true;
+        else CloseAssetImport();
+    }
+    if (m_assetImportCloseRequested)
+    {
+        ImGui::OpenPopup("Unsaved Asset Changes");
+        m_assetImportCloseRequested = false;
+    }
+    if (ImGui::BeginPopupModal("Unsaved Asset Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextUnformatted("Apply changes before returning to the world?");
+        if (ImGui::Button("Apply"))
+        {
+            ApplyAssetImport();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Discard"))
+        {
+            CloseAssetImport();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Stay"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::End();
+}
 void pwg::EditorScene::DrawObjectsWindow()
 {
     if (!m_showObjects || !m_worldObjectManager)
@@ -1140,9 +1430,9 @@ void pwg::EditorScene::DrawObjectsWindow()
         {
             if (auto* asset = m_worldObjectManager->ImportObj(path))
             {
-                BeginObjectPlacement(asset->id);
+                BeginAssetImport(asset->id, true);
+                m_dirty = true;
             }
-            m_dirty = true;
         }
     }
 
@@ -1156,6 +1446,11 @@ void pwg::EditorScene::DrawObjectsWindow()
         {
             label += " [" + std::to_string(asset.submeshes.size()) + " parts]";
         }
+        if (ImGui::SmallButton("Edit"))
+        {
+            BeginAssetImport(asset.id, false);
+        }
+        ImGui::SameLine();
         if (ImGui::Selectable(label.c_str(), selected))
         {
             m_worldObjectManager->SelectAsset(asset.id);
@@ -1177,6 +1472,247 @@ void pwg::EditorScene::DrawObjectsWindow()
                 }
             }
             ImGui::EndTooltip();
+        }
+        ImGui::PopID();
+    }
+
+    ImGui::SeparatorText("Procedural Rule Sets");
+    if (ImGui::Button("New Rule Set"))
+    {
+        if (auto* created = m_worldObjectManager->CreateRuleSet())
+        {
+            m_selectedRuleSetId = created->id;
+            m_dirty = true;
+        }
+    }
+
+    for (const auto& ruleSet : m_worldObjectManager->GetRuleSets())
+    {
+        ImGui::PushID(ruleSet.id);
+        int generatedCount = static_cast<int>(std::count_if(m_worldObjectManager->GetObjects().begin(), m_worldObjectManager->GetObjects().end(), [&](const WorldObject& object)
+        {
+            return object.generated && object.sourceRuleSetId == ruleSet.id;
+        }));
+        std::string label = ruleSet.name + " (" + std::to_string(generatedCount) + ")";
+        if (ImGui::Selectable(label.c_str(), m_selectedRuleSetId == ruleSet.id))
+        {
+            m_selectedRuleSetId = ruleSet.id;
+        }
+        ImGui::PopID();
+    }
+
+    if (auto* ruleSet = m_worldObjectManager->FindRuleSet(m_selectedRuleSetId))
+    {
+        ImGui::PushID(ruleSet->id);
+        char ruleName[128] = {};
+        std::snprintf(ruleName, sizeof(ruleName), "%s", ruleSet->name.c_str());
+        bool changed = false;
+        if (ImGui::InputText("Name", ruleName, sizeof(ruleName)))
+        {
+            ruleSet->name = ruleName;
+            changed = true;
+        }
+        changed = ImGui::Checkbox("Enabled", &ruleSet->enabled) || changed;
+        changed = ImGui::InputInt("Seed", &ruleSet->seed) || changed;
+        changed = ImGui::SliderFloat("Density", &ruleSet->density, 0.0f, 1.0f) || changed;
+        changed = ImGui::DragFloat("Minimum spacing", &ruleSet->spacing, 1.0f, 4.0f, 500.0f) || changed;
+        changed = ImGui::DragFloatRange2("Height", &ruleSet->minHeight, &ruleSet->maxHeight, 1.0f, -20000.0f, 20000.0f) || changed;
+        changed = ImGui::DragFloatRange2("Slope (degrees)", &ruleSet->minSlopeDegrees, &ruleSet->maxSlopeDegrees, 0.5f, 0.0f, 90.0f) || changed;
+        std::vector<std::string> placementMasks;
+        for (const auto& [name, mask] : m_terrain->GetChunkManager()->GetMasks())
+        {
+            if (mask && mask->texture && name != "NormalMask" && name != "WaterFlux" && name != "WaterFluxDiagonal")
+            {
+                placementMasks.push_back(name);
+            }
+        }
+        std::sort(placementMasks.begin(), placementMasks.end());
+        const char* maskPreview = ruleSet->maskName.empty() ? "None" : ruleSet->maskName.c_str();
+        if (ImGui::BeginCombo("Placement mask", maskPreview))
+        {
+            if (ImGui::Selectable("None", ruleSet->maskName.empty()))
+            {
+                ruleSet->maskName.clear();
+                changed = true;
+            }
+            for (const auto& maskName : placementMasks)
+            {
+                if (ImGui::Selectable(maskName.c_str(), ruleSet->maskName == maskName))
+                {
+                    ruleSet->maskName = maskName;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (!ruleSet->maskName.empty())
+        {
+            changed = ImGui::DragFloatRange2("Mask value", &ruleSet->minMaskValue, &ruleSet->maxMaskValue, 0.01f, -10000.0f, 10000.0f) || changed;
+        }
+        changed = ImGui::DragFloat("Avoid water distance", &ruleSet->avoidWaterDistance, 1.0f, 0.0f, 1000.0f) || changed;
+        if (ruleSet->avoidWaterDistance > 0.0f)
+        {
+            changed = ImGui::DragFloat("Water threshold", &ruleSet->waterThreshold, 0.001f, 0.0f, 1000.0f) || changed;
+        }
+        changed = ImGui::DragFloat("Avoid river distance", &ruleSet->avoidRiverDistance, 1.0f, 0.0f, 1000.0f) || changed;
+        if (ruleSet->avoidRiverDistance > 0.0f)
+        {
+            changed = ImGui::DragFloat("River threshold", &ruleSet->riverThreshold, 0.001f, 0.0f, 1000.0f) || changed;
+        }
+        changed = ImGui::DragFloatRange2("Scale multiplier", &ruleSet->minScale, &ruleSet->maxScale, 0.01f, 0.01f, 10.0f) || changed;
+        changed = ImGui::DragFloatRange2("Rotation X (deg)", &ruleSet->minRotationDegrees.x, &ruleSet->maxRotationDegrees.x, 1.0f, -360.0f, 360.0f) || changed;
+        changed = ImGui::DragFloatRange2("Rotation Y (deg)", &ruleSet->minRotationDegrees.y, &ruleSet->maxRotationDegrees.y, 1.0f, -360.0f, 360.0f) || changed;
+        changed = ImGui::DragFloatRange2("Rotation Z (deg)", &ruleSet->minRotationDegrees.z, &ruleSet->maxRotationDegrees.z, 1.0f, -360.0f, 360.0f) || changed;
+        changed = ImGui::Checkbox("Align to normal", &ruleSet->alignToNormal) || changed;
+
+        ImGui::TextUnformatted("Assets and weights");
+        for (const auto& asset : m_worldObjectManager->GetAssets())
+        {
+            ImGui::PushID(asset.id);
+            auto findEntry = [&]()
+            {
+                return std::find_if(ruleSet->assets.begin(), ruleSet->assets.end(), [&](const ObjectRuleAsset& entry) { return entry.assetId == asset.id; });
+            };
+            bool included = findEntry() != ruleSet->assets.end();
+            if (ImGui::Checkbox("##included", &included))
+            {
+                if (included)
+                {
+                    ruleSet->assets.push_back({ asset.id, 1.0f });
+                }
+                else
+                {
+                    ruleSet->assets.erase(std::remove_if(ruleSet->assets.begin(), ruleSet->assets.end(), [&](const ObjectRuleAsset& entry) { return entry.assetId == asset.id; }), ruleSet->assets.end());
+                }
+                changed = true;
+            }
+            ImGui::SameLine();
+            ImGui::TextUnformatted(asset.name.c_str());
+            auto entry = findEntry();
+            if (entry != ruleSet->assets.end())
+            {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(90.0f);
+                changed = ImGui::DragFloat("Weight", &entry->weight, 0.05f, 0.0f, 100.0f) || changed;
+            }
+            ImGui::PopID();
+        }
+
+        ImGui::SeparatorText("Exclusion Zones");
+        if (ImGui::Button("Add Exclusion Zone"))
+        {
+            if (auto* zone = m_worldObjectManager->CreateExclusionZone(ruleSet->id))
+            {
+                m_selectedExclusionZoneId = zone->id;
+                changed = true;
+            }
+        }
+        for (const auto& zone : m_worldObjectManager->GetExclusionZones())
+        {
+            if (zone.ruleSetId != 0 && zone.ruleSetId != ruleSet->id)
+            {
+                continue;
+            }
+            ImGui::PushID(zone.id);
+            std::string zoneLabel = zone.name + (zone.ruleSetId == 0 ? " (Global)" : "");
+            if (ImGui::Selectable(zoneLabel.c_str(), m_selectedExclusionZoneId == zone.id))
+            {
+                m_selectedExclusionZoneId = zone.id;
+            }
+            ImGui::PopID();
+        }
+        if (auto* zone = m_worldObjectManager->FindExclusionZone(m_selectedExclusionZoneId);
+            zone && (zone->ruleSetId == 0 || zone->ruleSetId == ruleSet->id))
+        {
+            ImGui::PushID(zone->id);
+            char zoneNameBuffer[128] = {};
+            std::snprintf(zoneNameBuffer, sizeof(zoneNameBuffer), "%s", zone->name.c_str());
+            if (ImGui::InputText("Zone Name", zoneNameBuffer, sizeof(zoneNameBuffer)))
+            {
+                zone->name = zoneNameBuffer;
+                changed = true;
+            }
+            changed = ImGui::Checkbox("Zone Enabled", &zone->enabled) || changed;
+            bool global = zone->ruleSetId == 0;
+            if (ImGui::Checkbox("Global Zone", &global))
+            {
+                zone->ruleSetId = global ? 0 : ruleSet->id;
+                changed = true;
+            }
+            int shape = static_cast<int>(zone->shape);
+            const char* shapeLabels[] = { "Circle", "Box" };
+            if (ImGui::Combo("Shape", &shape, shapeLabels, 2))
+            {
+                zone->shape = static_cast<ObjectExclusionShape>(shape);
+                changed = true;
+            }
+            changed = ImGui::DragFloat2("Center XZ", &zone->center.x, 0.5f) || changed;
+            if (zone->shape == ObjectExclusionShape::Circle)
+            {
+                changed = ImGui::DragFloat("Radius", &zone->radius, 0.5f, 0.0f, 100000.0f) || changed;
+            }
+            else
+            {
+                changed = ImGui::DragFloat2("Half Extents XZ", &zone->halfExtents.x, 0.5f, 0.0f, 100000.0f) || changed;
+            }
+            if (ImGui::Button("Delete Exclusion Zone"))
+            {
+                int removedZoneId = zone->id;
+                m_selectedExclusionZoneId = 0;
+                m_worldObjectManager->RemoveExclusionZone(removedZoneId);
+                changed = true;
+            }
+            ImGui::PopID();
+        }
+        int chunkCount = m_terrain->GetChunkManager()->GetChunkCount();
+        m_objectChunkX = std::clamp(m_objectChunkX, 0, chunkCount - 1);
+        m_objectChunkZ = std::clamp(m_objectChunkZ, 0, chunkCount - 1);
+        ImGui::SetNextItemWidth(100.0f);
+        ImGui::InputInt("Chunk X", &m_objectChunkX);
+        ImGui::SetNextItemWidth(100.0f);
+        ImGui::InputInt("Chunk Z", &m_objectChunkZ);
+        m_objectChunkX = std::clamp(m_objectChunkX, 0, chunkCount - 1);
+        m_objectChunkZ = std::clamp(m_objectChunkZ, 0, chunkCount - 1);
+        if (ImGui::Button("Regenerate Chunk"))
+        {
+            m_worldObjectManager->GenerateRuleSet(ruleSet->id, m_terrain, m_objectChunkX, m_objectChunkZ);
+            changed = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear Chunk"))
+        {
+            m_worldObjectManager->ClearGenerated(ruleSet->id, m_objectChunkX, m_objectChunkZ);
+            changed = true;
+        }
+
+        if (ImGui::Button("Generate"))
+        {
+            m_worldObjectManager->GenerateRuleSet(ruleSet->id, m_terrain);
+            changed = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear Generated"))
+        {
+            m_worldObjectManager->ClearGenerated(ruleSet->id);
+            changed = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Bake"))
+        {
+            m_worldObjectManager->BakeGenerated(ruleSet->id);
+            changed = true;
+        }
+        if (ImGui::Button("Delete Rule Set"))
+        {
+            int removedId = ruleSet->id;
+            m_selectedRuleSetId = 0;
+    m_selectedExclusionZoneId = 0;
+            m_worldObjectManager->RemoveRuleSet(removedId);
+            changed = true;
+        }
+        if (changed)
+        {
+            m_dirty = true;
         }
         ImGui::PopID();
     }
@@ -1231,12 +1767,12 @@ void pwg::EditorScene::DrawObjectsWindow()
         changed = ImGui::DragFloat3("Position", &object->transform.position.x, 0.25f) || changed;
         changed = ImGui::DragFloat3("Rotation", &object->transform.rotation.x, 0.01f) || changed;
         changed = ImGui::DragFloat3("Scale", &object->transform.scale.x, 0.01f, 0.001f, 100.0f) || changed;
-        if (object->snapToTerrain && !object->freeTransform)
-        {
-            object->transform.position.y = m_terrain->GetTerrainHeightAt(object->transform.position.x, object->transform.position.z) - 4.0f;
-        }
         if (changed)
         {
+            if (object->snapToTerrain && !object->freeTransform)
+            {
+                m_worldObjectManager->GroundObjectToTerrain(*object, m_terrain);
+            }
             m_dirty = true;
         }
     }

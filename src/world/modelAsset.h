@@ -34,11 +34,15 @@ namespace pwg
 		std::string path;
 		glm::vec3 defaultScale{ 1.0f, 1.0f, 1.0f };
 		glm::vec3 pivotOffset{ 0.0f, 0.0f, 0.0f };
+		glm::vec3 importRotation{ 0.0f, 0.0f, 0.0f };
 		glm::vec3 diffuseColor{ 0.78f, 0.78f, 0.74f };
 		std::string albedoPath;
 		std::shared_ptr<Texture> albedoTexture;
 		glm::vec3 boundsCenter{ 0.0f, 0.0f, 0.0f };
+		glm::vec3 boundsMin{ -0.5f, -0.5f, -0.5f };
+		glm::vec3 boundsMax{ 0.5f, 0.5f, 0.5f };
 		float boundsRadius{ 1.0f };
+		std::vector<glm::vec3> groundingPoints;
 		std::vector<ModelSubmesh> submeshes;
 		ObjectSurfaceMode defaultSurfaceMode{ ObjectSurfaceMode::SnapToTerrain };
 		std::shared_ptr<Mesh> mesh;
@@ -57,6 +61,11 @@ namespace pwg
 		bool alignToNormal{ false };
 		bool visible{ true };
 		bool selected{ false };
+		bool generated{ false };
+		int sourceRuleSetId{ 0 };
+		float terrainOffset{ -4.0f };
+		int generatedChunkX{ -1 };
+		int generatedChunkZ{ -1 };
 	};
 }
 
