@@ -2,6 +2,7 @@
 #define SRC_TERRAIN_GPU_TERRAIN_COMPUTE_PIPELINE_H
 
 #include <unordered_map>
+#include <cstdint>
 #include "graphics/shader/computeShader.h"
 #include "graphics/shader/shaderManager.h"
 #include "terrain/graph/terrainGraph.h"
@@ -23,6 +24,27 @@
 
 namespace pwg
 {
+	enum class VegetationAssetType
+	{
+		TreeA,
+		TreeB,
+		Grass
+	};
+
+	struct VegetationLayerDescriptor
+	{
+		int nodeId{ 0 };
+		VegetationAssetType assetType{ VegetationAssetType::TreeA };
+		int seed{ 1337 };
+		float density{ 0.5f };
+		float spacing{ 50.0f };
+		float minScale{ 0.8f };
+		float maxScale{ 1.2f };
+		float maxSlopeDegrees{ 30.0f };
+		float renderDistance{ 1000.0f };
+		std::shared_ptr<TerrainMask> densityMask;
+	};
+
 	class TerrainComputePipeline
 	{
 	public:
@@ -53,6 +75,8 @@ namespace pwg
 		std::shared_ptr<TerrainGraph> GetGraph();
 		TerrainGraphAsset& GetUniversalGraphAsset();
 		const TerrainGraphAsset& GetUniversalGraphAsset() const;
+		const std::vector<VegetationLayerDescriptor>& GetVegetationLayers() const;
+		std::uint64_t GetVegetationRevision() const;
 		void ResetUniversalGraphToDefault();
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& GetMasks();
 		HydraulicSimulationSettings& GetHydraulicSettings();
@@ -66,6 +90,8 @@ namespace pwg
 		std::unordered_map<std::string, std::shared_ptr<Texture>> m_finalTerrainMasks;
 		std::shared_ptr<TerrainGraph> m_graph;
 		TerrainGraphAsset m_universalGraphAsset;
+		std::vector<VegetationLayerDescriptor> m_vegetationLayers;
+		std::uint64_t m_vegetationRevision{ 0 };
 		std::shared_ptr<ShaderManager> m_shaderManager;
 		std::shared_ptr<TerrainDebug> m_terrainDebug;
 

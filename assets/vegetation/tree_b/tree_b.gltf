@@ -1,0 +1,270 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.4.2",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 333,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5125,
+      "count": 101748,
+      "bufferView": 0,
+      "byteOffset": 668
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 166,
+      "max": [
+        2.0590686798095703,
+        1.1076322793960571,
+        0.1113872081041336
+      ],
+      "min": [
+        -0.08885680139064789,
+        -0.007901787757873535,
+        -0.08966138958930969
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 166,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 166,
+      "bufferView": 1,
+      "byteOffset": 20
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 89762,
+      "max": [
+        2.301935911178589,
+        1.292370319366455,
+        0.3871777057647705
+      ],
+      "min": [
+        -0.43579012155532837,
+        0.024408161640167236,
+        -0.42990371584892273
+      ],
+      "bufferView": 2,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 89762,
+      "bufferView": 2,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 89762,
+      "bufferView": 2,
+      "byteOffset": 20
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 407660,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 407660,
+      "byteLength": 5312,
+      "byteStride": 32,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 412972,
+      "byteLength": 2872384,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    },
+    {
+      "source": 4,
+      "sampler": 0
+    },
+    {
+      "source": 3,
+      "sampler": 0
+    },
+    {
+      "source": 5,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "fir_sapling_branches_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/fir_sapling_branches_nor_gl_1k.jpg"
+    },
+    {
+      "name": "fir_sapling_branches_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/fir_sapling_branches_diff_1k.jpg"
+    },
+    {
+      "name": "fir_sapling_branches_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/fir_sapling_branches_arm_1k.jpg"
+    },
+    {
+      "name": "fir_sapling_twigs_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/fir_sapling_twigs_nor_gl_1k.jpg"
+    },
+    {
+      "name": "fir_sapling_twigs_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/fir_sapling_twigs_diff_1k.jpg"
+    },
+    {
+      "name": "fir_sapling_twigs_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/fir_sapling_twigs_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "fir_sapling.bin",
+      "byteLength": 3285356
+    }
+  ],
+  "materials": [
+    {
+      "name": "fir_sapling_branches",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    },
+    {
+      "name": "fir_sapling_twigs",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 3
+        },
+        "metallicRoughnessTexture": {
+          "index": 5
+        }
+      },
+      "normalTexture": {
+        "index": 4
+      },
+      "extensions": {
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        },
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            0.05309009571385226,
+            0.05309009571385226,
+            0.05309009571385226
+          ]
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cylinder",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 2,
+            "TEXCOORD_0": 3,
+            "NORMAL": 4
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        },
+        {
+          "attributes": {
+            "POSITION": 5,
+            "TEXCOORD_0": 6,
+            "NORMAL": 7
+          },
+          "mode": 4,
+          "material": 1,
+          "indices": 1
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "fir_sapling_a",
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0,
+  "extensionsUsed": [
+    "KHR_materials_ior",
+    "KHR_materials_specular"
+  ]
+}

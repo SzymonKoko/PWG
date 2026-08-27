@@ -68,7 +68,7 @@ void pwg::Renderer::DrawMeshInstanced(std::shared_ptr<Mesh> mesh, std::shared_pt
 
 bool pwg::Renderer::IsSphereVisible(const glm::vec3& center, float radius, float maxDistance) const
 {
-	if (maxDistance > 0.0f && glm::length(center - m_cameraPosition) > maxDistance + radius)
+	if (maxDistance > 0.0f && glm::distance(glm::vec2(center.x, center.z), glm::vec2(m_cameraPosition.x, m_cameraPosition.z)) > maxDistance + radius)
 	{
 		return false;
 	}

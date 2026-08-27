@@ -510,6 +510,7 @@ namespace pwg
 		// Recompute normals / slope from the restored heightmap so shading matches.
 		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
 		UpdateHeightCache();
+		++m_generationRevision;
 		CancelWaterSettle();
 	}
 
@@ -530,6 +531,7 @@ namespace pwg
 	{
 		m_terrainComputePipeline->BakeParticleErosion(m_globalMasks);
 		UpdateHeightCache();
+		++m_generationRevision;
 	}
 
 	void ChunkManager::StartParticleBake()
@@ -675,6 +677,7 @@ namespace pwg
 		m_heightCache.clear();
 		m_heightCacheValid = false;
 		m_needRegenerate = true;
+		++m_generationRevision;
 	}
 
 	void ChunkManager::SetNeedRegenerate(bool enabled)
@@ -707,6 +710,11 @@ namespace pwg
 		return m_worldSize;
 	}
 
+	std::uint64_t ChunkManager::GetGenerationRevision() const
+	{
+		return m_generationRevision;
+	}
+
 	bool ChunkManager::IsParticleBakeActive() const
 	{
 		return m_particleBakeActive;
@@ -730,8 +738,10 @@ namespace pwg
 		}
 
 		float worldHalfSize = (m_worldSize - 1) * 0.5f;
-		float textureX = std::clamp(worldX + worldHalfSize, 0.0f, static_cast<float>(m_worldSize - 1));
-		float textureZ = std::clamp(worldZ + worldHalfSize, 0.0f, static_cast<float>(m_worldSize - 1));
+		// Terrain vertices sample normalized UVs. OpenGL maps those coordinates to
+		// texel centers with a -0.5 offset, so CPU height queries must do the same.
+		float textureX = std::clamp(worldX + worldHalfSize - 0.5f, 0.0f, static_cast<float>(m_worldSize - 1));
+		float textureZ = std::clamp(worldZ + worldHalfSize - 0.5f, 0.0f, static_cast<float>(m_worldSize - 1));
 
 		int x0 = static_cast<int>(std::floor(textureX));
 		int z0 = static_cast<int>(std::floor(textureZ));
@@ -796,6 +806,7 @@ namespace pwg
 	{
 		m_terrainComputePipeline->GenerateWorld(m_globalMasks);
 		UpdateHeightCache();
+		++m_generationRevision;
 		m_needRegenerate = false;
 	}
 
@@ -807,6 +818,7 @@ namespace pwg
 		{
 			m_globalMasks["BaseHeight"]->texture->CopyFrom(*m_globalMasks["FinalHeight"]->texture);
 			UpdateHeightCache();
+			++m_generationRevision;
 			m_needRegenerate = false;
 		}
 		return executed;
@@ -819,6 +831,7 @@ namespace pwg
 			StepSimulation();
 		}
 		UpdateHeightCache();
+		++m_generationRevision;
 	}
 }
 

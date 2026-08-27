@@ -8,7 +8,6 @@
 #include "terrain/graph/universalTerrainGraph.h"
 #include "terrain/chunk/chunkManager.h"
 #include "yaml-cpp/yaml.h"
-#include "world/objModelImporter.h"
 
 #include <fstream>
 #include <unordered_map>
@@ -515,6 +514,41 @@ namespace pwg
 			if (node["string"]) param.stringValue = node["string"].as<std::string>();
 		}
 
+		void MigrateVegetationDefaults(TerrainGraphNodeInstance& node)
+		{
+			auto parameter = [&](const char* id) -> TerrainGraphParameter*
+			{
+				auto found = std::find_if(node.parameters.begin(), node.parameters.end(), [&](const TerrainGraphParameter& value)
+				{
+					return value.id == id;
+				});
+				return found != node.parameters.end() ? &(*found) : nullptr;
+			};
+			if (node.typeId == "grassAsset")
+			{
+				auto* density = parameter("density");
+				auto* spacing = parameter("spacing");
+				auto* renderDistance = parameter("renderDistance");
+				if (density && spacing && renderDistance &&
+				std::abs(density->floatValue - 0.65f) < 0.0001f &&
+				std::abs(spacing->floatValue - 5.0f) < 0.0001f &&
+				std::abs(renderDistance->floatValue - 220.0f) < 0.0001f)
+				{
+					density->floatValue = 0.95f;
+					spacing->floatValue = 3.0f;
+					renderDistance->floatValue = 180.0f;
+				}
+			}
+			else if (node.typeId == "treeAssetA" || node.typeId == "treeAssetB")
+			{
+				auto* maxSlope = parameter("maxSlope");
+				if (maxSlope && std::abs(maxSlope->floatValue - 28.0f) < 0.0001f)
+				{
+					maxSlope->floatValue = 15.0f;
+				}
+			}
+		}
+
 		YAML::Node WriteUniversalTerrainGraph(const TerrainGraphAsset& asset)
 		{
 			YAML::Node node;
@@ -605,6 +639,7 @@ namespace pwg
 							}
 						}
 					}
+					MigrateVegetationDefaults(graphNode);
 					asset.nodes.push_back(std::move(graphNode));
 				}
 			}
@@ -834,258 +869,6 @@ namespace pwg
 			ReadValue(node, "lakeMaxDepth", settings.lakeMaxDepth);
 		}
 	}
-		YAML::Node WriteWorldObjects(const WorldObjectManager& manager)
-		{
-			YAML::Node node;
-			for (const auto& asset : manager.GetAssets())
-			{
-				YAML::Node assetNode;
-				assetNode["id"] = asset.id;
-				assetNode["name"] = asset.name;
-				assetNode["path"] = asset.path;
-				assetNode["defaultScale"] = Vec3Node(asset.defaultScale);
-				assetNode["pivotOffset"] = Vec3Node(asset.pivotOffset);
-				assetNode["importRotation"] = Vec3Node(asset.importRotation);
-				assetNode["diffuseColor"] = Vec3Node(asset.diffuseColor);
-				assetNode["albedoPath"] = asset.albedoPath;
-				for (const auto& submesh : asset.submeshes)
-				{
-					YAML::Node submeshNode;
-					submeshNode["name"] = submesh.name;
-					submeshNode["diffuseColor"] = Vec3Node(submesh.diffuseColor);
-					submeshNode["albedoPath"] = submesh.albedoPath;
-					assetNode["submeshes"].push_back(submeshNode);
-				}
-				assetNode["surfaceMode"] = static_cast<int>(asset.defaultSurfaceMode);
-				node["assets"].push_back(assetNode);
-			}
-
-			for (const auto& object : manager.GetObjects())
-			{
-				if (object.generated)
-				{
-					continue;
-				}
-				YAML::Node objectNode;
-				objectNode["id"] = object.id;
-				objectNode["assetId"] = object.assetId;
-				objectNode["name"] = object.name;
-				objectNode["position"] = Vec3Node(object.transform.position);
-				objectNode["rotation"] = Vec3Node(object.transform.rotation);
-				objectNode["scale"] = Vec3Node(object.transform.scale);
-				objectNode["snapToTerrain"] = object.snapToTerrain;
-				objectNode["freeTransform"] = object.freeTransform;
-				objectNode["alignToNormal"] = object.alignToNormal;
-				objectNode["visible"] = object.visible;
-				objectNode["selected"] = object.selected;
-				objectNode["terrainOffset"] = object.terrainOffset;
-				node["instances"].push_back(objectNode);
-			}
-
-			for (const auto& ruleSet : manager.GetRuleSets())
-			{
-				YAML::Node ruleNode;
-				ruleNode["id"] = ruleSet.id;
-				ruleNode["name"] = ruleSet.name;
-				ruleNode["seed"] = ruleSet.seed;
-				ruleNode["enabled"] = ruleSet.enabled;
-				ruleNode["density"] = ruleSet.density;
-				ruleNode["spacing"] = ruleSet.spacing;
-				ruleNode["minHeight"] = ruleSet.minHeight;
-				ruleNode["maxHeight"] = ruleSet.maxHeight;
-				ruleNode["minSlopeDegrees"] = ruleSet.minSlopeDegrees;
-				ruleNode["maxSlopeDegrees"] = ruleSet.maxSlopeDegrees;
-				ruleNode["maskName"] = ruleSet.maskName;
-				ruleNode["minMaskValue"] = ruleSet.minMaskValue;
-				ruleNode["maxMaskValue"] = ruleSet.maxMaskValue;
-				ruleNode["avoidWaterDistance"] = ruleSet.avoidWaterDistance;
-				ruleNode["waterThreshold"] = ruleSet.waterThreshold;
-				ruleNode["avoidRiverDistance"] = ruleSet.avoidRiverDistance;
-				ruleNode["riverThreshold"] = ruleSet.riverThreshold;
-				ruleNode["minScale"] = ruleSet.minScale;
-				ruleNode["maxScale"] = ruleSet.maxScale;
-				ruleNode["minRotationDegrees"] = Vec3Node(ruleSet.minRotationDegrees);
-				ruleNode["maxRotationDegrees"] = Vec3Node(ruleSet.maxRotationDegrees);
-				ruleNode["randomYaw"] = ruleSet.randomYaw;
-				ruleNode["alignToNormal"] = ruleSet.alignToNormal;
-				for (const auto& entry : ruleSet.assets)
-				{
-					YAML::Node entryNode;
-					entryNode["assetId"] = entry.assetId;
-					entryNode["weight"] = entry.weight;
-					ruleNode["assets"].push_back(entryNode);
-				}
-				node["ruleSets"].push_back(ruleNode);
-			}
-			for (const auto& zone : manager.GetExclusionZones())
-			{
-				YAML::Node zoneNode;
-				zoneNode["id"] = zone.id;
-				zoneNode["name"] = zone.name;
-				zoneNode["enabled"] = zone.enabled;
-				zoneNode["ruleSetId"] = zone.ruleSetId;
-				zoneNode["shape"] = static_cast<int>(zone.shape);
-				zoneNode["center"]["x"] = zone.center.x;
-				zoneNode["center"]["y"] = zone.center.y;
-				zoneNode["halfExtents"]["x"] = zone.halfExtents.x;
-				zoneNode["halfExtents"]["y"] = zone.halfExtents.y;
-				zoneNode["radius"] = zone.radius;
-				node["exclusionZones"].push_back(zoneNode);
-			}
-			return node;
-		}
-
-		void ReadWorldObjects(const YAML::Node& node, EditorScene& scene)
-		{
-			auto manager = scene.GetWorldObjectManager();
-			if (!manager)
-			{
-				return;
-			}
-			manager->Clear();
-			if (!node)
-			{
-				return;
-			}
-
-			auto assets = node["assets"];
-			if (assets && assets.IsSequence())
-			{
-				for (const auto& assetNode : assets)
-				{
-					ModelAsset asset;
-					ReadValue(assetNode, "id", asset.id);
-					ReadValue(assetNode, "name", asset.name);
-					ReadValue(assetNode, "path", asset.path);
-					asset.defaultScale = ReadVec3(assetNode["defaultScale"], asset.defaultScale);
-					asset.pivotOffset = ReadVec3(assetNode["pivotOffset"], asset.pivotOffset);
-					asset.importRotation = ReadVec3(assetNode["importRotation"], asset.importRotation);
-					asset.diffuseColor = ReadVec3(assetNode["diffuseColor"], asset.diffuseColor);
-					ReadValue(assetNode, "albedoPath", asset.albedoPath);
-					int surfaceMode = static_cast<int>(asset.defaultSurfaceMode);
-					ReadValue(assetNode, "surfaceMode", surfaceMode);
-					asset.defaultSurfaceMode = static_cast<ObjectSurfaceMode>(std::clamp(surfaceMode, 0, 2));
-
-					auto imported = ObjModelImporter::Load(asset.path);
-					asset.submeshes = imported.submeshes;
-					asset.mesh = imported.mesh;
-					if (asset.albedoPath.empty())
-					{
-						asset.albedoPath = imported.albedoPath;
-					}
-					asset.loaded = imported.success;
-					asset.status = imported.message;
-					if (!asset.loaded)
-					{
-						asset.status = "Missing OBJ: " + asset.path;
-					}
-					manager->AddAssetRecord(asset);
-				}
-			}
-
-			auto ruleSets = node["ruleSets"];
-			if (ruleSets && ruleSets.IsSequence())
-			{
-				for (const auto& ruleNode : ruleSets)
-				{
-					ObjectRuleSet ruleSet;
-					ReadValue(ruleNode, "id", ruleSet.id);
-					ReadValue(ruleNode, "name", ruleSet.name);
-					ReadValue(ruleNode, "seed", ruleSet.seed);
-					ReadValue(ruleNode, "enabled", ruleSet.enabled);
-					ReadValue(ruleNode, "density", ruleSet.density);
-					ReadValue(ruleNode, "spacing", ruleSet.spacing);
-					ReadValue(ruleNode, "minHeight", ruleSet.minHeight);
-					ReadValue(ruleNode, "maxHeight", ruleSet.maxHeight);
-					ReadValue(ruleNode, "minSlopeDegrees", ruleSet.minSlopeDegrees);
-					ReadValue(ruleNode, "maxSlopeDegrees", ruleSet.maxSlopeDegrees);
-					ReadValue(ruleNode, "maskName", ruleSet.maskName);
-					ReadValue(ruleNode, "minMaskValue", ruleSet.minMaskValue);
-					ReadValue(ruleNode, "maxMaskValue", ruleSet.maxMaskValue);
-					ReadValue(ruleNode, "avoidWaterDistance", ruleSet.avoidWaterDistance);
-					ReadValue(ruleNode, "waterThreshold", ruleSet.waterThreshold);
-					ReadValue(ruleNode, "avoidRiverDistance", ruleSet.avoidRiverDistance);
-					ReadValue(ruleNode, "riverThreshold", ruleSet.riverThreshold);
-					ReadValue(ruleNode, "minScale", ruleSet.minScale);
-					ReadValue(ruleNode, "maxScale", ruleSet.maxScale);
-					ReadValue(ruleNode, "randomYaw", ruleSet.randomYaw);
-					if (ruleNode["minRotationDegrees"] && ruleNode["maxRotationDegrees"])
-					{
-						ruleSet.minRotationDegrees = ReadVec3(ruleNode["minRotationDegrees"], ruleSet.minRotationDegrees);
-						ruleSet.maxRotationDegrees = ReadVec3(ruleNode["maxRotationDegrees"], ruleSet.maxRotationDegrees);
-					}
-					else
-					{
-						ruleSet.minRotationDegrees = glm::vec3(0.0f);
-						ruleSet.maxRotationDegrees = glm::vec3(0.0f, ruleSet.randomYaw ? 360.0f : 0.0f, 0.0f);
-					}
-					ReadValue(ruleNode, "alignToNormal", ruleSet.alignToNormal);
-					auto entries = ruleNode["assets"];
-					if (entries && entries.IsSequence())
-					{
-						for (const auto& entryNode : entries)
-						{
-							ObjectRuleAsset entry;
-							ReadValue(entryNode, "assetId", entry.assetId);
-							ReadValue(entryNode, "weight", entry.weight);
-							ruleSet.assets.push_back(entry);
-						}
-					}
-					manager->AddRuleSetRecord(ruleSet);
-				}
-			}
-
-			auto exclusionZones = node["exclusionZones"];
-			if (exclusionZones && exclusionZones.IsSequence())
-			{
-				for (const auto& zoneNode : exclusionZones)
-				{
-					ObjectExclusionZone zone;
-					ReadValue(zoneNode, "id", zone.id);
-					ReadValue(zoneNode, "name", zone.name);
-					ReadValue(zoneNode, "enabled", zone.enabled);
-					ReadValue(zoneNode, "ruleSetId", zone.ruleSetId);
-					int shape = static_cast<int>(zone.shape);
-					ReadValue(zoneNode, "shape", shape);
-					zone.shape = static_cast<ObjectExclusionShape>(std::clamp(shape, 0, 1));
-					if (auto center = zoneNode["center"])
-					{
-						ReadValue(center, "x", zone.center.x);
-						ReadValue(center, "y", zone.center.y);
-					}
-					if (auto halfExtents = zoneNode["halfExtents"])
-					{
-						ReadValue(halfExtents, "x", zone.halfExtents.x);
-						ReadValue(halfExtents, "y", zone.halfExtents.y);
-					}
-					ReadValue(zoneNode, "radius", zone.radius);
-					manager->AddExclusionZoneRecord(zone);
-				}
-			}
-			auto instances = node["instances"];
-			if (instances && instances.IsSequence())
-			{
-				for (const auto& objectNode : instances)
-				{
-					WorldObject object;
-					ReadValue(objectNode, "id", object.id);
-					ReadValue(objectNode, "assetId", object.assetId);
-					ReadValue(objectNode, "name", object.name);
-					object.transform.position = ReadVec3(objectNode["position"], object.transform.position);
-					object.transform.rotation = ReadVec3(objectNode["rotation"], object.transform.rotation);
-					object.transform.scale = ReadVec3(objectNode["scale"], object.transform.scale);
-					ReadValue(objectNode, "snapToTerrain", object.snapToTerrain);
-					ReadValue(objectNode, "freeTransform", object.freeTransform);
-					ReadValue(objectNode, "alignToNormal", object.alignToNormal);
-					ReadValue(objectNode, "visible", object.visible);
-					ReadValue(objectNode, "selected", object.selected);
-					ReadValue(objectNode, "terrainOffset", object.terrainOffset);
-					manager->AddObjectRecord(object);
-				}
-			}
-			manager->MarkCleanSelection();
-		}
-
 	namespace
 	{
 		std::string SimulationSidecarPath(const std::string& projectPath)
@@ -1223,11 +1006,6 @@ namespace pwg
 		root["camera"]["activeType"] = static_cast<int>(scene.GetCameraManager()->GetActiveCameraType());
 		root["camera"]["position"] = Vec3Node(scene.GetCameraManager()->GetCameraPosition());
 		root["editorUi"] = WriteEditorUi(scene);
-		if (scene.GetWorldObjectManager())
-		{
-			root["worldObjects"] = WriteWorldObjects(*scene.GetWorldObjectManager());
-		}
-
 		std::ofstream stream(path);
 		if (!stream.is_open())
 		{
@@ -1296,8 +1074,6 @@ namespace pwg
 			scene.GetCameraManager()->SetCameraPosition(position.x, position.y, position.z);
 		}
 		ReadEditorUi(root["editorUi"], scene);
-		ReadWorldObjects(root["worldObjects"], scene);
-
 		chunkManager->GenerateWorld();
 
 		// Bring back the saved simulation state (water + eroded terrain) if present.
@@ -1305,19 +1081,6 @@ namespace pwg
 		if (ReadSimulationSidecar(SimulationSidecarPath(path), snapshot))
 		{
 			chunkManager->RestoreSimulationState(snapshot);
-		}
-		auto objectManager = scene.GetWorldObjectManager();
-		if (objectManager)
-		{
-			std::vector<int> ruleSetIds;
-			for (const auto& ruleSet : objectManager->GetRuleSets())
-			{
-				ruleSetIds.push_back(ruleSet.id);
-			}
-			for (int ruleSetId : ruleSetIds)
-			{
-				objectManager->GenerateRuleSet(ruleSetId, scene.GetTerrain());
-			}
 		}
 		return true;
 	}

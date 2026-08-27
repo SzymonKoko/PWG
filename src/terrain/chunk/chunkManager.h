@@ -12,6 +12,7 @@
 #include "graphics/shader/shader.h"
 #include <glm/glm.hpp>
 #include <vector>
+#include <cstdint>
 
 namespace pwg
 {
@@ -66,6 +67,7 @@ namespace pwg
 		int GetChunkCount();
 		int GetChunkSize();
 		int GetWorldSize();
+		std::uint64_t GetGenerationRevision() const;
 		bool IsParticleBakeActive() const;
 		int GetParticleBakeStep() const;
 		int GetParticleBakeTotal() const;
@@ -103,6 +105,7 @@ namespace pwg
 		int m_particleBakeTotal{ 0 };
 		std::vector<float> m_heightCache;
 		bool m_heightCacheValid{ false };
+		std::uint64_t m_generationRevision{ 0 };
 		std::shared_ptr<TerrainDebug> m_terrainDebug;
 		std::shared_ptr<Texture> m_sceneColorCopy;
 		int m_sceneColorCopyWidth{ 0 };

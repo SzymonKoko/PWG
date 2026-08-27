@@ -177,6 +177,7 @@ namespace pwg
 		}
 
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> outputs;
+		std::vector<VegetationLayerDescriptor> vegetationLayers;
 		auto outputFor = [&](int nodeId, const std::string& portId) -> std::shared_ptr<TerrainMask>
 		{
 			auto it = outputs.find(OutputKey(nodeId, portId));
@@ -396,10 +397,33 @@ namespace pwg
 				auto target = EnsureFloatMask(masks, targetName, m_size);
 				target->texture->CopyFrom(*source->texture);
 			}
+			else if (node->typeId == "treeAssetA" || node->typeId == "treeAssetB" || node->typeId == "grassAsset")
+			{
+				VegetationLayerDescriptor layer;
+				layer.nodeId = node->id;
+				layer.assetType = node->typeId == "treeAssetA"
+					? VegetationAssetType::TreeA
+					: (node->typeId == "treeAssetB" ? VegetationAssetType::TreeB : VegetationAssetType::Grass);
+				layer.seed = GetIntParameter(*node, "seed", 1337);
+				layer.density = std::clamp(GetFloatParameter(*node, "density", 0.5f), 0.0f, 1.0f);
+				layer.spacing = std::max(GetFloatParameter(*node, "spacing", 50.0f), 1.0f);
+				layer.minScale = GetFloatParameter(*node, "minScale", 0.8f);
+				layer.maxScale = GetFloatParameter(*node, "maxScale", 1.2f);
+				if (layer.minScale > layer.maxScale)
+				{
+					std::swap(layer.minScale, layer.maxScale);
+				}
+				layer.maxSlopeDegrees = std::clamp(GetFloatParameter(*node, "maxSlope", 30.0f), 0.0f, 89.0f);
+				layer.renderDistance = std::max(GetFloatParameter(*node, "renderDistance", 1000.0f), 1.0f);
+				layer.densityMask = inputFor(*node, "density");
+				vegetationLayers.push_back(std::move(layer));
+			}
 		}
 
 		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
 		m_terrainMasks = masks;
+		m_vegetationLayers = std::move(vegetationLayers);
+		++m_vegetationRevision;
 		return true;
 	}
 
@@ -716,6 +740,14 @@ namespace pwg
 	const TerrainGraphAsset& TerrainComputePipeline::GetUniversalGraphAsset() const
 	{
 		return m_universalGraphAsset;
+	}
+	const std::vector<VegetationLayerDescriptor>& TerrainComputePipeline::GetVegetationLayers() const
+	{
+		return m_vegetationLayers;
+	}
+	std::uint64_t TerrainComputePipeline::GetVegetationRevision() const
+	{
+		return m_vegetationRevision;
 	}
 	void TerrainComputePipeline::ResetUniversalGraphToDefault()
 	{

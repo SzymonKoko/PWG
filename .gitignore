@@ -4,3 +4,4 @@ docs/reports/**/*.aux
 docs/reports/**/*.log
 docs/reports/**/*.out
 docs/reports/**/*.toc
+source-assets/vegetation/*.zip
