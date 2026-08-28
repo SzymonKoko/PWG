@@ -139,6 +139,7 @@ void pwg::Gui::EnableDockSpace()
 		ImGui::DockBuilderDockWindow("Outliner", dockLeft);
 		ImGui::DockBuilderDockWindow("Terrain Graph", dockBottom);
 		ImGui::DockBuilderDockWindow("Material Library", dockRight);
+		ImGui::DockBuilderDockWindow("Vegetation Library", dockRight);
 		ImGui::DockBuilderDockWindow("World", dockRight);
 		ImGui::DockBuilderDockWindow("Debug", dockBottom);
 		ImGui::DockBuilderFinish(dockspace_id);
@@ -252,6 +253,7 @@ void pwg::Gui::DrawMainMenuBar()
 		ImGui::MenuItem("Outliner", nullptr, &editor->ShowOutliner());
 		ImGui::MenuItem("Terrain Graph", nullptr, &editor->ShowTerrainGraph());
 		ImGui::MenuItem("Material Library", nullptr, &editor->ShowMaterialLibrary());
+		ImGui::MenuItem("Vegetation Library", nullptr, &editor->ShowVegetationLibrary());
 		ImGui::MenuItem("World", nullptr, &editor->ShowWorld());
 		ImGui::MenuItem("Debug", nullptr, &editor->ShowDebugWindow());
 		ImGui::EndMenu();

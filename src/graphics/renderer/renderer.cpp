@@ -3,6 +3,8 @@
 #include "core/logger/logger.h"
 #include "graphics/renderer/irenderable.h"
 
+#include <algorithm>
+
 pwg::Renderer::Renderer()
 {
 	m_lightingUploader = std::make_unique<LightingUploader>();
@@ -66,13 +68,14 @@ void pwg::Renderer::DrawMeshInstanced(std::shared_ptr<Mesh> mesh, std::shared_pt
 	mesh->DrawInstanced(transforms);
 }
 
-bool pwg::Renderer::IsSphereVisible(const glm::vec3& center, float radius, float maxDistance) const
+bool pwg::Renderer::IsSphereVisible(const glm::vec3& center, float radius, float maxDistance, float frustumMargin) const
 {
 	if (maxDistance > 0.0f && glm::distance(glm::vec2(center.x, center.z), glm::vec2(m_cameraPosition.x, m_cameraPosition.z)) > maxDistance + radius)
 	{
 		return false;
 	}
 
+	float cullingRadius = radius + std::max(frustumMargin, 0.0f);
 	glm::mat4 clip = m_projectionMatrix * m_viewMatrix;
 	auto row = [&](int index)
 	{
@@ -93,7 +96,7 @@ bool pwg::Renderer::IsSphereVisible(const glm::vec3& center, float radius, float
 			continue;
 		}
 		plane /= normalLength;
-		if (glm::dot(glm::vec3(plane), center) + plane.w < -radius)
+		if (glm::dot(glm::vec3(plane), center) + plane.w < -cullingRadius)
 		{
 			return false;
 		}

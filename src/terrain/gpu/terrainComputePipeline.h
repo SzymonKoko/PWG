@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <cstdint>
+#include <string>
 #include "graphics/shader/computeShader.h"
 #include "graphics/shader/shaderManager.h"
 #include "terrain/graph/terrainGraph.h"
@@ -24,23 +25,18 @@
 
 namespace pwg
 {
-	enum class VegetationAssetType
-	{
-		TreeA,
-		TreeB,
-		Grass
-	};
-
 	struct VegetationLayerDescriptor
 	{
 		int nodeId{ 0 };
-		VegetationAssetType assetType{ VegetationAssetType::TreeA };
+		std::string assetId{ "builtin.tree_a" };
 		int seed{ 1337 };
 		float density{ 0.5f };
 		float spacing{ 50.0f };
 		float minScale{ 0.8f };
 		float maxScale{ 1.2f };
 		float maxSlopeDegrees{ 30.0f };
+		bool alignToSlope{ false };
+		float maxTiltDegrees{ 30.0f };
 		float renderDistance{ 1000.0f };
 		std::shared_ptr<TerrainMask> densityMask;
 	};

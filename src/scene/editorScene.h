@@ -90,6 +90,7 @@ namespace pwg
 		bool& ShowTerrainControls();
 		bool& ShowDebugWindow();
 		bool& ShowMaterialLibrary();
+		bool& ShowVegetationLibrary();
 		bool& ShowTerrainGraph();
 		bool& ShowWorld();
 		bool& ShowOutliner();
@@ -103,6 +104,7 @@ namespace pwg
 		void DrawOutliner();
 		void DrawWorldWindow();
 		void DrawSkyboxControls();
+		void DrawVegetationAssetLibrary();
 		bool LoadSkyboxFolder(const std::string& folder);
 		void ResetSkyboxToDefault();
 
@@ -124,6 +126,7 @@ namespace pwg
 		std::shared_ptr<Shader> m_terrainShadowShader;			/**< Depth-only terrain shader for shadow pass. */
 		std::shared_ptr<SkyBox> m_skybox;
 		std::shared_ptr<TerrainMaterialLibrary> m_terrainMaterialLibrary;
+		std::shared_ptr<VegetationAssetRegistry> m_vegetationAssetRegistry;
 		std::shared_ptr<VegetationSystem> m_vegetationSystem;
 		SkyboxDefinition m_skyboxDefinition;
 		std::string m_skyboxStatus{ "Ready" };
@@ -138,6 +141,7 @@ namespace pwg
 		bool m_showWorld{ true };
 		bool m_showDebugWindow{ true };
 		bool m_showMaterialLibrary{ true };
+		bool m_showVegetationLibrary{ true };
 		bool m_showTerrainGraph{ true };
 		bool m_terrainGraphInputCaptured{ false };
 		bool m_dirty{ false };

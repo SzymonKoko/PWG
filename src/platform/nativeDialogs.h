@@ -9,6 +9,7 @@ namespace pwg::platform
 	std::string SaveProjectDialog();
 	std::string OpenImageDialog();
 	std::string OpenObjDialog();
+	std::string OpenVegetationModelDialog();
 	std::string PickFolderDialog(const char* title);
 }
 

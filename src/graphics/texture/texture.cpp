@@ -62,6 +62,41 @@ pwg::Texture::Texture(const std::string& imagePath, TextureType type)
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+pwg::Texture::Texture(const unsigned char* encodedData, std::size_t encodedSize, TextureType type)
+{
+	m_wrapS = ToGL(TextureWrapMode::REPEAT);
+	m_wrapT = ToGL(TextureWrapMode::REPEAT);
+	m_minFilter = ToGL(TextureFilterMode::MIPMAP_LINEAR_LINEAR);
+	m_magFilter = ToGL(TextureFilterMode::LINEAR);
+	m_textureType = type;
+	m_format = GetFormatForType(type);
+
+	glGenTextures(1, &m_textureID);
+	glBindTexture(GL_TEXTURE_2D, m_textureID);
+	m_image = encodedData && encodedSize > 0
+		? stbi_load_from_memory(encodedData, static_cast<int>(encodedSize), &m_width, &m_height, &m_nrChannels, STBI_rgb_alpha)
+		: nullptr;
+	if (m_image)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, m_format.internalFormat, m_width, m_height, 0, m_format.format, m_format.type, m_image);
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else
+	{
+		PWG_ERROR("Failed to load embedded texture");
+	}
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, m_wrapS);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, m_wrapT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, m_minFilter);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, m_magFilter);
+	if (m_image)
+	{
+		stbi_image_free(m_image);
+		m_image = nullptr;
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 pwg::Texture::Texture(int width, int height, TextureType type)
 {
 	m_width = width;

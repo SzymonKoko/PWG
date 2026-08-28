@@ -3,6 +3,7 @@
 #include "terrain/chunk/chunkManager.h"
 #include "terrain/graph/passes/terrainPass.h"
 #include "terrain/graph/universalTerrainGraph.h"
+#include "vegetation/vegetationAssetRegistry.h"
 
 #include <algorithm>
 #include <cmath>
@@ -957,7 +958,7 @@ namespace pwg::controls
 			return it != node.parameters.end() ? &(*it) : nullptr;
 		}
 
-		bool DrawGraphParameterControl(TerrainGraphParameter& param)
+		bool DrawGraphParameterControl(TerrainGraphParameter& param, const std::shared_ptr<VegetationAssetRegistry>& assetRegistry)
 		{
 			static const char* noiseTypes[] = { "OpenSimplex2", "OpenSimplex2S", "Cellular", "Perlin", "Value Cubic", "Value" };
 			static const char* fractalTypes[] = { "None", "FBm", "Ridged", "Ping Pong" };
@@ -1009,6 +1010,29 @@ namespace pwg::controls
 				break;
 			case TerrainGraphParameterType::String:
 			{
+				if (param.id == "assetId" && assetRegistry)
+				{
+					const VegetationAssetDefinition* selected = assetRegistry->Find(param.stringValue);
+					std::string preview = selected ? selected->name : "Missing: " + param.stringValue;
+					if (ImGui::BeginCombo("##value", preview.c_str()))
+					{
+						for (const auto& asset : assetRegistry->Assets())
+						{
+							bool isSelected = asset.id == param.stringValue;
+							const char* kind = asset.kind == VegetationKind::Grass ? "Grass" : (asset.kind == VegetationKind::Rock ? "Rock" : "Tree");
+							std::string label = asset.name + " [" + kind + "]";
+							if (ImGui::Selectable(label.c_str(), isSelected))
+							{
+								param.stringValue = asset.id;
+								changed = true;
+							}
+							if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", asset.id.c_str());
+							if (isSelected) ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
+					break;
+				}
 				char buffer[128]{};
 				std::snprintf(buffer, sizeof(buffer), "%s", param.stringValue.c_str());
 				if (ImGui::InputText("##value", buffer, sizeof(buffer)))
@@ -1527,7 +1551,7 @@ namespace pwg::controls
 			return capturedInput;
 		}
 
-		bool DrawUniversalGraphInspector(TerrainGraphAsset& asset, int& selectedNodeId, bool* viewChanged)
+		bool DrawUniversalGraphInspector(TerrainGraphAsset& asset, int& selectedNodeId, const std::shared_ptr<VegetationAssetRegistry>& assetRegistry, bool* viewChanged)
 		{
 			bool changed = false;
 			TerrainGraphNodeInstance* node = asset.FindNode(selectedNodeId);
@@ -1542,6 +1566,9 @@ namespace pwg::controls
 				ImGui::TextDisabled("Unknown node type.");
 				return false;
 			}
+			TerrainGraphParameter* assetParameter = FindNodeParameter(*node, "assetId");
+			std::string previousAssetId = assetParameter ? assetParameter->stringValue : std::string{};
+			const VegetationAssetDefinition* previousAsset = assetRegistry && assetParameter ? assetRegistry->Find(previousAssetId) : nullptr;
 
 			ImGui::Text("%s", node->displayName.c_str());
 			ImGui::TextDisabled("%s / %s", type->category.c_str(), type->typeId.c_str());
@@ -1601,10 +1628,59 @@ namespace pwg::controls
 				for (auto& param : node->parameters)
 				{
 					ImGui::PushID(param.id.c_str());
-					changed |= DrawGraphParameterControl(param);
+					changed |= DrawGraphParameterControl(param, assetRegistry);
 					ImGui::PopID();
 				}
 				ImGui::PopItemWidth();
+			}
+
+			if (assetParameter && assetParameter->stringValue != previousAssetId && assetRegistry)
+			{
+				const VegetationAssetDefinition* selectedAsset = assetRegistry->Find(assetParameter->stringValue);
+				if (selectedAsset && (!previousAsset || selectedAsset->kind != previousAsset->kind))
+				{
+					auto setFloat = [&](const char* id, float value)
+					{
+						if (TerrainGraphParameter* parameter = FindNodeParameter(*node, id)) parameter->floatValue = value;
+					};
+					auto setBool = [&](const char* id, bool value)
+					{
+						if (TerrainGraphParameter* parameter = FindNodeParameter(*node, id)) parameter->boolValue = value;
+					};
+					if (selectedAsset->kind == VegetationKind::Grass)
+					{
+						setFloat("density", 0.95f);
+						setFloat("spacing", 3.0f);
+						setFloat("minScale", 0.75f);
+						setFloat("maxScale", 1.35f);
+						setFloat("maxSlope", 38.0f);
+						setBool("alignToSlope", false);
+						setFloat("maxTilt", 30.0f);
+						setFloat("renderDistance", 180.0f);
+					}
+					else if (selectedAsset->kind == VegetationKind::Rock)
+					{
+						setFloat("density", 0.55f);
+						setFloat("spacing", 14.0f);
+						setFloat("minScale", 0.70f);
+						setFloat("maxScale", 1.40f);
+						setFloat("maxSlope", 30.0f);
+						setBool("alignToSlope", true);
+						setFloat("maxTilt", 35.0f);
+						setFloat("renderDistance", 1000.0f);
+					}
+					else
+					{
+						setFloat("density", 0.45f);
+						setFloat("spacing", 55.0f);
+						setFloat("minScale", 0.80f);
+						setFloat("maxScale", 1.25f);
+						setFloat("maxSlope", 15.0f);
+						setBool("alignToSlope", false);
+						setFloat("maxTilt", 15.0f);
+						setFloat("renderDistance", 1400.0f);
+					}
+				}
 			}
 
 			if (changed && viewChanged)
@@ -1615,7 +1691,7 @@ namespace pwg::controls
 		}
 	}
 
-	bool TerrainGraphEditor::Show(std::shared_ptr<ChunkManager> chunkManager, TerrainGraphViewState& viewState, bool* inputCaptured, bool* viewChanged)
+	bool TerrainGraphEditor::Show(std::shared_ptr<ChunkManager> chunkManager, TerrainGraphViewState& viewState, std::shared_ptr<VegetationAssetRegistry> assetRegistry, bool* inputCaptured, bool* viewChanged)
 	{
 		if (inputCaptured)
 		{
@@ -1841,7 +1917,7 @@ namespace pwg::controls
 						ImGui::BulletText("%s", message.c_str());
 					}
 				}
-				bool inspectorChanged = DrawUniversalGraphInspector(asset, selectedUniversalNodeId, &universalViewChanged);
+				bool inspectorChanged = DrawUniversalGraphInspector(asset, selectedUniversalNodeId, assetRegistry, &universalViewChanged);
 				changed = changed || inspectorChanged;
 				ImGui::EndChild();
 				if (inputCaptured)

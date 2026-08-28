@@ -6,6 +6,7 @@
 #include "graphics/renderer/renderer.h"
 #include "terrain/gpu/terrainComputePipeline.h"
 #include "terrain/terrain.h"
+#include "vegetation/vegetationAssetRegistry.h"
 
 #include <cstdint>
 #include <memory>
@@ -28,24 +29,30 @@ namespace pwg
 
 	struct VegetationModel
 	{
+		std::string assetId;
+		VegetationKind kind{ VegetationKind::Tree };
 		std::vector<VegetationSubmesh> submeshes;
 		glm::vec3 boundsMin{ 0.0f };
 		glm::vec3 boundsMax{ 0.0f };
 		float targetHeight{ 1.0f };
+		float groundSink{ 0.1f };
 		float groundRadiusRatio{ 0.05f };
 		float footprintRadiusRatio{ 0.5f };
+		bool submeshesAsVariants{ false };
 		bool loaded{ false };
 	};
 
 	class VegetationSystem
 	{
 	public:
-		VegetationSystem(std::shared_ptr<Shader> vegetationShader, std::shared_ptr<Shader> shadowShader);
+		VegetationSystem(std::shared_ptr<Shader> vegetationShader, std::shared_ptr<Shader> shadowShader, std::shared_ptr<VegetationAssetRegistry> assetRegistry);
 
 		void Sync(std::shared_ptr<Terrain> terrain, const TerrainComputePipeline& pipeline, std::uint64_t terrainRevision);
 		void Update(std::shared_ptr<Terrain> terrain, std::shared_ptr<ICamera> camera, float dt);
 		void Draw(Renderer& renderer);
 		void DrawShadow(const glm::mat4& lightSpaceMatrix);
+		float GetCollisionGroundHeight(std::shared_ptr<Terrain> terrain, float x, float z) const;
+		void ReloadAssetModels();
 		void Clear();
 
 		std::size_t GetTreeCount() const;
@@ -57,34 +64,41 @@ namespace pwg
 		{
 			VegetationLayerDescriptor descriptor;
 			std::shared_ptr<std::vector<float>> densityData;
+			int modelIndex{ -1 };
 		};
 
 		struct Instance
 		{
-			VegetationAssetType assetType{ VegetationAssetType::TreeA };
+			int modelIndex{ -1 };
 			glm::vec3 position{ 0.0f };
 			glm::mat4 model{ 1.0f };
 			float radius{ 1.0f };
 			float renderDistance{ 1000.0f };
 			float groundRadius{ 0.5f };
 			float groundSink{ 0.0f };
+			float collisionRadius{ 0.0f };
+			float collisionHeight{ 0.0f };
 			int variantIndex{ 0 };
 		};
 
-		bool LoadModel(VegetationAssetType type, const std::string& path, float targetHeight);
+		bool LoadModel(const VegetationAssetDefinition& definition);
+		int EnsureModel(const std::string& assetId);
 		void Regenerate(std::shared_ptr<Terrain> terrain, const std::vector<VegetationLayerDescriptor>& layers);
 		void RebuildGrass(std::shared_ptr<Terrain> terrain, const glm::vec3& cameraPosition);
 		void RefreshGrounding(std::shared_ptr<Terrain> terrain);
 		float SampleGroundHeight(std::shared_ptr<Terrain> terrain, float x, float z, float radius, float sink) const;
 		float SampleMask(const std::vector<float>& data, float worldX, float worldZ) const;
 		bool AcceptTerrainPoint(std::shared_ptr<Terrain> terrain, float x, float z, float maxSlopeDegrees) const;
-		glm::mat4 BuildModelMatrix(const VegetationModel& model, const glm::vec3& position, float yaw, float scale) const;
-		glm::mat4 BuildModelMatrix(const VegetationSubmesh& submesh, float targetHeight, const glm::vec3& position, float yaw, float scale) const;
-		const VegetationModel* FindModel(VegetationAssetType type) const;
+		glm::vec3 SampleTerrainNormal(std::shared_ptr<Terrain> terrain, float x, float z) const;
+		glm::mat4 BuildModelMatrix(const VegetationModel& model, const glm::vec3& position, float yaw, float scale, const glm::vec3& normal, float maxTiltDegrees) const;
+		glm::mat4 BuildModelMatrix(const VegetationSubmesh& submesh, float targetHeight, const glm::vec3& position, float yaw, float scale, const glm::vec3& normal, float maxTiltDegrees) const;
+		const VegetationModel* FindModel(int modelIndex) const;
 
 		std::shared_ptr<Shader> m_vegetationShader;
 		std::shared_ptr<Shader> m_shadowShader;
-		std::unordered_map<int, VegetationModel> m_models;
+		std::shared_ptr<VegetationAssetRegistry> m_assetRegistry;
+		std::vector<VegetationModel> m_models;
+		std::unordered_map<std::string, int> m_modelIndices;
 		std::vector<RuntimeLayer> m_layers;
 		std::vector<Instance> m_trees;
 		std::vector<Instance> m_grass;

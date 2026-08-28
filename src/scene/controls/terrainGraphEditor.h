@@ -10,6 +10,7 @@
 namespace pwg
 {
 	class ChunkManager;
+	class VegetationAssetRegistry;
 }
 
 namespace pwg::controls
@@ -76,7 +77,7 @@ namespace pwg::controls
 	class TerrainGraphEditor
 	{
 	public:
-		static bool Show(std::shared_ptr<ChunkManager> chunkManager, TerrainGraphViewState& viewState, bool* inputCaptured = nullptr, bool* viewChanged = nullptr);
+		static bool Show(std::shared_ptr<ChunkManager> chunkManager, TerrainGraphViewState& viewState, std::shared_ptr<VegetationAssetRegistry> assetRegistry = nullptr, bool* inputCaptured = nullptr, bool* viewChanged = nullptr);
 	};
 }
 

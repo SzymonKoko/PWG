@@ -339,6 +339,8 @@ namespace pwg
 				FloatParam("minScale", "Min Scale", 0.80f, 0.25f, 3.0f),
 				FloatParam("maxScale", "Max Scale", 1.25f, 0.25f, 3.0f),
 				FloatParam("maxSlope", "Max Slope", 15.0f, 0.0f, 75.0f),
+				BoolParam("alignToSlope", "Align To Slope", false),
+				FloatParam("maxTilt", "Max Tilt", 15.0f, 0.0f, 75.0f),
 				FloatParam("renderDistance", "Render Distance", 1400.0f, 100.0f, 5000.0f)
 			} },
 			{ "treeAssetB", "Tree B", "Vegetation", { Input("density", "Density Mask", false, 1.0f) }, {}, {
@@ -348,6 +350,8 @@ namespace pwg
 				FloatParam("minScale", "Min Scale", 0.85f, 0.25f, 3.0f),
 				FloatParam("maxScale", "Max Scale", 1.30f, 0.25f, 3.0f),
 				FloatParam("maxSlope", "Max Slope", 15.0f, 0.0f, 75.0f),
+				BoolParam("alignToSlope", "Align To Slope", false),
+				FloatParam("maxTilt", "Max Tilt", 15.0f, 0.0f, 75.0f),
 				FloatParam("renderDistance", "Render Distance", 1400.0f, 100.0f, 5000.0f)
 			} },
 			{ "grassAsset", "Grass", "Vegetation", { Input("density", "Density Mask", false, 1.0f) }, {}, {
@@ -357,7 +361,21 @@ namespace pwg
 				FloatParam("minScale", "Min Scale", 0.75f, 0.25f, 3.0f),
 				FloatParam("maxScale", "Max Scale", 1.35f, 0.25f, 3.0f),
 				FloatParam("maxSlope", "Max Slope", 38.0f, 0.0f, 75.0f),
+				BoolParam("alignToSlope", "Align To Slope", false),
+				FloatParam("maxTilt", "Max Tilt", 30.0f, 0.0f, 75.0f),
 				FloatParam("renderDistance", "Render Distance", 180.0f, 50.0f, 600.0f)
+			} },
+			{ "vegetationAsset", "Vegetation Asset", "Vegetation", { Input("density", "Density Mask", false, 1.0f) }, {}, {
+				StringParam("assetId", "Asset", "builtin.tree_a"),
+				IntParam("seed", "Seed", 9157, 1.0f, 100000.0f),
+				FloatParam("density", "Density", 0.45f, 0.0f, 1.0f),
+				FloatParam("spacing", "Spacing", 55.0f, 1.0f, 250.0f),
+				FloatParam("minScale", "Min Scale", 0.80f, 0.25f, 3.0f),
+				FloatParam("maxScale", "Max Scale", 1.25f, 0.25f, 3.0f),
+				FloatParam("maxSlope", "Max Slope", 15.0f, 0.0f, 75.0f),
+				BoolParam("alignToSlope", "Align To Slope", false),
+				FloatParam("maxTilt", "Max Tilt", 30.0f, 0.0f, 75.0f),
+				FloatParam("renderDistance", "Render Distance", 1400.0f, 50.0f, 5000.0f)
 			} },
 			{ "outputHeight", "Output Height", "Outputs", { Input("height", "Height") }, {}, {} },
 			{ "outputMask", "Output Mask", "Outputs", { Input("mask", "Mask") }, {}, { StringParam("target", "Target", "FinalMask") } }

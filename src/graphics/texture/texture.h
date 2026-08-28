@@ -10,6 +10,7 @@
 #include "graphics/common/GL_Types.h"
 #include <filesystem>
 #include <vector>
+#include <cstddef>
 
 #include "core/logger/logger.h"
 
@@ -35,6 +36,7 @@ namespace pwg
 		* @param imagePath Path to the image file.
 		*/
 		Texture(const std::string& imagePath, TextureType type);
+		Texture(const unsigned char* encodedData, std::size_t encodedSize, TextureType type);
 
 		/**
 		* @brief Creates an empty texture with specified dimensions and format.

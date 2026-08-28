@@ -125,6 +125,29 @@ namespace pwg::platform
 		}
 		return {};
 	}
+	std::string OpenVegetationModelDialog()
+	{
+		char fileName[MAX_PATH] = {};
+		OPENFILENAMEA ofn = {};
+		ofn.lStructSize = sizeof(ofn);
+		ofn.hwndOwner = nullptr;
+		ofn.lpstrFile = fileName;
+		ofn.nMaxFile = MAX_PATH;
+		ofn.lpstrFilter = "glTF Models (*.gltf;*.glb)\0*.gltf;*.glb\0";
+		ofn.nFilterIndex = 1;
+		std::string initialDir = AssetInitialDirectory();
+		if (!initialDir.empty())
+		{
+			ofn.lpstrInitialDir = initialDir.c_str();
+		}
+		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+		if (GetOpenFileNameA(&ofn) == TRUE)
+		{
+			return fileName;
+		}
+		return {};
+	}
 	std::string PickFolderDialog(const char* title)
 	{
 		BROWSEINFOA browseInfo = {};

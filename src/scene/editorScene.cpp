@@ -442,8 +442,9 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     m_terrainMaterialLibrary = std::make_shared<TerrainMaterialLibrary>(m_resourceManager, terrainMaterial);
     auto skybox = textureManager->GetCubeMapTexture("Skybox");
 
-    m_terrain = std::make_shared<Terrain>(m_resourceManager);
-    m_vegetationSystem = std::make_shared<VegetationSystem>(vegetationShader, vegetationShadowShader);
+	m_terrain = std::make_shared<Terrain>(m_resourceManager);
+	m_vegetationAssetRegistry = std::make_shared<VegetationAssetRegistry>();
+    m_vegetationSystem = std::make_shared<VegetationSystem>(vegetationShader, vegetationShadowShader, m_vegetationAssetRegistry);
     m_skybox = std::make_shared<SkyBox>(skybox, skyboxMaterial);
     m_postProcessor = std::make_shared<PostProcessor>(postprocessShader);
     m_shadowMap = std::make_shared<DirectionalShadowMap>();
@@ -458,9 +459,8 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     m_cameraManager->SetDefaultCameraPosition(m_terrain->GetSize());
     m_cameraManager->SetTerrainHeightProvider([this](float x, float z)
     {
-        return m_terrain->GetTerrainHeightAt(x, z);
+		return m_vegetationSystem ? m_vegetationSystem->GetCollisionGroundHeight(m_terrain, x, z) : m_terrain->GetTerrainHeightAt(x, z);
     });
-
     m_cameraManager->SetCamera(CameraType::EDITOR);
 
     PWG_INFO("Editor scene initialized");
@@ -659,7 +659,7 @@ void pwg::EditorScene::Draw()
     ImGui::Begin("Terrain Graph", &m_showTerrainGraph);
     bool terrainGraphInputCaptured = false;
     bool terrainGraphViewChanged = false;
-    if (controls::TerrainGraphEditor::Show(m_terrain->GetChunkManager(), m_terrainGraphViewState, &terrainGraphInputCaptured, &terrainGraphViewChanged))
+    if (controls::TerrainGraphEditor::Show(m_terrain->GetChunkManager(), m_terrainGraphViewState, m_vegetationAssetRegistry, &terrainGraphInputCaptured, &terrainGraphViewChanged))
     {
         m_dirty = true;
     }
@@ -676,17 +676,22 @@ void pwg::EditorScene::Draw()
         m_terrainGraphInputCaptured = false;
     }
 
-    if (m_showMaterialLibrary)
+	if (m_showMaterialLibrary)
     {
     ImGui::Begin("Material Library", &m_showMaterialLibrary);
 
     if (m_terrainMaterialLibrary && m_terrainMaterialLibrary->ShowGui())
     {
         m_dirty = true;
-    }
+	}
 
     ImGui::End();
     }
+
+	if (m_showVegetationLibrary)
+	{
+		DrawVegetationAssetLibrary();
+	}
 
     DrawWorldWindow();
 }
@@ -915,6 +920,11 @@ bool& pwg::EditorScene::ShowMaterialLibrary()
     return m_showMaterialLibrary;
 }
 
+bool& pwg::EditorScene::ShowVegetationLibrary()
+{
+	return m_showVegetationLibrary;
+}
+
 bool& pwg::EditorScene::ShowTerrainGraph()
 {
     return m_showTerrainGraph;
@@ -952,7 +962,8 @@ void pwg::EditorScene::ResetEditorWindows()
     m_showTerrainControls = false;
     m_showWorld = true;
     m_showDebugWindow = true;
-    m_showMaterialLibrary = true;
+	m_showMaterialLibrary = true;
+	m_showVegetationLibrary = true;
     m_showTerrainGraph = true;
 }
 
@@ -1007,6 +1018,219 @@ void pwg::EditorScene::DrawWorldWindow()
         ImGui::EndTabBar();
     }
     ImGui::End();
+}
+
+void pwg::EditorScene::DrawVegetationAssetLibrary()
+{
+	ImGui::Begin("Vegetation Library", &m_showVegetationLibrary);
+	if (!m_vegetationAssetRegistry)
+	{
+		ImGui::TextDisabled("Asset registry unavailable");
+		ImGui::End();
+		return;
+	}
+
+	static std::string pendingModelPath;
+	static char importName[128]{};
+	static int importKind = 0;
+	static float importHeight = 30.0f;
+	static float importGroundSink = 1.0f;
+	static bool importVariants = false;
+	static std::string selectedAssetId;
+	static char editName[128]{};
+	static int editKind = 0;
+	static float editHeight = 1.0f;
+	static float editGroundSink = 0.0f;
+	static bool editVariants = false;
+	auto kindIndex = [](VegetationKind kind)
+	{
+		if (kind == VegetationKind::Grass) return 1;
+		if (kind == VegetationKind::Rock) return 2;
+		return 0;
+	};
+	auto kindFromIndex = [](int index)
+	{
+		if (index == 1) return VegetationKind::Grass;
+		if (index == 2) return VegetationKind::Rock;
+		return VegetationKind::Tree;
+	};
+	auto kindName = [](VegetationKind kind)
+	{
+		if (kind == VegetationKind::Grass) return "Grass";
+		if (kind == VegetationKind::Rock) return "Rock";
+		return "Tree";
+	};
+	auto loadEditState = [&](const VegetationAssetDefinition* asset)
+	{
+		if (!asset) return;
+		std::snprintf(editName, sizeof(editName), "%s", asset->name.c_str());
+		editKind = kindIndex(asset->kind);
+		editHeight = asset->targetHeight;
+		editGroundSink = asset->groundSink;
+		editVariants = asset->submeshesAsVariants;
+	};
+
+	if (ImGui::Button("Import Model..."))
+	{
+		pendingModelPath = platform::OpenVegetationModelDialog();
+		if (!pendingModelPath.empty())
+		{
+			std::string defaultName = std::filesystem::path(pendingModelPath).stem().string();
+			std::snprintf(importName, sizeof(importName), "%s", defaultName.c_str());
+			importKind = 0;
+			importHeight = 30.0f;
+			importGroundSink = 1.0f;
+			importVariants = false;
+			ImGui::OpenPopup("Import Vegetation Model");
+		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Reload"))
+	{
+		m_vegetationAssetRegistry->Reload();
+		loadEditState(m_vegetationAssetRegistry->Find(selectedAssetId));
+	}
+	ImGui::TextWrapped("%s", m_vegetationAssetRegistry->Status().c_str());
+	ImGui::TextDisabled("%s", m_vegetationAssetRegistry->LibraryRoot().string().c_str());
+	if (m_vegetationSystem)
+	{
+		ImGui::TextDisabled("Runtime: %s", m_vegetationSystem->GetStatus().c_str());
+	}
+
+	ImGui::Separator();
+	if (ImGui::BeginTable("VegetationAssets", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable))
+	{
+		ImGui::TableSetupColumn("Name");
+		ImGui::TableSetupColumn("Kind", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+		ImGui::TableSetupColumn("Height", ImGuiTableColumnFlags_WidthFixed, 65.0f);
+		ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+		ImGui::TableHeadersRow();
+		for (const auto& asset : m_vegetationAssetRegistry->Assets())
+		{
+			ImGui::PushID(asset.id.c_str());
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			bool selected = asset.id == selectedAssetId;
+			if (ImGui::Selectable(asset.name.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns))
+			{
+				selectedAssetId = asset.id;
+				loadEditState(&asset);
+			}
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", asset.id.c_str());
+			ImGui::TableSetColumnIndex(1);
+			ImGui::TextUnformatted(kindName(asset.kind));
+			ImGui::TableSetColumnIndex(2);
+			ImGui::Text("%.1f", asset.targetHeight);
+			ImGui::TableSetColumnIndex(3);
+			ImGui::TextUnformatted(asset.builtin ? "Built-in" : "External");
+			ImGui::PopID();
+		}
+		ImGui::EndTable();
+	}
+
+	if (const VegetationAssetDefinition* selected = m_vegetationAssetRegistry->Find(selectedAssetId))
+	{
+		ImGui::Separator();
+		ImGui::Text("Asset: %s", selected->id.c_str());
+		if (selected->builtin)
+		{
+			ImGui::TextDisabled("Built-in asset metadata is read-only");
+		}
+		else
+		{
+			ImGui::SetNextItemWidth(-1.0f);
+			ImGui::InputText("Name", editName, sizeof(editName));
+			const char* editKinds[] = { "Tree", "Grass", "Rock" };
+			ImGui::Combo("Kind", &editKind, editKinds, IM_ARRAYSIZE(editKinds));
+			ImGui::DragFloat("Target Height", &editHeight, 0.1f, 0.1f, 500.0f, "%.2f");
+			ImGui::DragFloat("Ground Sink", &editGroundSink, 0.01f, 0.0f, 20.0f, "%.2f");
+			if (editKind != 0)
+			{
+				ImGui::Checkbox("Submeshes As Variants", &editVariants);
+			}
+			else
+			{
+				editVariants = false;
+			}
+			if (ImGui::Button("Save Manifest"))
+			{
+				if (m_vegetationAssetRegistry->Update(
+					selectedAssetId,
+					editName,
+					kindFromIndex(editKind),
+					editHeight,
+					editGroundSink,
+					editVariants))
+				{
+					if (m_vegetationSystem) m_vegetationSystem->ReloadAssetModels();
+					loadEditState(m_vegetationAssetRegistry->Find(selectedAssetId));
+				}
+			}
+		}
+	}
+
+	if (ImGui::BeginPopupModal("Import Vegetation Model", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::TextUnformatted(std::filesystem::path(pendingModelPath).filename().string().c_str());
+		ImGui::TextWrapped("%s", m_vegetationAssetRegistry->Status().c_str());
+		ImGui::SetNextItemWidth(320.0f);
+		ImGui::InputText("Name", importName, sizeof(importName));
+		const char* kinds[] = { "Tree", "Grass", "Rock" };
+		ImGui::Combo("Kind", &importKind, kinds, IM_ARRAYSIZE(kinds));
+		if (ImGui::IsItemEdited())
+		{
+			if (importKind == 0)
+			{
+				importHeight = 30.0f;
+				importGroundSink = 1.0f;
+			}
+			else if (importKind == 1)
+			{
+				importHeight = 3.2f;
+				importGroundSink = 0.12f;
+			}
+			else
+			{
+				importHeight = 3.0f;
+				importGroundSink = 0.15f;
+			}
+		}
+		ImGui::DragFloat("Target Height", &importHeight, 0.1f, 0.1f, 500.0f, "%.2f");
+		ImGui::DragFloat("Ground Sink", &importGroundSink, 0.01f, 0.0f, 20.0f, "%.2f");
+		if (importKind != 0)
+		{
+			ImGui::Checkbox("Submeshes As Variants", &importVariants);
+		}
+		else
+		{
+			importVariants = false;
+		}
+		if (ImGui::Button("Import"))
+		{
+			auto imported = m_vegetationAssetRegistry->Import(
+				pendingModelPath,
+				importName,
+				kindFromIndex(importKind),
+				importHeight,
+				importGroundSink,
+				importVariants);
+			if (imported)
+			{
+				selectedAssetId = *imported;
+				loadEditState(m_vegetationAssetRegistry->Find(selectedAssetId));
+				pendingModelPath.clear();
+				ImGui::CloseCurrentPopup();
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			pendingModelPath.clear();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+	ImGui::End();
 }
 
 void pwg::EditorScene::DrawSkyboxControls()

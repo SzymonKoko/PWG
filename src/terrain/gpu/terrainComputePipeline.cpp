@@ -397,13 +397,15 @@ namespace pwg
 				auto target = EnsureFloatMask(masks, targetName, m_size);
 				target->texture->CopyFrom(*source->texture);
 			}
-			else if (node->typeId == "treeAssetA" || node->typeId == "treeAssetB" || node->typeId == "grassAsset")
+			else if (node->typeId == "treeAssetA" || node->typeId == "treeAssetB" || node->typeId == "grassAsset" || node->typeId == "vegetationAsset")
 			{
 				VegetationLayerDescriptor layer;
 				layer.nodeId = node->id;
-				layer.assetType = node->typeId == "treeAssetA"
-					? VegetationAssetType::TreeA
-					: (node->typeId == "treeAssetB" ? VegetationAssetType::TreeB : VegetationAssetType::Grass);
+				layer.assetId = node->typeId == "treeAssetA"
+					? "builtin.tree_a"
+					: (node->typeId == "treeAssetB"
+						? "builtin.tree_b"
+						: (node->typeId == "grassAsset" ? "builtin.grass" : GetStringParameter(*node, "assetId", "builtin.tree_a")));
 				layer.seed = GetIntParameter(*node, "seed", 1337);
 				layer.density = std::clamp(GetFloatParameter(*node, "density", 0.5f), 0.0f, 1.0f);
 				layer.spacing = std::max(GetFloatParameter(*node, "spacing", 50.0f), 1.0f);
@@ -414,6 +416,8 @@ namespace pwg
 					std::swap(layer.minScale, layer.maxScale);
 				}
 				layer.maxSlopeDegrees = std::clamp(GetFloatParameter(*node, "maxSlope", 30.0f), 0.0f, 89.0f);
+				layer.alignToSlope = GetBoolParameter(*node, "alignToSlope", false);
+				layer.maxTiltDegrees = std::clamp(GetFloatParameter(*node, "maxTilt", 30.0f), 0.0f, 89.0f);
 				layer.renderDistance = std::max(GetFloatParameter(*node, "renderDistance", 1000.0f), 1.0f);
 				layer.densityMask = inputFor(*node, "density");
 				vegetationLayers.push_back(std::move(layer));

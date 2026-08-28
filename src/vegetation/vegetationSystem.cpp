@@ -36,6 +36,20 @@ namespace pwg
 			return static_cast<float>(value & 0x00ffffffu) / static_cast<float>(0x01000000u);
 		}
 
+		glm::mat4 SlopeAlignment(const glm::vec3& terrainNormal, float maxTiltDegrees)
+		{
+			const glm::vec3 up(0.0f, 1.0f, 0.0f);
+			glm::vec3 normal = glm::normalize(terrainNormal);
+			float angle = std::acos(std::clamp(glm::dot(up, normal), -1.0f, 1.0f));
+			float limitedAngle = std::min(angle, glm::radians(std::max(maxTiltDegrees, 0.0f)));
+			glm::vec3 axis = glm::cross(up, normal);
+			if (limitedAngle <= 0.0001f || glm::dot(axis, axis) <= 0.000001f)
+			{
+				return glm::mat4(1.0f);
+			}
+			return glm::rotate(glm::mat4(1.0f), limitedAngle, glm::normalize(axis));
+		}
+
 		glm::vec3 MaterialColor(const aiMaterial* material)
 		{
 			aiColor4D color;
@@ -51,7 +65,7 @@ namespace pwg
 			return glm::vec3(0.72f, 0.78f, 0.68f);
 		}
 
-		std::string AlbedoPath(const aiMaterial* material, const std::filesystem::path& folder)
+		std::string AlbedoReference(const aiMaterial* material)
 		{
 			if (!material)
 			{
@@ -63,31 +77,19 @@ namespace pwg
 			{
 				return {};
 			}
-			std::string raw = texture.C_Str();
-			if (raw.empty() || raw.front() == '*')
-			{
-				return {};
-			}
-			std::filesystem::path path = raw;
-			if (!path.is_absolute())
-			{
-				path = folder / path;
-			}
-			return path.lexically_normal().generic_string();
+			return texture.C_Str();
 		}
 	}
 
-	VegetationSystem::VegetationSystem(std::shared_ptr<Shader> vegetationShader, std::shared_ptr<Shader> shadowShader)
-		: m_vegetationShader(std::move(vegetationShader)), m_shadowShader(std::move(shadowShader))
+	VegetationSystem::VegetationSystem(std::shared_ptr<Shader> vegetationShader, std::shared_ptr<Shader> shadowShader, std::shared_ptr<VegetationAssetRegistry> assetRegistry)
+		: m_vegetationShader(std::move(vegetationShader)), m_shadowShader(std::move(shadowShader)), m_assetRegistry(std::move(assetRegistry))
 	{
-		bool treeA = LoadModel(VegetationAssetType::TreeA, "../assets/vegetation/tree_a/tree_a.gltf", 36.0f);
-		bool treeB = LoadModel(VegetationAssetType::TreeB, "../assets/vegetation/tree_b/tree_b.gltf", 34.0f);
-		bool grass = LoadModel(VegetationAssetType::Grass, "../assets/vegetation/grass/grass.gltf", 3.2f);
-		m_status = treeA && treeB && grass ? "Ready" : "One or more vegetation assets are missing";
+		m_status = m_assetRegistry ? "Ready" : "Vegetation asset registry is unavailable";
 	}
 
-	bool VegetationSystem::LoadModel(VegetationAssetType type, const std::string& path, float targetHeight)
+	bool VegetationSystem::LoadModel(const VegetationAssetDefinition& definition)
 	{
+		const std::string& path = definition.modelPath;
 		if (!m_vegetationShader || !std::filesystem::exists(path))
 		{
 			PWG_WARN("Vegetation asset missing: {0}", path);
@@ -111,7 +113,11 @@ namespace pwg
 		}
 
 		VegetationModel model;
-		model.targetHeight = targetHeight;
+		model.assetId = definition.id;
+		model.kind = definition.kind;
+		model.targetHeight = definition.targetHeight;
+		model.groundSink = definition.groundSink;
+		model.submeshesAsVariants = definition.submeshesAsVariants;
 		model.boundsMin = glm::vec3(std::numeric_limits<float>::max());
 		model.boundsMax = glm::vec3(std::numeric_limits<float>::lowest());
 		std::filesystem::path folder = std::filesystem::path(path).parent_path();
@@ -188,17 +194,35 @@ namespace pwg
 			}
 			submesh.material = std::make_shared<Material>(m_vegetationShader);
 			submesh.material->SetUniformVec3("u_baseColor", baseColor);
-			std::string albedoPath = AlbedoPath(sourceMaterial, folder);
-			if (!albedoPath.empty() && std::filesystem::exists(albedoPath))
+			std::string albedoReference = AlbedoReference(sourceMaterial);
+			if (!albedoReference.empty() && albedoReference.front() == '*')
 			{
-				auto found = textureCache.find(albedoPath);
+				std::string cacheKey = path + "#" + albedoReference;
+				auto found = textureCache.find(cacheKey);
 				if (found == textureCache.end())
 				{
-					found = textureCache.emplace(albedoPath, std::make_shared<Texture>(albedoPath, TextureType::ALBEDO)).first;
+					const aiTexture* embedded = scene->GetEmbeddedTexture(albedoReference.c_str());
+					if (embedded && embedded->mHeight == 0 && embedded->mWidth > 0)
+					{
+						const auto* bytes = reinterpret_cast<const unsigned char*>(embedded->pcData);
+						found = textureCache.emplace(cacheKey, std::make_shared<Texture>(bytes, embedded->mWidth, TextureType::ALBEDO)).first;
+					}
 				}
-				submesh.albedo = found->second;
-				submesh.material->SetUniformTexture("u_albedo", submesh.albedo);
+				if (found != textureCache.end()) submesh.albedo = found->second;
 			}
+			else if (!albedoReference.empty())
+			{
+				std::filesystem::path albedoPath = albedoReference;
+				if (!albedoPath.is_absolute()) albedoPath = folder / albedoPath;
+				std::string resolved = albedoPath.lexically_normal().generic_string();
+				if (std::filesystem::exists(resolved))
+				{
+					auto found = textureCache.find(resolved);
+					if (found == textureCache.end()) found = textureCache.emplace(resolved, std::make_shared<Texture>(resolved, TextureType::ALBEDO)).first;
+					submesh.albedo = found->second;
+				}
+			}
+			if (submesh.albedo) submesh.material->SetUniformTexture("u_albedo", submesh.albedo);
 			submesh.material->SetUniformInt("u_hasAlbedo", submesh.albedo ? 1 : 0);
 			model.submeshes.push_back(std::move(submesh));
 		}
@@ -223,12 +247,37 @@ namespace pwg
 			model.footprintRadiusRatio = std::max(footprintRadius / sourceHeight, 0.01f);
 		}
 		model.loaded = !model.submeshes.empty() && sourceHeight > 0.0001f;
-		m_models[static_cast<int>(type)] = std::move(model);
-		if (m_models[static_cast<int>(type)].loaded)
+		if (!model.loaded)
 		{
-			PWG_INFO("Vegetation asset loaded: {0} ({1} submeshes)", path, m_models[static_cast<int>(type)].submeshes.size());
+			return false;
 		}
-		return m_models[static_cast<int>(type)].loaded;
+		int modelIndex = static_cast<int>(m_models.size());
+		m_modelIndices[definition.id] = modelIndex;
+		m_models.push_back(std::move(model));
+		PWG_INFO("Vegetation asset loaded: {0} ({1} submeshes)", path, m_models.back().submeshes.size());
+		return true;
+	}
+
+	int VegetationSystem::EnsureModel(const std::string& assetId)
+	{
+		auto loaded = m_modelIndices.find(assetId);
+		if (loaded != m_modelIndices.end())
+		{
+			return loaded->second;
+		}
+		const VegetationAssetDefinition* definition = m_assetRegistry ? m_assetRegistry->Find(assetId) : nullptr;
+		if (!definition)
+		{
+			m_status = "Missing vegetation asset: " + assetId;
+			PWG_WARN("Missing vegetation asset definition: {0}", assetId);
+			return -1;
+		}
+		if (!LoadModel(*definition))
+		{
+			m_status = "Failed to load vegetation asset: " + definition->name;
+			return -1;
+		}
+		return m_modelIndices[assetId];
 	}
 
 	void VegetationSystem::Sync(std::shared_ptr<Terrain> terrain, const TerrainComputePipeline& pipeline, std::uint64_t terrainRevision)
@@ -263,10 +312,13 @@ namespace pwg
 		m_worldMax = m_worldMin + static_cast<float>(chunkManager->GetChunkCount() * (chunkManager->GetChunkSize() - 1));
 
 		std::unordered_map<unsigned int, std::shared_ptr<std::vector<float>>> maskCache;
+		std::size_t missingAssetCount = 0;
 		for (const auto& descriptor : layers)
 		{
 			RuntimeLayer layer;
 			layer.descriptor = descriptor;
+			layer.modelIndex = EnsureModel(descriptor.assetId);
+			if (layer.modelIndex < 0) ++missingAssetCount;
 			if (descriptor.densityMask && descriptor.densityMask->texture)
 			{
 				unsigned int textureId = descriptor.densityMask->texture->GetTextureID();
@@ -297,7 +349,8 @@ namespace pwg
 
 		for (const auto& layer : m_layers)
 		{
-			if (layer.descriptor.assetType == VegetationAssetType::Grass || !FindModel(layer.descriptor.assetType))
+			const VegetationModel* model = FindModel(layer.modelIndex);
+			if (!model || model->kind == VegetationKind::Grass)
 			{
 				continue;
 			}
@@ -310,11 +363,14 @@ namespace pwg
 					std::uint32_t hash = Hash(x, z, static_cast<std::uint32_t>(layer.descriptor.seed ^ (layer.descriptor.nodeId * 7919)));
 					float worldX = m_worldMin + (static_cast<float>(x) + 0.1f + Unit(hash) * 0.8f) * spacing;
 					float worldZ = m_worldMin + (static_cast<float>(z) + 0.1f + Unit(Hash(x, z, hash ^ 0xa511e9b3u)) * 0.8f) * spacing;
-					const VegetationModel* model = FindModel(layer.descriptor.assetType);
 					float scale = glm::mix(layer.descriptor.minScale, layer.descriptor.maxScale, Unit(Hash(x, z, hash ^ 0xc2b2ae35u)));
+					int variantIndex = model->submeshesAsVariants ? static_cast<int>(hash % model->submeshes.size()) : -1;
 					float height = model->targetHeight * scale;
-					float groundRadius = std::clamp(model->groundRadiusRatio * height, 0.6f, 2.5f);
-					float footprintRadius = model->footprintRadiusRatio * height;
+					float groundRadiusRatio = variantIndex >= 0 ? model->submeshes[static_cast<std::size_t>(variantIndex)].groundRadiusRatio : model->groundRadiusRatio;
+					float footprintRadiusRatio = variantIndex >= 0 ? model->submeshes[static_cast<std::size_t>(variantIndex)].footprintRadiusRatio : model->footprintRadiusRatio;
+					float minimumGroundRadius = model->kind == VegetationKind::Rock ? 0.25f : 0.6f;
+					float groundRadius = std::clamp(groundRadiusRatio * height, minimumGroundRadius, 2.5f);
+					float footprintRadius = footprintRadiusRatio * height;
 					if (worldX - footprintRadius < m_worldMin || worldX + footprintRadius > m_worldMax ||
 						worldZ - footprintRadius < m_worldMin || worldZ + footprintRadius > m_worldMax)
 					{
@@ -352,13 +408,23 @@ namespace pwg
 
 					accepted[key(cellX, cellZ)].push_back(glm::vec2(worldX, worldZ));
 					float yaw = Unit(Hash(x, z, hash ^ 0x27d4eb2fu)) * glm::two_pi<float>();
-					float groundSink = std::clamp(height * 0.04f, 0.80f, 2.0f);
+					float groundSink = std::max(model->groundSink * scale, 0.0f);
 					glm::vec3 position(worldX, SampleGroundHeight(terrain, worldX, worldZ, groundRadius, groundSink), worldZ);
-					m_trees.push_back({ layer.descriptor.assetType, position, BuildModelMatrix(*model, position, yaw, scale), height * 0.6f, layer.descriptor.renderDistance, groundRadius, groundSink, 0 });
+					glm::vec3 normal = layer.descriptor.alignToSlope ? SampleTerrainNormal(terrain, worldX, worldZ) : glm::vec3(0.0f, 1.0f, 0.0f);
+					glm::mat4 modelMatrix = variantIndex >= 0
+						? BuildModelMatrix(model->submeshes[static_cast<std::size_t>(variantIndex)], model->targetHeight, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees)
+						: BuildModelMatrix(*model, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees);
+					float collisionRadius = model->kind == VegetationKind::Rock ? std::max(footprintRadius, 0.35f) : 0.0f;
+					float collisionHeight = model->kind == VegetationKind::Rock ? std::max(height - groundSink, 0.5f) : 0.0f;
+					m_trees.push_back({ layer.modelIndex, position, modelMatrix, height * 0.6f, layer.descriptor.renderDistance, groundRadius, groundSink, collisionRadius, collisionHeight, variantIndex });
 				}
 			}
 		}
-		m_status = "Generated " + std::to_string(m_trees.size()) + " trees";
+		m_status = "Generated " + std::to_string(m_trees.size()) + " static objects";
+		if (missingAssetCount > 0)
+		{
+			m_status += "; missing " + std::to_string(missingAssetCount) + " asset" + (missingAssetCount == 1 ? "" : "s");
+		}
 	}
 
 	void VegetationSystem::Update(std::shared_ptr<Terrain> terrain, std::shared_ptr<ICamera> camera, float dt)
@@ -373,7 +439,8 @@ namespace pwg
 		float grassRebuildDistance = std::numeric_limits<float>::max();
 		for (const auto& layer : m_layers)
 		{
-			if (layer.descriptor.assetType == VegetationAssetType::Grass)
+			const VegetationModel* model = FindModel(layer.modelIndex);
+			if (model && model->kind == VegetationKind::Grass)
 			{
 				grassRebuildDistance = std::min(grassRebuildDistance, std::clamp(layer.descriptor.renderDistance * 0.2f, 24.0f, 80.0f));
 			}
@@ -396,18 +463,19 @@ namespace pwg
 		m_grass.clear();
 		m_lastGrassCamera = cameraPosition;
 		m_grassBuilt = true;
-		std::size_t remainingGrassLayers = static_cast<std::size_t>(std::count_if(m_layers.begin(), m_layers.end(), [](const RuntimeLayer& layer)
+		std::size_t remainingGrassLayers = static_cast<std::size_t>(std::count_if(m_layers.begin(), m_layers.end(), [&](const RuntimeLayer& layer)
 		{
-			return layer.descriptor.assetType == VegetationAssetType::Grass;
+			const VegetationModel* model = FindModel(layer.modelIndex);
+			return model && model->kind == VegetationKind::Grass;
 		}));
 		for (const auto& layer : m_layers)
 		{
-			if (layer.descriptor.assetType != VegetationAssetType::Grass)
+			const VegetationModel* model = FindModel(layer.modelIndex);
+			if (!model || model->kind != VegetationKind::Grass)
 			{
 				continue;
 			}
-			const VegetationModel* model = FindModel(VegetationAssetType::Grass);
-			if (!model || remainingGrassLayers == 0) continue;
+			if (remainingGrassLayers == 0) continue;
 			std::size_t layerLimit = m_grass.size() + (maxGrassInstances - m_grass.size()) / remainingGrassLayers;
 			--remainingGrassLayers;
 			float spacing = std::max(layer.descriptor.spacing, 1.0f);
@@ -422,12 +490,13 @@ namespace pwg
 				std::uint32_t hash = Hash(x, z, static_cast<std::uint32_t>(layer.descriptor.seed ^ (layer.descriptor.nodeId * 7919)));
 				float worldX = m_worldMin + (static_cast<float>(x) + 0.1f + Unit(hash) * 0.8f) * spacing;
 				float worldZ = m_worldMin + (static_cast<float>(z) + 0.1f + Unit(Hash(x, z, hash ^ 0x517cc1b7u)) * 0.8f) * spacing;
-				int variantIndex = static_cast<int>(hash % model->submeshes.size());
-				const VegetationSubmesh& variant = model->submeshes[static_cast<std::size_t>(variantIndex)];
+				int variantIndex = model->submeshesAsVariants ? static_cast<int>(hash % model->submeshes.size()) : -1;
 				float scale = glm::mix(layer.descriptor.minScale, layer.descriptor.maxScale, Unit(Hash(x, z, hash ^ 0xb5297a4du)));
 				float height = model->targetHeight * scale;
-				float groundRadius = std::clamp(variant.groundRadiusRatio * height, 0.25f, 1.6f);
-				float footprintRadius = variant.footprintRadiusRatio * height;
+				float groundRadiusRatio = variantIndex >= 0 ? model->submeshes[static_cast<std::size_t>(variantIndex)].groundRadiusRatio : model->groundRadiusRatio;
+				float footprintRadiusRatio = variantIndex >= 0 ? model->submeshes[static_cast<std::size_t>(variantIndex)].footprintRadiusRatio : model->footprintRadiusRatio;
+				float groundRadius = std::clamp(groundRadiusRatio * height, 0.25f, 1.6f);
+				float footprintRadius = footprintRadiusRatio * height;
 				if (worldX - footprintRadius < m_worldMin || worldX + footprintRadius > m_worldMax ||
 					worldZ - footprintRadius < m_worldMin || worldZ + footprintRadius > m_worldMax ||
 					glm::distance(glm::vec2(worldX, worldZ), glm::vec2(cameraPosition.x, cameraPosition.z)) > radius)
@@ -444,9 +513,13 @@ namespace pwg
 					return;
 				}
 				float yaw = Unit(Hash(x, z, hash ^ 0x1b56c4e9u)) * glm::two_pi<float>();
-				float groundSink = std::clamp(height * 0.035f, 0.04f, 0.16f);
+				float groundSink = std::max(model->groundSink * scale, 0.0f);
 				glm::vec3 position(worldX, SampleGroundHeight(terrain, worldX, worldZ, groundRadius, groundSink), worldZ);
-				m_grass.push_back({ VegetationAssetType::Grass, position, BuildModelMatrix(variant, model->targetHeight, position, yaw, scale), height * 0.75f, radius, groundRadius, groundSink, variantIndex });
+				glm::vec3 normal = layer.descriptor.alignToSlope ? SampleTerrainNormal(terrain, worldX, worldZ) : glm::vec3(0.0f, 1.0f, 0.0f);
+				glm::mat4 modelMatrix = variantIndex >= 0
+					? BuildModelMatrix(model->submeshes[static_cast<std::size_t>(variantIndex)], model->targetHeight, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees)
+					: BuildModelMatrix(*model, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees);
+				m_grass.push_back({ layer.modelIndex, position, modelMatrix, height * 0.75f, radius, groundRadius, groundSink, 0.0f, 0.0f, variantIndex });
 			};
 
 			tryCell(centerX, centerZ);
@@ -535,53 +608,87 @@ namespace pwg
 		return slope <= maxSlopeDegrees;
 	}
 
-	glm::mat4 VegetationSystem::BuildModelMatrix(const VegetationModel& model, const glm::vec3& position, float yaw, float scale) const
+	glm::vec3 VegetationSystem::SampleTerrainNormal(std::shared_ptr<Terrain> terrain, float x, float z) const
+	{
+		constexpr float offset = 1.0f;
+		float dx = (terrain->GetTerrainHeightAt(x + offset, z) - terrain->GetTerrainHeightAt(x - offset, z)) / (2.0f * offset);
+		float dz = (terrain->GetTerrainHeightAt(x, z + offset) - terrain->GetTerrainHeightAt(x, z - offset)) / (2.0f * offset);
+		return glm::normalize(glm::vec3(-dx, 1.0f, -dz));
+	}
+
+	glm::mat4 VegetationSystem::BuildModelMatrix(const VegetationModel& model, const glm::vec3& position, float yaw, float scale, const glm::vec3& normal, float maxTiltDegrees) const
 	{
 		float sourceHeight = std::max(model.boundsMax.y - model.boundsMin.y, 0.0001f);
 		float normalizedScale = model.targetHeight / sourceHeight * scale;
 		glm::vec3 center((model.boundsMin.x + model.boundsMax.x) * 0.5f, model.boundsMin.y, (model.boundsMin.z + model.boundsMax.z) * 0.5f);
 		glm::mat4 result(1.0f);
 		result = glm::translate(result, position);
+		result *= SlopeAlignment(normal, maxTiltDegrees);
 		result = glm::rotate(result, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
 		result = glm::scale(result, glm::vec3(normalizedScale));
 		result = glm::translate(result, -center);
 		return result;
 	}
 
-	glm::mat4 VegetationSystem::BuildModelMatrix(const VegetationSubmesh& submesh, float targetHeight, const glm::vec3& position, float yaw, float scale) const
+	glm::mat4 VegetationSystem::BuildModelMatrix(const VegetationSubmesh& submesh, float targetHeight, const glm::vec3& position, float yaw, float scale, const glm::vec3& normal, float maxTiltDegrees) const
 	{
 		float sourceHeight = std::max(submesh.boundsMax.y - submesh.boundsMin.y, 0.0001f);
 		float normalizedScale = targetHeight / sourceHeight * scale;
 		glm::vec3 center((submesh.boundsMin.x + submesh.boundsMax.x) * 0.5f, submesh.boundsMin.y, (submesh.boundsMin.z + submesh.boundsMax.z) * 0.5f);
 		glm::mat4 result(1.0f);
 		result = glm::translate(result, position);
+		result *= SlopeAlignment(normal, maxTiltDegrees);
 		result = glm::rotate(result, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
 		result = glm::scale(result, glm::vec3(normalizedScale));
 		result = glm::translate(result, -center);
 		return result;
 	}
 
-	const VegetationModel* VegetationSystem::FindModel(VegetationAssetType type) const
+	const VegetationModel* VegetationSystem::FindModel(int modelIndex) const
 	{
-		auto found = m_models.find(static_cast<int>(type));
-		return found != m_models.end() && found->second.loaded ? &found->second : nullptr;
+		return modelIndex >= 0 && modelIndex < static_cast<int>(m_models.size()) && m_models[static_cast<std::size_t>(modelIndex)].loaded
+			? &m_models[static_cast<std::size_t>(modelIndex)]
+			: nullptr;
+	}
+
+	float VegetationSystem::GetCollisionGroundHeight(std::shared_ptr<Terrain> terrain, float x, float z) const
+	{
+		float height = terrain ? terrain->GetTerrainHeightAt(x, z) : 0.0f;
+		for (const Instance& instance : m_trees)
+		{
+			const VegetationModel* model = FindModel(instance.modelIndex);
+			if (!model || model->kind != VegetationKind::Rock || instance.collisionRadius <= 0.0f) continue;
+			glm::vec2 offset(x - instance.position.x, z - instance.position.z);
+			float normalizedDistance = glm::length(offset) / instance.collisionRadius;
+			if (normalizedDistance < 1.0f)
+			{
+				float profile = 1.0f - glm::smoothstep(0.0f, 1.0f, normalizedDistance);
+				float surfaceHeight = instance.position.y + instance.collisionHeight * profile;
+				height = std::max(height, surfaceHeight);
+			}
+		}
+		return height;
 	}
 
 	void VegetationSystem::Draw(Renderer& renderer)
 	{
-		for (VegetationAssetType type : { VegetationAssetType::TreeA, VegetationAssetType::TreeB, VegetationAssetType::Grass })
+		for (int modelIndex = 0; modelIndex < static_cast<int>(m_models.size()); ++modelIndex)
 		{
-			const VegetationModel* model = FindModel(type);
+			const VegetationModel* model = FindModel(modelIndex);
 			if (!model) continue;
-			const auto& source = type == VegetationAssetType::Grass ? m_grass : m_trees;
-			std::size_t batchCount = type == VegetationAssetType::Grass ? model->submeshes.size() : 1;
+			bool grass = model->kind == VegetationKind::Grass;
+			bool tree = model->kind == VegetationKind::Tree;
+			float frustumMargin = tree ? 18.0f : (grass ? 6.0f : 10.0f);
+			bool variants = model->submeshesAsVariants;
+			const auto& source = grass ? m_grass : m_trees;
+			std::size_t batchCount = variants ? model->submeshes.size() : 1;
 			std::vector<std::vector<glm::mat4>> batches(std::max<std::size_t>(batchCount, 1));
 			float renderDistance = 1.0f;
 			for (const auto& instance : source)
 			{
-				if (instance.assetType == type && renderer.IsSphereVisible(instance.position, instance.radius, instance.renderDistance))
+				if (instance.modelIndex == modelIndex && renderer.IsSphereVisible(instance.position, instance.radius, instance.renderDistance, frustumMargin))
 				{
-					std::size_t batch = type == VegetationAssetType::Grass
+					std::size_t batch = variants
 						? static_cast<std::size_t>(std::max(instance.variantIndex, 0)) % batches.size()
 						: 0;
 					batches[batch].push_back(instance.model);
@@ -592,12 +699,12 @@ namespace pwg
 			{
 				const auto& submesh = model->submeshes[submeshIndex];
 				submesh.material->SetUniformFloat("u_time", m_time);
-				submesh.material->SetUniformInt("u_isGrass", type == VegetationAssetType::Grass ? 1 : 0);
-				submesh.material->SetUniformInt("u_isTree", type == VegetationAssetType::Grass ? 0 : 1);
-				submesh.material->SetUniformFloat("u_modelMinY", type == VegetationAssetType::Grass ? submesh.boundsMin.y : model->boundsMin.y);
-				submesh.material->SetUniformFloat("u_modelMaxY", type == VegetationAssetType::Grass ? submesh.boundsMax.y : model->boundsMax.y);
+				submesh.material->SetUniformInt("u_isGrass", grass ? 1 : 0);
+				submesh.material->SetUniformInt("u_isTree", tree ? 1 : 0);
+				submesh.material->SetUniformFloat("u_modelMinY", variants ? submesh.boundsMin.y : model->boundsMin.y);
+				submesh.material->SetUniformFloat("u_modelMaxY", variants ? submesh.boundsMax.y : model->boundsMax.y);
 				submesh.material->SetUniformFloat("u_renderDistance", renderDistance);
-				const auto& transforms = type == VegetationAssetType::Grass ? batches[submeshIndex] : batches[0];
+				const auto& transforms = variants ? batches[submeshIndex] : batches[0];
 				renderer.DrawMeshInstanced(submesh.mesh, submesh.material, transforms);
 			}
 		}
@@ -606,22 +713,32 @@ namespace pwg
 	void VegetationSystem::DrawShadow(const glm::mat4& lightSpaceMatrix)
 	{
 		if (!m_shadowShader || m_trees.empty()) return;
-		for (VegetationAssetType type : { VegetationAssetType::TreeA, VegetationAssetType::TreeB })
+		for (int modelIndex = 0; modelIndex < static_cast<int>(m_models.size()); ++modelIndex)
 		{
-			const VegetationModel* model = FindModel(type);
-			if (!model) continue;
-			std::vector<glm::mat4> transforms;
+			const VegetationModel* model = FindModel(modelIndex);
+			if (!model || model->kind == VegetationKind::Grass) continue;
+			bool variants = model->submeshesAsVariants;
+			std::size_t batchCount = variants ? model->submeshes.size() : 1;
+			std::vector<std::vector<glm::mat4>> batches(std::max<std::size_t>(batchCount, 1));
 			for (const auto& instance : m_trees)
 			{
-				if (instance.assetType == type) transforms.push_back(instance.model);
+				if (instance.modelIndex != modelIndex) continue;
+				std::size_t batch = variants
+					? static_cast<std::size_t>(std::max(instance.variantIndex, 0)) % batches.size()
+					: 0;
+				batches[batch].push_back(instance.model);
 			}
-			for (const auto& submesh : model->submeshes)
+			for (std::size_t submeshIndex = 0; submeshIndex < model->submeshes.size(); ++submeshIndex)
 			{
+				const auto& submesh = model->submeshes[submeshIndex];
+				const auto& transforms = variants ? batches[submeshIndex] : batches[0];
+				if (transforms.empty()) continue;
 				m_shadowShader->ActivateShader();
 				m_shadowShader->SetUniformMat4("u_lightSpaceMatrix", lightSpaceMatrix);
 				m_shadowShader->SetUniformFloat("u_time", m_time);
-				m_shadowShader->SetUniformFloat("u_modelMinY", model->boundsMin.y);
-				m_shadowShader->SetUniformFloat("u_modelMaxY", model->boundsMax.y);
+				m_shadowShader->SetUniformInt("u_isTree", model->kind == VegetationKind::Tree ? 1 : 0);
+				m_shadowShader->SetUniformFloat("u_modelMinY", variants ? submesh.boundsMin.y : model->boundsMin.y);
+				m_shadowShader->SetUniformFloat("u_modelMaxY", variants ? submesh.boundsMax.y : model->boundsMax.y);
 				m_shadowShader->SetUniformInt("u_hasAlbedo", submesh.albedo ? 1 : 0);
 				if (submesh.albedo)
 				{
@@ -646,6 +763,20 @@ namespace pwg
 		m_groundingAccumulator = 0.0f;
 		m_seenGraphRevision = 0;
 		m_seenTerrainRevision = 0;
+	}
+
+	void VegetationSystem::ReloadAssetModels()
+	{
+		m_models.clear();
+		m_modelIndices.clear();
+		m_layers.clear();
+		m_trees.clear();
+		m_grass.clear();
+		m_grassBuilt = false;
+		m_lastGrassCamera = glm::vec3(1000000.0f);
+		m_seenGraphRevision = std::numeric_limits<std::uint64_t>::max();
+		m_seenTerrainRevision = std::numeric_limits<std::uint64_t>::max();
+		m_status = "Vegetation asset metadata reloaded";
 	}
 
 	std::size_t VegetationSystem::GetTreeCount() const { return m_trees.size(); }

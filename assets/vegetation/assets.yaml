@@ -1,0 +1,22 @@
+assets:
+  - id: builtin.tree_a
+    name: Tree A
+    kind: Tree
+    modelPath: tree_a/tree_a.gltf
+    targetHeight: 36.0
+    groundSink: 1.2
+    submeshesAsVariants: false
+  - id: builtin.tree_b
+    name: Tree B
+    kind: Tree
+    modelPath: tree_b/tree_b.gltf
+    targetHeight: 34.0
+    groundSink: 1.0
+    submeshesAsVariants: false
+  - id: builtin.grass
+    name: Grass
+    kind: Grass
+    modelPath: grass/grass.gltf
+    targetHeight: 3.2
+    groundSink: 0.12
+    submeshesAsVariants: true
