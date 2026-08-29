@@ -1,15 +1,17 @@
 #include "chunkManager.h"
 #include "terrain/masks/mask.h"
+#include "graphics/renderer/renderer.h"
 #include <glad/glad.h>
 #include <algorithm>
 #include <cmath>
 
 namespace pwg
 {
-	ChunkManager::ChunkManager(std::shared_ptr<ResourceManager> resourceManager, TerrainSettings& settings, std::shared_ptr<Material> terrainMaterial, std::shared_ptr<TerrainDebug> debug)
+	ChunkManager::ChunkManager(std::shared_ptr<ResourceManager> resourceManager, TerrainSettings& settings, std::shared_ptr<Material> terrainMaterial, std::shared_ptr<Material> waterMaterial, std::shared_ptr<TerrainDebug> debug)
 		: m_terrainSettings(settings),
 		  m_resourceManager(resourceManager),
 		  m_terrainMaterial(terrainMaterial),
+		  m_waterMaterial(waterMaterial),
 		  m_terrainDebug(debug)
 	{
 		m_worldSize = settings.chunkSize * m_chunkCount;
@@ -53,8 +55,14 @@ namespace pwg
 
 	}
 
+	ChunkManager::~ChunkManager()
+	{
+		if (m_sceneDepthCopy != 0) glDeleteTextures(1, &m_sceneDepthCopy);
+	}
+
 	void ChunkManager::Update(std::shared_ptr<ICamera> camera, float dt)
 	{
+		m_waterTime += std::clamp(dt, 0.0f, 0.1f);
 		for (int i = 0; i < m_chunkCount; i++)
 		{
 			for (int j = 0; j < m_chunkCount; j++)
@@ -298,10 +306,10 @@ namespace pwg
 		m_terrainMaterial->Apply();
 	}
 
-	void ChunkManager::DrawTerrainChunks(bool waterOverlay)
+	void ChunkManager::DrawTerrainChunks(const std::shared_ptr<Material>& material)
 	{
 		float worldHalfSize = (m_worldSize - 1) * 0.5f;
-		auto shader = m_terrainMaterial->GetShader();
+		auto shader = material ? material->GetShader() : nullptr;
 		if (!shader)
 		{
 			return;
@@ -382,12 +390,16 @@ namespace pwg
 		}
 
 		SetupSharedTerrainUniforms(false);
-		DrawTerrainChunks(false);
+		DrawTerrainChunks(m_terrainMaterial);
+	}
 
+	void ChunkManager::DrawWater(Renderer& renderer)
+	{
 		if (m_terrainDebug->GetStatus() || !m_terrainComputePipeline->GetHydraulicSettings().showWaterSurface)
 		{
 			return;
 		}
+		if (!m_waterMaterial || !m_waterMaterial->GetShader()) return;
 
 		GLint viewport[4];
 		glGetIntegerv(GL_VIEWPORT, viewport);
@@ -400,35 +412,44 @@ namespace pwg
 
 		if (!m_sceneColorCopy || m_sceneColorCopyWidth != viewportWidth || m_sceneColorCopyHeight != viewportHeight)
 		{
-			m_sceneColorCopy = std::make_shared<Texture>(viewportWidth, viewportHeight, TextureType::ALBEDO);
+			m_sceneColorCopy = std::make_shared<Texture>(viewportWidth, viewportHeight, TextureType::HDR_COLOR);
 			m_sceneColorCopyWidth = viewportWidth;
 			m_sceneColorCopyHeight = viewportHeight;
+			if (m_sceneDepthCopy != 0) glDeleteTextures(1, &m_sceneDepthCopy);
+			glGenTextures(1, &m_sceneDepthCopy);
+			glBindTexture(GL_TEXTURE_2D, m_sceneDepthCopy);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, viewportWidth, viewportHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		}
 
-		bool useWaterRefraction = m_terrainComputePipeline->GetHydraulicSettings().waterRefractionEnabled;
-		if (useWaterRefraction)
-		{
-			glBindTexture(GL_TEXTURE_2D, m_sceneColorCopy->GetTextureID());
-			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, viewportWidth, viewportHeight);
-			glBindTexture(GL_TEXTURE_2D, 0);
-		}
+		glBindTexture(GL_TEXTURE_2D, m_sceneColorCopy->GetTextureID());
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, viewportWidth, viewportHeight);
+		glBindTexture(GL_TEXTURE_2D, m_sceneDepthCopy);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, viewportWidth, viewportHeight);
+		glBindTexture(GL_TEXTURE_2D, 0);
 
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glDepthMask(GL_FALSE);
-
-		m_terrainMaterial->SetUniformInt("u_renderWaterOverlay", 1);
-		m_terrainMaterial->SetUniformInt("u_useWaterRefraction", useWaterRefraction ? 1 : 0);
-		if (useWaterRefraction)
-		{
-			m_terrainMaterial->SetUniformTexture("u_SceneColor", m_sceneColorCopy);
-		}
-		m_terrainMaterial->SetUniformVec2("u_viewportSize", glm::vec2(viewportWidth, viewportHeight));
-		m_terrainMaterial->Apply();
-		DrawTerrainChunks(true);
+		renderer.PrepareMaterial(m_waterMaterial);
+		m_waterMaterial->SetUniformTexture("u_Heightmap", m_globalMasks["FinalHeight"]->texture);
+		m_waterMaterial->SetUniformTexture("u_Watermap", m_globalMasks["WaterMask"]->texture);
+		m_waterMaterial->SetUniformTexture("u_FlowAccumulationmap", m_globalMasks["FlowAccumulationMask"]->texture);
+		m_waterMaterial->SetUniformTexture("u_RiverChannelmap", m_globalMasks["RiverChannelMask"]->texture);
+		m_waterMaterial->SetUniformTexture("u_SceneColor", m_sceneColorCopy);
+		m_waterMaterial->SetUniformVec2("u_viewportSize", glm::vec2(viewportWidth, viewportHeight));
+		m_waterMaterial->SetUniformFloat("u_time", m_waterTime);
+		m_waterMaterial->SetUniformFloat("u_minVisibleWaterDepth", m_terrainComputePipeline->GetHydraulicSettings().minVisibleWaterDepth);
+		m_waterMaterial->SetUniformInt("u_useWaterRefraction", m_terrainComputePipeline->GetHydraulicSettings().waterRefractionEnabled ? 1 : 0);
+		m_waterMaterial->Apply();
+		auto waterShader = m_waterMaterial->GetShader();
+		glActiveTexture(GL_TEXTURE15);
+		glBindTexture(GL_TEXTURE_2D, m_sceneDepthCopy);
+		waterShader->SetUniformInt("u_SceneDepth", 15);
+		DrawTerrainChunks(m_waterMaterial);
 
 		glDepthMask(GL_TRUE);
-		glDisable(GL_BLEND);
 	}
 
 	void pwg::ChunkManager::Regenerate()

@@ -16,6 +16,8 @@
 
 namespace pwg
 {
+	class Renderer;
+
 	// Snapshot of the live simulation textures so the eroded terrain and the water
 	// (rivers / lakes) survive saving and reopening a project.
 	struct SimulationStateSnapshot
@@ -34,11 +36,12 @@ namespace pwg
 	class ChunkManager
 	{
 	public:
-		ChunkManager(std::shared_ptr<ResourceManager> resourceManager, TerrainSettings& settings, std::shared_ptr<Material> terrainMaterial, std::shared_ptr<TerrainDebug> debug);
-		~ChunkManager() = default;
+		ChunkManager(std::shared_ptr<ResourceManager> resourceManager, TerrainSettings& settings, std::shared_ptr<Material> terrainMaterial, std::shared_ptr<Material> waterMaterial, std::shared_ptr<TerrainDebug> debug);
+		~ChunkManager();
 
 		void Update(std::shared_ptr<ICamera> camera, float dt);
 		void Draw();
+		void DrawWater(Renderer& renderer);
 		void DrawShadowMap(std::shared_ptr<Shader> shader, const glm::mat4& lightSpaceMatrix);
 		void Regenerate();
 		void StepSimulation();
@@ -83,6 +86,7 @@ namespace pwg
 		std::shared_ptr<TerrainComputePipeline> m_terrainComputePipeline;
 		std::shared_ptr<ResourceManager> m_resourceManager;
 		std::shared_ptr<Material> m_terrainMaterial;
+		std::shared_ptr<Material> m_waterMaterial;
 		std::unique_ptr<LODManager> m_lodManager;
 		std::vector<TerrainChunk> m_chunks;
 		TerrainSettings m_terrainSettings;
@@ -108,8 +112,10 @@ namespace pwg
 		std::uint64_t m_generationRevision{ 0 };
 		std::shared_ptr<TerrainDebug> m_terrainDebug;
 		std::shared_ptr<Texture> m_sceneColorCopy;
+		unsigned int m_sceneDepthCopy{ 0 };
 		int m_sceneColorCopyWidth{ 0 };
 		int m_sceneColorCopyHeight{ 0 };
+		float m_waterTime{ 0.0f };
 
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> m_globalMasks;
 
@@ -119,7 +125,7 @@ namespace pwg
 		bool IsChunkVisible(const TerrainChunk& chunk, float worldHalfSize) const;
 		void UpdateFrustum(std::shared_ptr<ICamera> camera);
 		void SetupSharedTerrainUniforms(bool waterOverlay);
-		void DrawTerrainChunks(bool waterOverlay);
+		void DrawTerrainChunks(const std::shared_ptr<Material>& material);
 	};
 }
 #endif // !SRC_TERRAIN_CHUNK_CHUNK_MANAGER_H_

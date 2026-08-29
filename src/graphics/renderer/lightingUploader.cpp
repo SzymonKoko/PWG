@@ -18,4 +18,14 @@ void pwg::LightingUploader::Upload(std::shared_ptr<Material> material, const Env
 	material->SetUniformFloat("u_snowSoftness", lighting.snowSoftness);
 	material->SetUniformFloat("u_wetnessStrength", lighting.wetnessStrength);
 	material->SetUniformFloat("u_waterAlpha", lighting.waterAlpha);
+	material->SetUniformVec3("u_waterShallowColor", lighting.waterShallowColor);
+	material->SetUniformVec3("u_waterDeepColor", lighting.waterDeepColor);
+	material->SetUniformFloat("u_waterNormalStrength", lighting.waterNormalStrength);
+	material->SetUniformFloat("u_waterWaveScale", lighting.waterWaveScale);
+	material->SetUniformFloat("u_waterWaveSpeed", lighting.waterWaveSpeed);
+	material->SetUniformFloat("u_waterRefractionStrength", lighting.waterRefractionStrength);
+	material->SetUniformFloat("u_waterAbsorption", lighting.waterAbsorption);
+	material->SetUniformFloat("u_waterFoamWidth", lighting.waterFoamWidth);
+	material->SetUniformFloat("u_waterFoamIntensity", lighting.waterFoamIntensity);
+	material->SetUniformFloat("u_waterRoughness", lighting.waterRoughness);
 }

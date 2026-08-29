@@ -49,7 +49,7 @@ namespace pwg
 
 		void Sync(std::shared_ptr<Terrain> terrain, const TerrainComputePipeline& pipeline, std::uint64_t terrainRevision);
 		void Update(std::shared_ptr<Terrain> terrain, std::shared_ptr<ICamera> camera, float dt);
-		void Draw(Renderer& renderer);
+		void Draw(Renderer& renderer, std::shared_ptr<Terrain> terrain);
 		void DrawShadow(const glm::mat4& lightSpaceMatrix);
 		float GetCollisionGroundHeight(std::shared_ptr<Terrain> terrain, float x, float z) const;
 		void ReloadAssetModels();
@@ -88,7 +88,7 @@ namespace pwg
 		void RefreshGrounding(std::shared_ptr<Terrain> terrain);
 		float SampleGroundHeight(std::shared_ptr<Terrain> terrain, float x, float z, float radius, float sink) const;
 		float SampleMask(const std::vector<float>& data, float worldX, float worldZ) const;
-		bool AcceptTerrainPoint(std::shared_ptr<Terrain> terrain, float x, float z, float maxSlopeDegrees) const;
+		bool AcceptTerrainPoint(std::shared_ptr<Terrain> terrain, float x, float z, float maxSlopeDegrees, bool avoidWater) const;
 		glm::vec3 SampleTerrainNormal(std::shared_ptr<Terrain> terrain, float x, float z) const;
 		glm::mat4 BuildModelMatrix(const VegetationModel& model, const glm::vec3& position, float yaw, float scale, const glm::vec3& normal, float maxTiltDegrees) const;
 		glm::mat4 BuildModelMatrix(const VegetationSubmesh& submesh, float targetHeight, const glm::vec3& position, float yaw, float scale, const glm::vec3& normal, float maxTiltDegrees) const;
@@ -112,6 +112,7 @@ namespace pwg
 		bool m_grassBuilt{ false };
 		float m_time{ 0.0f };
 		float m_groundingAccumulator{ 0.0f };
+		float m_minVisibleWaterDepth{ 0.025f };
 		std::string m_status{ "Vegetation assets are not loaded" };
 	};
 }

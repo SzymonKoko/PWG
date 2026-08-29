@@ -18,7 +18,7 @@ namespace pwg
 		bool autoWaterSimulation = false;
 		bool particleErosionEnabled = false;
 		bool showWaterSurface = true;
-		bool waterRefractionEnabled = false;
+		bool waterRefractionEnabled = true;
 		bool useDiagonalFlow = true;
 
 		// Water budget
@@ -30,6 +30,7 @@ namespace pwg
 		float infiltrationRate = 0.00003f;
 		float boundaryDrain = 0.92f;
 		float maxWaterDepth = 2.5f;
+		float minVisibleWaterDepth = 0.025f;
 
 		// Virtual pipes
 		float pipeFlow = 0.38f;

@@ -77,6 +77,7 @@ namespace pwg
 		* @return OpenGL texture ID used as the framebuffer color attachment.
 		*/
 		unsigned int GetTextureID() { return m_fboTexture->GetTextureID(); }
+		unsigned int GetDepthTextureID() const { return m_depthTextureID; }
 
 		/**
 		* @brief Getter for the framebuffer width.
@@ -92,7 +93,7 @@ namespace pwg
 
 	private:
 		unsigned int m_frameBufferObjectID{ 0 };			/**< OpenGL Framebuffer Object ID. */
-		unsigned int m_renderBufferObjectID{ 0 };			/**< Optional Render Buffer Object ID (for depth/stencil). */
+		unsigned int m_depthTextureID{ 0 };
 		std::shared_ptr<Texture> m_fboTexture{ nullptr };	/**< Texture attached as color output. */
 		int m_width{ 800 };									/**< Framebuffer width in pixels. */
 		int m_height{ 800 };								/**< Framebuffer height in pixels. */

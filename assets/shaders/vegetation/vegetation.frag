@@ -10,6 +10,7 @@ out vec4 FragColor;
 uniform sampler2D u_albedo;
 uniform int u_hasAlbedo;
 uniform int u_isGrass;
+uniform int u_isTree;
 uniform vec3 u_baseColor;
 uniform vec3 u_lightDirection;
 uniform vec3 u_lightColor;
@@ -18,9 +19,27 @@ uniform vec3 u_cameraPosition;
 uniform float u_renderDistance;
 uniform float u_skyAmbient;
 uniform vec3 u_skyTint;
+uniform sampler2D u_Watermap;
+uniform sampler2D u_FlowAccumulationmap;
+uniform sampler2D u_RiverChannelmap;
+uniform float u_waterWorldSize;
+uniform float u_minVisibleWaterDepth;
 
 void main()
 {
+	if (u_isGrass == 1 || u_isTree == 1)
+	{
+		vec2 waterUV = f_WorldPos.xz / max(u_waterWorldSize - 1.0, 1.0) + vec2(0.5);
+		float waterDepth = texture(u_Watermap, waterUV).r;
+		float flow = max(texture(u_FlowAccumulationmap, waterUV).r, texture(u_RiverChannelmap, waterUV).r);
+		float depthCoverage = smoothstep(u_minVisibleWaterDepth, u_minVisibleWaterDepth + max(0.012, u_minVisibleWaterDepth * 0.75), waterDepth);
+		float flowCoverage = smoothstep(0.10, 0.32, flow);
+		if (max(depthCoverage, flowCoverage) > 0.05)
+		{
+			discard;
+		}
+	}
+
     vec4 sampled = u_hasAlbedo == 1 ? texture(u_albedo, f_Uv) : vec4(1.0);
     if (sampled.a < 0.35)
     {

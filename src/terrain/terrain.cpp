@@ -7,8 +7,9 @@ namespace pwg
     {
 
         m_material = resourceManager->GetMaterialManager()->GetMaterial("TerrainMaterial");
+        auto waterMaterial = resourceManager->GetMaterialManager()->GetMaterial("WaterMaterial");
         m_terrainDebug = std::make_shared<TerrainDebug>();
-        m_chunkManager = std::make_shared<ChunkManager>(resourceManager, m_terrainSettings, m_material, m_terrainDebug);
+        m_chunkManager = std::make_shared<ChunkManager>(resourceManager, m_terrainSettings, m_material, waterMaterial, m_terrainDebug);
 
         m_size = m_chunkManager->GetWorldSize();
 
@@ -26,6 +27,11 @@ namespace pwg
     void Terrain::Draw(Renderer& renderer)
     {
         m_chunkManager->Draw();
+    }
+
+    void Terrain::DrawWater(Renderer& renderer)
+    {
+        m_chunkManager->DrawWater(renderer);
     }
 
     void Terrain::DrawShadowMap(std::shared_ptr<Shader> shader, const glm::mat4& lightSpaceMatrix)

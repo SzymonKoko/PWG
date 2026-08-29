@@ -308,6 +308,7 @@ namespace pwg
 			return;
 		}
 		auto chunkManager = terrain->GetChunkManager();
+		m_minVisibleWaterDepth = chunkManager->GetTerrainComputePipeline()->GetHydraulicSettings().minVisibleWaterDepth;
 		m_worldMin = -(static_cast<float>(m_worldSize) - 1.0f) * 0.5f;
 		m_worldMax = m_worldMin + static_cast<float>(chunkManager->GetChunkCount() * (chunkManager->GetChunkSize() - 1));
 
@@ -378,7 +379,7 @@ namespace pwg
 					}
 					float mask = layer.densityData ? SampleMask(*layer.densityData, worldX, worldZ) : 1.0f;
 					if (Unit(Hash(x, z, hash ^ 0x63d83595u)) > layer.descriptor.density * std::clamp(mask, 0.0f, 1.0f) ||
-						!AcceptTerrainPoint(terrain, worldX, worldZ, layer.descriptor.maxSlopeDegrees))
+						!AcceptTerrainPoint(terrain, worldX, worldZ, layer.descriptor.maxSlopeDegrees, model->kind != VegetationKind::Rock))
 					{
 						continue;
 					}
@@ -436,6 +437,7 @@ namespace pwg
 			return;
 		}
 		glm::vec3 cameraPosition = camera->GetCameraPosition();
+		m_minVisibleWaterDepth = terrain->GetChunkManager()->GetTerrainComputePipeline()->GetHydraulicSettings().minVisibleWaterDepth;
 		float grassRebuildDistance = std::numeric_limits<float>::max();
 		for (const auto& layer : m_layers)
 		{
@@ -508,7 +510,7 @@ namespace pwg
 					? glm::mix(0.55f, 1.0f, glm::smoothstep(0.05f, 0.68f, std::clamp(mask, 0.0f, 1.0f)))
 					: 1.0f;
 				if (Unit(Hash(x, z, hash ^ 0x68e31da4u)) > layer.descriptor.density * distribution ||
-					!AcceptTerrainPoint(terrain, worldX, worldZ, layer.descriptor.maxSlopeDegrees))
+					!AcceptTerrainPoint(terrain, worldX, worldZ, layer.descriptor.maxSlopeDegrees, true))
 				{
 					return;
 				}
@@ -596,9 +598,9 @@ namespace pwg
 		return glm::mix(glm::mix(at(x0, z0), at(x1, z0), tx), glm::mix(at(x0, z1), at(x1, z1), tx), tz);
 	}
 
-	bool VegetationSystem::AcceptTerrainPoint(std::shared_ptr<Terrain> terrain, float x, float z, float maxSlopeDegrees) const
+	bool VegetationSystem::AcceptTerrainPoint(std::shared_ptr<Terrain> terrain, float x, float z, float maxSlopeDegrees, bool avoidWater) const
 	{
-		if (!m_waterData.empty() && SampleMask(m_waterData, x, z) > 0.002f)
+		if (avoidWater && !m_waterData.empty() && SampleMask(m_waterData, x, z) >= m_minVisibleWaterDepth)
 		{
 			return false;
 		}
@@ -670,8 +672,16 @@ namespace pwg
 		return height;
 	}
 
-	void VegetationSystem::Draw(Renderer& renderer)
+	void VegetationSystem::Draw(Renderer& renderer, std::shared_ptr<Terrain> terrain)
 	{
+		if (!terrain) return;
+		auto chunkManager = terrain->GetChunkManager();
+		auto& masks = chunkManager->GetMasks();
+		auto water = masks.find("WaterMask");
+		auto flow = masks.find("FlowAccumulationMask");
+		auto channels = masks.find("RiverChannelMask");
+		if (water == masks.end() || flow == masks.end() || channels == masks.end()) return;
+		auto& hydraulicSettings = chunkManager->GetTerrainComputePipeline()->GetHydraulicSettings();
 		for (int modelIndex = 0; modelIndex < static_cast<int>(m_models.size()); ++modelIndex)
 		{
 			const VegetationModel* model = FindModel(modelIndex);
@@ -704,6 +714,11 @@ namespace pwg
 				submesh.material->SetUniformFloat("u_modelMinY", variants ? submesh.boundsMin.y : model->boundsMin.y);
 				submesh.material->SetUniformFloat("u_modelMaxY", variants ? submesh.boundsMax.y : model->boundsMax.y);
 				submesh.material->SetUniformFloat("u_renderDistance", renderDistance);
+				submesh.material->SetUniformTexture("u_Watermap", water->second->texture);
+				submesh.material->SetUniformTexture("u_FlowAccumulationmap", flow->second->texture);
+				submesh.material->SetUniformTexture("u_RiverChannelmap", channels->second->texture);
+				submesh.material->SetUniformFloat("u_waterWorldSize", static_cast<float>(m_worldSize));
+				submesh.material->SetUniformFloat("u_minVisibleWaterDepth", hydraulicSettings.minVisibleWaterDepth);
 				const auto& transforms = variants ? batches[submeshIndex] : batches[0];
 				renderer.DrawMeshInstanced(submesh.mesh, submesh.material, transforms);
 			}

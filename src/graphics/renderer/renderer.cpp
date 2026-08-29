@@ -68,6 +68,15 @@ void pwg::Renderer::DrawMeshInstanced(std::shared_ptr<Mesh> mesh, std::shared_pt
 	mesh->DrawInstanced(transforms);
 }
 
+void pwg::Renderer::PrepareMaterial(const std::shared_ptr<Material>& material)
+{
+	if (!material) return;
+	m_lightingUploader->Upload(material, m_environmentLighting, m_cameraPosition);
+	material->SetUniformMat4("u_view", m_viewMatrix);
+	material->SetUniformMat4("u_projection", m_projectionMatrix);
+	material->SetUniformMat4("u_inverseProjection", glm::inverse(m_projectionMatrix));
+}
+
 bool pwg::Renderer::IsSphereVisible(const glm::vec3& center, float radius, float maxDistance, float frustumMargin) const
 {
 	if (maxDistance > 0.0f && glm::distance(glm::vec2(center.x, center.z), glm::vec2(m_cameraPosition.x, m_cameraPosition.z)) > maxDistance + radius)

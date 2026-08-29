@@ -83,6 +83,7 @@ namespace pwg
 		 * @param renderer Reference to the renderer.
 		 */
 		void Draw(Renderer& renderer) override;
+		void DrawWater(Renderer& renderer);
 		void DrawShadowMap(std::shared_ptr<Shader> shader, const glm::mat4& lightSpaceMatrix);
 
 		/**

@@ -71,7 +71,35 @@ namespace pwg::controls
 			changed |= ImGui::SliderFloat("Snow height", &settings.snowHeight, 0.0f, 5000.0f, "%.0f");
 			changed |= ImGui::SliderFloat("Snow softness", &settings.snowSoftness, 50.0f, 2500.0f, "%.0f");
 			changed |= ImGui::SliderFloat("Wetness strength", &settings.wetnessStrength, 0.0f, 1.5f, "%.2f");
-			changed |= ImGui::SliderFloat("Water alpha", &settings.waterAlpha, 0.05f, 1.0f, "%.2f");
+
+			ImGui::Separator();
+			ImGui::Text("Water appearance");
+			changed |= ImGui::ColorEdit3("Shallow color", &settings.waterShallowColor.x);
+			changed |= ImGui::ColorEdit3("Deep color", &settings.waterDeepColor.x);
+			changed |= ImGui::SliderFloat("Water alpha", &settings.waterAlpha, 0.15f, 1.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Wave normal strength", &settings.waterNormalStrength, 0.0f, 1.5f, "%.2f");
+			changed |= ImGui::SliderFloat("Wave scale", &settings.waterWaveScale, 0.25f, 3.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Wave speed", &settings.waterWaveSpeed, 0.0f, 3.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Refraction", &settings.waterRefractionStrength, 0.0f, 20.0f, "%.1f px");
+			changed |= ImGui::SliderFloat("Absorption", &settings.waterAbsorption, 0.02f, 1.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Foam width", &settings.waterFoamWidth, 0.05f, 4.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Foam intensity", &settings.waterFoamIntensity, 0.0f, 1.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Water roughness", &settings.waterRoughness, 0.04f, 0.5f, "%.2f");
+			if (ImGui::Button("Clear Lake preset"))
+			{
+				settings.waterShallowColor = { 0.08f, 0.38f, 0.42f };
+				settings.waterDeepColor = { 0.012f, 0.055f, 0.09f };
+				settings.waterAlpha = 0.72f;
+				settings.waterNormalStrength = 0.52f;
+				settings.waterWaveScale = 1.0f;
+				settings.waterWaveSpeed = 1.0f;
+				settings.waterRefractionStrength = 7.0f;
+				settings.waterAbsorption = 0.22f;
+				settings.waterFoamWidth = 1.1f;
+				settings.waterFoamIntensity = 0.32f;
+				settings.waterRoughness = 0.16f;
+				changed = true;
+			}
 
 			return changed;
 		}

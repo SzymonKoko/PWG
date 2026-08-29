@@ -95,6 +95,16 @@ namespace pwg
 		lighting.snowSoftness = m_settings.snowSoftness;
 		lighting.wetnessStrength = m_settings.wetnessStrength;
 		lighting.waterAlpha = m_settings.waterAlpha;
+		lighting.waterShallowColor = m_settings.waterShallowColor;
+		lighting.waterDeepColor = m_settings.waterDeepColor;
+		lighting.waterNormalStrength = m_settings.waterNormalStrength;
+		lighting.waterWaveScale = m_settings.waterWaveScale;
+		lighting.waterWaveSpeed = m_settings.waterWaveSpeed;
+		lighting.waterRefractionStrength = m_settings.waterRefractionStrength;
+		lighting.waterAbsorption = m_settings.waterAbsorption;
+		lighting.waterFoamWidth = m_settings.waterFoamWidth;
+		lighting.waterFoamIntensity = m_settings.waterFoamIntensity;
+		lighting.waterRoughness = m_settings.waterRoughness;
 		return lighting;
 	}
 

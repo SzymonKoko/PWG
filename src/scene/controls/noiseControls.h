@@ -92,6 +92,8 @@ namespace pwg::controls
                 ImGui::Text("Shallow Water");
                 ImGui::Checkbox("Enable erosion", &hydraulicSettings.erosionEnabled);
                 ImGui::Checkbox("Show water surface", &hydraulicSettings.showWaterSurface);
+                ImGui::Checkbox("Enable water refraction", &hydraulicSettings.waterRefractionEnabled);
+                ImGui::SliderFloat("Minimum visible water depth", &hydraulicSettings.minVisibleWaterDepth, 0.005f, 0.25f, "%.3f");
                 ImGui::Checkbox("Auto-run simulation", &hydraulicSettings.autoWaterSimulation);
 
                 ImGui::Separator();
@@ -112,7 +114,7 @@ namespace pwg::controls
 
                 ImGui::Separator();
                 ImGui::Text("Lakes");
-                ImGui::SliderFloat("Lake min depth", &hydraulicSettings.lakeMinDepth, 0.005f, 0.1f);
+                ImGui::SliderFloat("Lake formation min depth", &hydraulicSettings.lakeMinDepth, 0.005f, 0.1f);
                 ImGui::SliderFloat("Lake leveling", &hydraulicSettings.lakeLeveling, 0.0f, 0.8f);
 
                 ImGui::Separator();
@@ -130,6 +132,7 @@ namespace pwg::controls
                     hydraulicSettings.flowConcentration = 0.40f;
                     hydraulicSettings.evaporation = 0.00004f;
                     hydraulicSettings.maxWaterDepth = 2.5f;
+                    hydraulicSettings.minVisibleWaterDepth = 0.025f;
                     hydraulicSettings.erosionStrength = 0.20f;
                     hydraulicSettings.flatteningStrength = 0.25f;
                     hydraulicSettings.depositionStrength = 0.014f;
@@ -147,6 +150,7 @@ namespace pwg::controls
                     hydraulicSettings.flowConcentration = 0.55f;
                     hydraulicSettings.evaporation = 0.00003f;
                     hydraulicSettings.maxWaterDepth = 3.0f;
+                    hydraulicSettings.minVisibleWaterDepth = 0.025f;
                     hydraulicSettings.erosionStrength = 0.28f;
                     hydraulicSettings.flatteningStrength = 0.15f;
                     hydraulicSettings.depositionStrength = 0.015f;
@@ -164,6 +168,7 @@ namespace pwg::controls
                     hydraulicSettings.flowConcentration = 0.30f;
                     hydraulicSettings.evaporation = 0.00002f;
                     hydraulicSettings.maxWaterDepth = 4.0f;
+                    hydraulicSettings.minVisibleWaterDepth = 0.018f;
                     hydraulicSettings.erosionStrength = 0.10f;
                     hydraulicSettings.flatteningStrength = 0.35f;
                     hydraulicSettings.depositionStrength = 0.018f;

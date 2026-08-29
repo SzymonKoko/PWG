@@ -56,12 +56,19 @@ void pwg::FrameBuffer::InitializeFrameBuffer()
 
 	if (m_useRBO)
 	{
-		glGenRenderbuffers(1, &m_renderBufferObjectID);
-		glBindRenderbuffer(GL_RENDERBUFFER, m_renderBufferObjectID);
+		glGenTextures(1, &m_depthTextureID);
+		glBindTexture(GL_TEXTURE_2D, m_depthTextureID);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_depthTextureID, 0);
+	}
 
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, m_width, m_height);
-
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_renderBufferObjectID);
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	{
+		PWG_ERROR("Framebuffer is incomplete ({0}x{1})", m_width, m_height);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -73,7 +80,8 @@ void pwg::FrameBuffer::CleanUp()
 	glDeleteFramebuffers(1, &m_frameBufferObjectID);
 	if (m_useRBO)
 	{
-		glDeleteRenderbuffers(1, &m_renderBufferObjectID);
+		glDeleteTextures(1, &m_depthTextureID);
+		m_depthTextureID = 0;
 	}
 	if (m_fboTexture)
 	{

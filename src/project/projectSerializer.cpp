@@ -162,6 +162,16 @@ namespace pwg
 			node["snowSoftness"] = settings.snowSoftness;
 			node["wetnessStrength"] = settings.wetnessStrength;
 			node["waterAlpha"] = settings.waterAlpha;
+			node["waterShallowColor"] = Vec3Node(settings.waterShallowColor);
+			node["waterDeepColor"] = Vec3Node(settings.waterDeepColor);
+			node["waterNormalStrength"] = settings.waterNormalStrength;
+			node["waterWaveScale"] = settings.waterWaveScale;
+			node["waterWaveSpeed"] = settings.waterWaveSpeed;
+			node["waterRefractionStrength"] = settings.waterRefractionStrength;
+			node["waterAbsorption"] = settings.waterAbsorption;
+			node["waterFoamWidth"] = settings.waterFoamWidth;
+			node["waterFoamIntensity"] = settings.waterFoamIntensity;
+			node["waterRoughness"] = settings.waterRoughness;
 			return node;
 		}
 
@@ -414,6 +424,16 @@ namespace pwg
 			ReadValue(node, "snowSoftness", settings.snowSoftness);
 			ReadValue(node, "wetnessStrength", settings.wetnessStrength);
 			ReadValue(node, "waterAlpha", settings.waterAlpha);
+			settings.waterShallowColor = ReadVec3(node["waterShallowColor"], settings.waterShallowColor);
+			settings.waterDeepColor = ReadVec3(node["waterDeepColor"], settings.waterDeepColor);
+			ReadValue(node, "waterNormalStrength", settings.waterNormalStrength);
+			ReadValue(node, "waterWaveScale", settings.waterWaveScale);
+			ReadValue(node, "waterWaveSpeed", settings.waterWaveSpeed);
+			ReadValue(node, "waterRefractionStrength", settings.waterRefractionStrength);
+			ReadValue(node, "waterAbsorption", settings.waterAbsorption);
+			ReadValue(node, "waterFoamWidth", settings.waterFoamWidth);
+			ReadValue(node, "waterFoamIntensity", settings.waterFoamIntensity);
+			ReadValue(node, "waterRoughness", settings.waterRoughness);
 		}
 
 		void ReadLegacyLighting(const YAML::Node& lightNode, const YAML::Node& sunNode, EnvironmentSettings& settings)
@@ -704,6 +724,7 @@ namespace pwg
 			node["boundaryDrain"] = settings.boundaryDrain;
 			node["lakeLeveling"] = settings.lakeLeveling;
 			node["maxWaterDepth"] = settings.maxWaterDepth;
+			node["minVisibleWaterDepth"] = settings.minVisibleWaterDepth;
 			node["maxSurfaceDrop"] = settings.maxSurfaceDrop;
 			node["evaporation"] = settings.evaporation;
 			node["infiltrationRate"] = settings.infiltrationRate;
@@ -802,6 +823,7 @@ namespace pwg
 			ReadValue(node, "boundaryDrain", settings.boundaryDrain);
 			ReadValue(node, "lakeLeveling", settings.lakeLeveling);
 			ReadValue(node, "maxWaterDepth", settings.maxWaterDepth);
+			ReadValue(node, "minVisibleWaterDepth", settings.minVisibleWaterDepth);
 			ReadValue(node, "maxSurfaceDrop", settings.maxSurfaceDrop);
 			ReadValue(node, "evaporation", settings.evaporation);
 			ReadValue(node, "infiltrationRate", settings.infiltrationRate);

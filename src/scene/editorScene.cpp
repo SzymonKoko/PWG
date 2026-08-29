@@ -414,6 +414,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     std::string postprocessShadersPath = "../assets/shaders/postprocess/";
     std::string shadowShadersPath = "../assets/shaders/shadow/";
     std::string vegetationShadersPath = "../assets/shaders/vegetation/";
+	std::string waterShadersPath = "../assets/shaders/water/";
 
     shaderManager->Load("terrainShader", terrainShadersPath + "terrain.vert", terrainShadersPath + "terrain.frag");
     shaderManager->Load("skyboxShader", skyboxShadersPath + "skybox.vert", skyboxShadersPath + "skybox.frag");
@@ -421,6 +422,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     shaderManager->Load("terrainShadowShader", shadowShadersPath + "terrain_shadow.vert", shadowShadersPath + "terrain_shadow.frag");
     shaderManager->Load("vegetationShader", vegetationShadersPath + "vegetation.vert", vegetationShadersPath + "vegetation.frag");
     shaderManager->Load("vegetationShadowShader", vegetationShadersPath + "vegetation_shadow.vert", vegetationShadersPath + "vegetation_shadow.frag");
+	shaderManager->Load("waterShader", waterShadersPath + "water.vert", waterShadersPath + "water.frag");
 
     auto terrainShader = shaderManager->GetShader<pwg::Shader>("terrainShader");
     auto skyboxShader = shaderManager->GetShader<pwg::Shader>("skyboxShader");
@@ -428,15 +430,21 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
     m_terrainShadowShader = shaderManager->GetShader<pwg::Shader>("terrainShadowShader");
     auto vegetationShader = shaderManager->GetShader<pwg::Shader>("vegetationShader");
     auto vegetationShadowShader = shaderManager->GetShader<pwg::Shader>("vegetationShadowShader");
+	auto waterShader = shaderManager->GetShader<pwg::Shader>("waterShader");
 
     /*== TEXTURE LOADING ==*/
     std::string terrainTexturesPath = "../assets/textures/";
+	textureManager->Load("WaterNormalLarge", terrainTexturesPath + "water/water_large_normal.jpg", TextureType::NORMAL);
+	textureManager->Load("WaterNormalDetail", terrainTexturesPath + "water/water_detail_normal.jpg", TextureType::NORMAL);
     m_skyboxDefinition = DefaultSkyboxDefinition();
     textureManager->LoadCubeMapTexture("Skybox", FaceVector(m_skyboxDefinition), TextureType::ALBEDO);
 
 
     /*== CREATING MATERIALS ==*/
     auto terrainMaterial = materialManager->CreateMaterial("TerrainMaterial", terrainShader);
+	auto waterMaterial = materialManager->CreateMaterial("WaterMaterial", waterShader);
+	waterMaterial->SetUniformTexture("u_WaterNormalLarge", textureManager->GetTexture("WaterNormalLarge"));
+	waterMaterial->SetUniformTexture("u_WaterNormalDetail", textureManager->GetTexture("WaterNormalDetail"));
     auto skyboxMaterial = materialManager->CreateMaterial("SkyboxMaterial", skyboxShader);
 
     m_terrainMaterialLibrary = std::make_shared<TerrainMaterialLibrary>(m_resourceManager, terrainMaterial);
@@ -592,8 +600,9 @@ void pwg::EditorScene::Draw()
     m_renderer.DrawAll();
     if (m_vegetationSystem)
     {
-        m_vegetationSystem->Draw(m_renderer);
+        m_vegetationSystem->Draw(m_renderer, m_terrain);
     }
+	m_terrain->DrawWater(m_renderer);
     m_renderer.EndFrame();
     m_hdrFrameBuffer->Unbind();
 
