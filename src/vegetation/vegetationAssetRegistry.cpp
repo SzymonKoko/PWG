@@ -282,6 +282,7 @@ namespace pwg
 		VegetationKind kind,
 		float targetHeight,
 		float groundSink,
+		const glm::vec3& rotationDegrees,
 		bool submeshesAsVariants)
 	{
 		if (!fs::is_regular_file(sourceModel) || !HasSupportedExtension(sourceModel))
@@ -348,6 +349,9 @@ namespace pwg
 			manifest["modelPath"] = sourceModel.filename().generic_string();
 			manifest["targetHeight"] = targetHeight;
 			manifest["groundSink"] = groundSink;
+			manifest["rotationX"] = rotationDegrees.x;
+			manifest["rotationY"] = rotationDegrees.y;
+			manifest["rotationZ"] = rotationDegrees.z;
 			manifest["submeshesAsVariants"] = submeshesAsVariants;
 			std::ofstream output(staging / "asset.yaml", std::ios::binary);
 			if (!output) throw std::runtime_error("could not create asset.yaml");
@@ -381,6 +385,7 @@ namespace pwg
 		VegetationKind kind,
 		float targetHeight,
 		float groundSink,
+		const glm::vec3& rotationDegrees,
 		bool submeshesAsVariants)
 	{
 		const VegetationAssetDefinition* current = Find(id);
@@ -411,6 +416,9 @@ namespace pwg
 		manifest["modelPath"] = relativeModel.generic_string();
 		manifest["targetHeight"] = targetHeight;
 		manifest["groundSink"] = groundSink;
+		manifest["rotationX"] = rotationDegrees.x;
+		manifest["rotationY"] = rotationDegrees.y;
+		manifest["rotationZ"] = rotationDegrees.z;
 		manifest["submeshesAsVariants"] = submeshesAsVariants;
 
 		const fs::path temporaryPath = manifestPath.string() + ".tmp";
@@ -511,6 +519,9 @@ namespace pwg
 				asset.manifestPath = fs::absolute(manifestPath).lexically_normal().generic_string();
 				asset.targetHeight = node["targetHeight"] ? node["targetHeight"].as<float>() : 1.0f;
 				asset.groundSink = node["groundSink"] ? node["groundSink"].as<float>() : 0.0f;
+				asset.rotationDegrees.x = node["rotationX"] ? node["rotationX"].as<float>() : 0.0f;
+				asset.rotationDegrees.y = node["rotationY"] ? node["rotationY"].as<float>() : 0.0f;
+				asset.rotationDegrees.z = node["rotationZ"] ? node["rotationZ"].as<float>() : 0.0f;
 				asset.submeshesAsVariants = node["submeshesAsVariants"] ? node["submeshesAsVariants"].as<bool>() : false;
 				asset.builtin = builtin;
 

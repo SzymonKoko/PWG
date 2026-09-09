@@ -75,6 +75,7 @@ namespace pwg
 		std::shared_ptr<EnvironmentSystem> GetEnvironmentSystem();
 		CameraManager* GetCameraManager();
 		std::shared_ptr<TerrainMaterialLibrary> GetTerrainMaterialLibrary();
+		void ReloadVegetationAssets();
 		const SkyboxDefinition& GetSkyboxDefinition() const;
 		void SetSkyboxDefinition(const SkyboxDefinition& definition);
 		bool ReloadSkybox();
@@ -90,6 +91,7 @@ namespace pwg
 		bool& ShowTerrainControls();
 		bool& ShowDebugWindow();
 		bool& ShowMaterialLibrary();
+		bool& ShowCameraSettings();
 		bool& ShowVegetationLibrary();
 		bool& ShowTerrainGraph();
 		bool& ShowWorld();
@@ -103,6 +105,7 @@ namespace pwg
 		void HandleKeyboardInputs();
 		void DrawOutliner();
 		void DrawWorldWindow();
+		void DrawCameraSettings();
 		void DrawSkyboxControls();
 		void DrawVegetationAssetLibrary();
 		bool LoadSkyboxFolder(const std::string& folder);
@@ -141,6 +144,7 @@ namespace pwg
 		bool m_showWorld{ true };
 		bool m_showDebugWindow{ true };
 		bool m_showMaterialLibrary{ true };
+		bool m_showCameraSettings{ true };
 		bool m_showVegetationLibrary{ true };
 		bool m_showTerrainGraph{ true };
 		bool m_terrainGraphInputCaptured{ false };

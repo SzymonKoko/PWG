@@ -1,6 +1,7 @@
 #include "universalTerrainGraph.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <queue>
 #include <unordered_map>
@@ -393,6 +394,91 @@ namespace pwg
 		return it != types.end() ? &(*it) : nullptr;
 	}
 
+	TerrainGraphValueRange EstimateTerrainGraphOutputRange(const TerrainGraphAsset& asset, int nodeId, const std::string&, int depth)
+	{
+		if (depth > 32) return { 0.0f, 1.0f, false };
+		const TerrainGraphNodeInstance* node = asset.FindNode(nodeId);
+		if (!node) return { 0.0f, 1.0f, false };
+		auto floatParam = [&](const char* id, float fallback)
+		{
+			const auto* parameter = FindParameter(*node, id);
+			return parameter ? parameter->floatValue : fallback;
+		};
+		auto inputRange = [&](const char* inputId)
+		{
+			const TerrainGraphLink* link = asset.FindInputLink(nodeId, inputId);
+			return link ? EstimateTerrainGraphOutputRange(asset, link->fromNodeId, link->fromPortId, depth + 1) : TerrainGraphValueRange{ 0.0f, 1.0f, false };
+		};
+
+		if (node->typeId == "constant")
+		{
+			float value = floatParam("value", 1.0f);
+			return { value, value, true };
+		}
+		if (node->typeId == "noiseHeight" || node->typeId == "noiseMask" || node->typeId == "normalize" ||
+			node->typeId == "smoothstep" || node->typeId == "thresholdMask" || node->typeId == "heightBandMask" ||
+			node->typeId == "slopeMask" || node->typeId == "curvatureMask" || node->typeId == "posterizeMask")
+		{
+			return { 0.0f, 1.0f, true };
+		}
+		if (node->typeId == "fitRange")
+		{
+			float a = floatParam("outMin", 0.0f);
+			float b = floatParam("outMax", 1.0f);
+			return { std::min(a, b), std::max(a, b), true };
+		}
+		if (node->typeId == "clamp" || node->typeId == "terrace")
+		{
+			float a = floatParam("min", 0.0f);
+			float b = floatParam("max", 1.0f);
+			return { std::min(a, b), std::max(a, b), true };
+		}
+		if (node->typeId == "blurMask") return inputRange("mask");
+		if (node->typeId == "power")
+		{
+			auto value = inputRange("value");
+			float exponent = std::max(floatParam("power", 1.0f), 0.0001f);
+			return { std::pow(std::max(value.minimum, 0.0f), exponent), std::pow(std::max(value.maximum, 0.0f), exponent), value.valid };
+		}
+		if (node->typeId == "abs")
+		{
+			auto value = inputRange("value");
+			return { 0.0f, std::max(std::abs(value.minimum), std::abs(value.maximum)), value.valid };
+		}
+		if (node->typeId == "invert")
+		{
+			auto value = inputRange("value");
+			float pivot = floatParam("pivot", 1.0f);
+			return { pivot - value.maximum, pivot - value.minimum, value.valid };
+		}
+		if (node->typeId == "lerp")
+		{
+			auto a = inputRange("a");
+			auto b = inputRange("b");
+			return { std::min(a.minimum, b.minimum), std::max(a.maximum, b.maximum), a.valid && b.valid };
+		}
+		if (node->typeId == "add" || node->typeId == "subtract" || node->typeId == "multiply" || node->typeId == "divide" ||
+			node->typeId == "min" || node->typeId == "max")
+		{
+			auto a = inputRange("a");
+			auto b = inputRange("b");
+			if (!a.valid || !b.valid) return { 0.0f, 1.0f, false };
+			if (node->typeId == "add") return { a.minimum + b.minimum, a.maximum + b.maximum, true };
+			if (node->typeId == "subtract") return { a.minimum - b.maximum, a.maximum - b.minimum, true };
+			if (node->typeId == "min") return { std::min(a.minimum, b.minimum), std::min(a.maximum, b.maximum), true };
+			if (node->typeId == "max") return { std::max(a.minimum, b.minimum), std::max(a.maximum, b.maximum), true };
+			if (node->typeId == "divide" && b.minimum <= 0.0f && b.maximum >= 0.0f) return { 0.0f, 1.0f, false };
+			float values[4] = {
+				node->typeId == "divide" ? a.minimum / b.minimum : a.minimum * b.minimum,
+				node->typeId == "divide" ? a.minimum / b.maximum : a.minimum * b.maximum,
+				node->typeId == "divide" ? a.maximum / b.minimum : a.maximum * b.minimum,
+				node->typeId == "divide" ? a.maximum / b.maximum : a.maximum * b.maximum
+			};
+			return { *std::min_element(values, values + 4), *std::max_element(values, values + 4), true };
+		}
+		return { 0.0f, 1.0f, false };
+	}
+
 	const TerrainGraphPortDefinition* FindTerrainGraphInput(const TerrainGraphNodeType& type, const std::string& portId)
 	{
 		auto it = std::find_if(type.inputs.begin(), type.inputs.end(), [&](const TerrainGraphPortDefinition& port)
@@ -510,6 +596,7 @@ namespace pwg
 	TerrainGraphAsset BuildDefaultUniversalTerrainGraph()
 	{
 		TerrainGraphAsset asset;
+		asset.useUniversalGraph = true;
 		const auto* noise = FindTerrainGraphNodeType("noiseHeight");
 		const auto* output = FindTerrainGraphNodeType("outputHeight");
 		if (noise && output)

@@ -1,6 +1,7 @@
 #include "projectSerializer.h"
 
 #include "scene/editorScene.h"
+#include "scene/controls/terrainGraphEditor.h"
 #include "scene/environment/environmentSettings.h"
 #include "terrain/materials/terrainMaterialLibrary.h"
 #include "terrain/graph/passes/terrainPass.h"
@@ -222,6 +223,121 @@ namespace pwg
 			scene.SetSkyboxDefinition(skybox);
 		}
 
+		YAML::Node WriteCommonCameraSettings(const CameraProperties& settings)
+		{
+			YAML::Node node;
+			node["fov"] = settings.fov;
+			node["nearPlane"] = settings.nearPlane;
+			node["farPlane"] = settings.farPlane;
+			return node;
+		}
+
+		void ReadCommonCameraSettings(const YAML::Node& node, CameraProperties& settings)
+		{
+			ReadValue(node, "fov", settings.fov);
+			ReadValue(node, "nearPlane", settings.nearPlane);
+			ReadValue(node, "farPlane", settings.farPlane);
+			settings.fov = std::clamp(settings.fov, 20.0f, 120.0f);
+			settings.nearPlane = std::clamp(settings.nearPlane, 0.001f, 10.0f);
+			settings.farPlane = std::max(settings.farPlane, settings.nearPlane + 1.0f);
+		}
+
+		YAML::Node WriteCameraSettings(CameraManager& manager)
+		{
+			YAML::Node node;
+			auto editor = manager.GetEditorCamera();
+			auto flyover = manager.GetFlyoverCamera();
+			auto player = manager.GetPlayerCamera();
+
+			node["editor"]["common"] = WriteCommonCameraSettings(editor->GetCameraProperties());
+			auto& editorSettings = editor->GetProperties();
+			node["editor"]["orbitSensitivity"] = editorSettings.orbitSensitivity;
+			node["editor"]["panSpeed"] = editorSettings.panSpeed;
+			node["editor"]["zoomSpeed"] = editorSettings.zoomSpeed;
+			node["editor"]["minZoom"] = editorSettings.minZoom;
+			node["editor"]["maxZoom"] = editorSettings.maxZoom;
+
+			node["flyover"]["common"] = WriteCommonCameraSettings(flyover->GetCameraProperties());
+			auto& flyoverSettings = flyover->GetProperties();
+			node["flyover"]["sensitivity"] = flyoverSettings.sensitivity;
+			node["flyover"]["acceleration"] = flyoverSettings.acceleration;
+			node["flyover"]["flightDrag"] = flyoverSettings.flightDrag;
+			node["flyover"]["braking"] = flyoverSettings.braking;
+			node["flyover"]["maxSpeed"] = flyoverSettings.maxSpeed;
+			node["flyover"]["boostMultiplier"] = flyoverSettings.boostMultiplier;
+			node["flyover"]["lookSmoothing"] = flyoverSettings.lookSmoothing;
+			node["flyover"]["gimbalStrengthDegrees"] = flyoverSettings.gimbalStrengthDegrees;
+			node["flyover"]["gimbalSmoothing"] = flyoverSettings.gimbalSmoothing;
+
+			node["player"]["common"] = WriteCommonCameraSettings(player->GetCameraProperties());
+			auto& playerSettings = player->GetProperties();
+			node["player"]["sensitivity"] = playerSettings.cameraSensitivity;
+			node["player"]["acceleration"] = playerSettings.acceleration;
+			node["player"]["maxGroundSpeed"] = playerSettings.maxGroundSpeed;
+			node["player"]["groundDamping"] = playerSettings.groundDamping;
+			node["player"]["airDamping"] = playerSettings.airDamping;
+			node["player"]["gravity"] = playerSettings.gravity;
+			node["player"]["jumpSpeed"] = playerSettings.jumpSpeed;
+			node["player"]["eyeHeight"] = playerSettings.eyeHeight;
+			node["player"]["groundSnapDistance"] = playerSettings.groundSnapDistance;
+			node["player"]["headBobEnabled"] = playerSettings.headBobEnabled;
+			node["player"]["headBobHeight"] = playerSettings.headBobHeight;
+			node["player"]["headBobSide"] = playerSettings.headBobSide;
+			node["player"]["headBobStrideLength"] = playerSettings.headBobStrideLength;
+			node["player"]["headBobRollDegrees"] = playerSettings.headBobRollDegrees;
+			node["player"]["headBobResponse"] = playerSettings.headBobResponse;
+			return node;
+		}
+
+		void ReadCameraSettings(const YAML::Node& node, CameraManager& manager)
+		{
+			if (!node) return;
+			auto editor = manager.GetEditorCamera();
+			auto flyover = manager.GetFlyoverCamera();
+			auto player = manager.GetPlayerCamera();
+
+			auto editorNode = node["editor"];
+			ReadCommonCameraSettings(editorNode["common"], editor->GetCameraProperties());
+			auto& editorSettings = editor->GetProperties();
+			ReadValue(editorNode, "orbitSensitivity", editorSettings.orbitSensitivity);
+			ReadValue(editorNode, "panSpeed", editorSettings.panSpeed);
+			ReadValue(editorNode, "zoomSpeed", editorSettings.zoomSpeed);
+			ReadValue(editorNode, "minZoom", editorSettings.minZoom);
+			ReadValue(editorNode, "maxZoom", editorSettings.maxZoom);
+
+			auto flyoverNode = node["flyover"];
+			ReadCommonCameraSettings(flyoverNode["common"], flyover->GetCameraProperties());
+			auto& flyoverSettings = flyover->GetProperties();
+			ReadValue(flyoverNode, "sensitivity", flyoverSettings.sensitivity);
+			ReadValue(flyoverNode, "acceleration", flyoverSettings.acceleration);
+			ReadValue(flyoverNode, "flightDrag", flyoverSettings.flightDrag);
+			ReadValue(flyoverNode, "braking", flyoverSettings.braking);
+			ReadValue(flyoverNode, "maxSpeed", flyoverSettings.maxSpeed);
+			ReadValue(flyoverNode, "boostMultiplier", flyoverSettings.boostMultiplier);
+			ReadValue(flyoverNode, "lookSmoothing", flyoverSettings.lookSmoothing);
+			ReadValue(flyoverNode, "gimbalStrengthDegrees", flyoverSettings.gimbalStrengthDegrees);
+			ReadValue(flyoverNode, "gimbalSmoothing", flyoverSettings.gimbalSmoothing);
+
+			auto playerNode = node["player"];
+			ReadCommonCameraSettings(playerNode["common"], player->GetCameraProperties());
+			auto& playerSettings = player->GetProperties();
+			ReadValue(playerNode, "sensitivity", playerSettings.cameraSensitivity);
+			ReadValue(playerNode, "acceleration", playerSettings.acceleration);
+			ReadValue(playerNode, "maxGroundSpeed", playerSettings.maxGroundSpeed);
+			ReadValue(playerNode, "groundDamping", playerSettings.groundDamping);
+			ReadValue(playerNode, "airDamping", playerSettings.airDamping);
+			ReadValue(playerNode, "gravity", playerSettings.gravity);
+			ReadValue(playerNode, "jumpSpeed", playerSettings.jumpSpeed);
+			ReadValue(playerNode, "eyeHeight", playerSettings.eyeHeight);
+			ReadValue(playerNode, "groundSnapDistance", playerSettings.groundSnapDistance);
+			ReadValue(playerNode, "headBobEnabled", playerSettings.headBobEnabled);
+			ReadValue(playerNode, "headBobHeight", playerSettings.headBobHeight);
+			ReadValue(playerNode, "headBobSide", playerSettings.headBobSide);
+			ReadValue(playerNode, "headBobStrideLength", playerSettings.headBobStrideLength);
+			ReadValue(playerNode, "headBobRollDegrees", playerSettings.headBobRollDegrees);
+			ReadValue(playerNode, "headBobResponse", playerSettings.headBobResponse);
+		}
+
 		YAML::Node WriteEditorUi(EditorScene& scene)
 		{
 			YAML::Node node;
@@ -232,6 +348,7 @@ namespace pwg
 			node["showOutliner"] = scene.ShowOutliner();
 			node["showDebugWindow"] = scene.ShowDebugWindow();
 			node["showMaterialLibrary"] = scene.ShowMaterialLibrary();
+			node["showCameraSettings"] = scene.ShowCameraSettings();
 			node["imguiLayout"] = scene.GetProjectLayoutIni();
 
 			const auto& graphView = scene.GetTerrainGraphViewState();
@@ -283,6 +400,7 @@ namespace pwg
 			ReadValue(node, "showOutliner", scene.ShowOutliner());
 			ReadValue(node, "showDebugWindow", scene.ShowDebugWindow());
 			ReadValue(node, "showMaterialLibrary", scene.ShowMaterialLibrary());
+			ReadValue(node, "showCameraSettings", scene.ShowCameraSettings());
 			if (node["showLightControls"] || node["showEnvironmentWindow"])
 			{
 				bool legacyLight = true;
@@ -1027,6 +1145,7 @@ namespace pwg
 
 		root["camera"]["activeType"] = static_cast<int>(scene.GetCameraManager()->GetActiveCameraType());
 		root["camera"]["position"] = Vec3Node(scene.GetCameraManager()->GetCameraPosition());
+		root["camera"]["settings"] = WriteCameraSettings(*scene.GetCameraManager());
 		root["editorUi"] = WriteEditorUi(scene);
 		std::ofstream stream(path);
 		if (!stream.is_open())
@@ -1085,11 +1204,15 @@ namespace pwg
 				}
 			}
 		}
-		ReadUniversalTerrainGraph(root["terrainGraphV2"], pipeline->GetUniversalGraphAsset());
+		const auto universalGraphNode = root["terrainGraphV2"];
+		ReadUniversalTerrainGraph(universalGraphNode, pipeline->GetUniversalGraphAsset());
+		controls::TerrainGraphEditor::ResetHistory();
+		scene.ReloadVegetationAssets();
 
 		auto cameraNode = root["camera"];
 		if (cameraNode)
 		{
+			ReadCameraSettings(cameraNode["settings"], *scene.GetCameraManager());
 			int cameraType = cameraNode["activeType"] ? cameraNode["activeType"].as<int>() : 0;
 			scene.GetCameraManager()->SetCamera(static_cast<CameraType>(cameraType));
 			glm::vec3 position = ReadVec3(cameraNode["position"], scene.GetCameraManager()->GetCameraPosition());
@@ -1097,6 +1220,10 @@ namespace pwg
 		}
 		ReadEditorUi(root["editorUi"], scene);
 		chunkManager->GenerateWorld();
+		if (universalGraphNode && !pipeline->GetUniversalGraphAsset().nodes.empty())
+		{
+			chunkManager->RunUniversalGraph();
+		}
 
 		// Bring back the saved simulation state (water + eroded terrain) if present.
 		SimulationStateSnapshot snapshot;

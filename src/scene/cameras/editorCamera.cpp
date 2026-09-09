@@ -75,11 +75,9 @@ void pwg::EditorCamera::HandleMouseInput(pwg::MouseInput& mouseInput, float dt)
 
     if (mouseInput.IsButtonDown(GLFW_MOUSE_BUTTON_RIGHT))
     {
-        const float sensitivity = 0.1f;
-
-        //Moving m_cameraProperties with mouse
-        float xoffset = deltaX * sensitivity;
-        float yoffset = deltaY * sensitivity;
+		//Moving m_cameraProperties with mouse
+		float xoffset = deltaX * m_editorCameraProperties.orbitSensitivity;
+		float yoffset = deltaY * m_editorCameraProperties.orbitSensitivity;
 
         //Updating yaw and pitch angles
         m_editorCameraProperties.yaw += xoffset;
@@ -88,7 +86,7 @@ void pwg::EditorCamera::HandleMouseInput(pwg::MouseInput& mouseInput, float dt)
     }
     else if (mouseInput.IsButtonDown(GLFW_MOUSE_BUTTON_MIDDLE))
     {
-        float panSpeed = 0.0005f * m_editorCameraProperties.distanceToTarget;
+		float panSpeed = m_editorCameraProperties.panSpeed * m_editorCameraProperties.distanceToTarget;
 
         glm::vec3 right = glm::normalize(glm::cross(m_cameraProperties.forward, m_cameraProperties.up));
 

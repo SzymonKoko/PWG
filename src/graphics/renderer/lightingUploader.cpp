@@ -11,6 +11,8 @@ void pwg::LightingUploader::Upload(std::shared_ptr<Material> material, const Env
 	material->SetUniformFloat("u_skyAmbient", lighting.skyAmbient);
 	material->SetUniformFloat("u_groundAmbient", lighting.groundAmbient);
 	material->SetUniformVec3("u_skyTint", lighting.skyTint);
+	material->SetUniformInt("u_useSkybox", lighting.useSkyboxBlend ? 1 : 0);
+	material->SetUniformFloat("u_skyboxBlend", lighting.skyboxBlend);
 	material->SetUniformVec3("u_groundAlbedo", lighting.groundAlbedo);
 	material->SetUniformFloat("u_fogDensity", lighting.fogDensity);
 	material->SetUniformFloat("u_normalStrength", lighting.normalStrength);

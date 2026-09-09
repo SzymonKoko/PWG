@@ -27,6 +27,12 @@ namespace pwg
 		float jumpSpeed{ 32.0f };
 		float eyeHeight{ 6.0f };
 		float groundSnapDistance{ 2.5f };
+		float headBobHeight{ 0.16f };
+		float headBobSide{ 0.10f };
+		float headBobStrideLength{ 6.0f };
+		float headBobRollDegrees{ 0.35f };
+		float headBobResponse{ 12.0f };
+		bool headBobEnabled{ true };
 		bool grounded{ false };
 	};
 
@@ -80,6 +86,8 @@ namespace pwg
 		* @return 3D vector representing camera position.
 		*/
 		glm::vec3 GetCameraPosition() override;
+		CameraProperties& GetCameraProperties() { return m_cameraProperties; }
+		PlayerCameraProperties& GetProperties() { return m_playerCameraProperties; }
 
 		/**
 		* @brief Checks whether the camera has spawned into the scene.
@@ -115,6 +123,8 @@ namespace pwg
 		* Updates the PlayerCameraProperties::direction vector.
 		*/
 		void CalculateCameraForward();
+		void UpdateCameraMotion(float dt, bool wasGrounded, float previousVerticalVelocity);
+		void ResetCameraMotion();
 		void UpdateMatrices();
 		float GetGroundHeight() const;
 
@@ -122,6 +132,15 @@ namespace pwg
 		CameraProperties m_cameraProperties;				/**< Common camera properties (projection, matrices, etc.). */
 		PlayerCameraProperties m_playerCameraProperties;	/**< Player-specific camera properties (orientation, speed). */
 		std::function<float(float, float)> m_terrainHeightProvider;
+		glm::vec3 m_viewPosition{ 0.0f };
+		float m_smoothedEyeY{ 0.0f };
+		float m_headBobPhase{ 0.0f };
+		float m_headBobWeight{ 0.0f };
+		float m_headBobSideOffset{ 0.0f };
+		float m_headBobHeightOffset{ 0.0f };
+		float m_headBobRoll{ 0.0f };
+		float m_landingOffset{ 0.0f };
+		float m_landingVelocity{ 0.0f };
 
 		bool m_spawned{ false };							/**< Flag indicating whether the camera has spawned into the scene. */
 	};

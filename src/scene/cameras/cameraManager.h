@@ -76,6 +76,9 @@ namespace pwg
 		* @return Shared pointer to ICamera.
 		*/
 		std::shared_ptr<ICamera> GetActiveCamera();
+		std::shared_ptr<EditorCamera> GetEditorCamera() { return m_editorCamera; }
+		std::shared_ptr<FlyoverCamera> GetFlyoverCamera() { return m_flyoverCamera; }
+		std::shared_ptr<PlayerCamera> GetPlayerCamera() { return m_playerCamera; }
 
 		/**
 		* @brief Returns the type of the currently active camera.

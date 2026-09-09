@@ -85,7 +85,7 @@ namespace pwg::controls
 			changed |= ImGui::SliderFloat("Foam width", &settings.waterFoamWidth, 0.05f, 4.0f, "%.2f");
 			changed |= ImGui::SliderFloat("Foam intensity", &settings.waterFoamIntensity, 0.0f, 1.0f, "%.2f");
 			changed |= ImGui::SliderFloat("Water roughness", &settings.waterRoughness, 0.04f, 0.5f, "%.2f");
-			if (ImGui::Button("Clear Lake preset"))
+			auto applyClearLake = [&]()
 			{
 				settings.waterShallowColor = { 0.08f, 0.38f, 0.42f };
 				settings.waterDeepColor = { 0.012f, 0.055f, 0.09f };
@@ -98,6 +98,50 @@ namespace pwg::controls
 				settings.waterFoamWidth = 1.1f;
 				settings.waterFoamIntensity = 0.32f;
 				settings.waterRoughness = 0.16f;
+			};
+			auto applyMountainLake = [&]()
+			{
+				settings.waterShallowColor = { 0.10f, 0.46f, 0.50f };
+				settings.waterDeepColor = { 0.015f, 0.075f, 0.11f };
+				settings.waterAlpha = 0.78f;
+				settings.waterNormalStrength = 0.34f;
+				settings.waterWaveScale = 1.25f;
+				settings.waterWaveSpeed = 0.58f;
+				settings.waterRefractionStrength = 5.0f;
+				settings.waterAbsorption = 0.17f;
+				settings.waterFoamWidth = 0.72f;
+				settings.waterFoamIntensity = 0.24f;
+				settings.waterRoughness = 0.11f;
+			};
+			auto applyRiver = [&]()
+			{
+				settings.waterShallowColor = { 0.09f, 0.34f, 0.34f };
+				settings.waterDeepColor = { 0.018f, 0.065f, 0.075f };
+				settings.waterAlpha = 0.76f;
+				settings.waterNormalStrength = 0.72f;
+				settings.waterWaveScale = 0.72f;
+				settings.waterWaveSpeed = 1.55f;
+				settings.waterRefractionStrength = 9.0f;
+				settings.waterAbsorption = 0.30f;
+				settings.waterFoamWidth = 0.48f;
+				settings.waterFoamIntensity = 0.58f;
+				settings.waterRoughness = 0.24f;
+			};
+			if (ImGui::Button("Calm Lake"))
+			{
+				applyClearLake();
+				changed = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Mountain Lake"))
+			{
+				applyMountainLake();
+				changed = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("River"))
+			{
+				applyRiver();
 				changed = true;
 			}
 

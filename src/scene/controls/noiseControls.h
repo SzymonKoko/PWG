@@ -312,7 +312,7 @@ namespace pwg::controls
     {
         for (auto& mask : chunkManager->GetMasks())
         {
-            if (mask.first == "FinalHeight")
+            if (mask.first == "FinalHeight" || mask.first.starts_with("preview_"))
             {
                 continue;
             }

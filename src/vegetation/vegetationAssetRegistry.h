@@ -2,6 +2,7 @@
 #define SRC_VEGETATION_VEGETATION_ASSET_REGISTRY_H
 
 #include <filesystem>
+#include <glm/vec3.hpp>
 #include <optional>
 #include <string>
 #include <vector>
@@ -24,6 +25,7 @@ namespace pwg
 		std::string manifestPath;
 		float targetHeight{ 1.0f };
 		float groundSink{ 0.0f };
+		glm::vec3 rotationDegrees{ 0.0f };
 		bool submeshesAsVariants{ false };
 		bool builtin{ false };
 	};
@@ -43,6 +45,7 @@ namespace pwg
 			VegetationKind kind,
 			float targetHeight,
 			float groundSink,
+			const glm::vec3& rotationDegrees,
 			bool submeshesAsVariants);
 		bool Update(
 			const std::string& id,
@@ -50,6 +53,7 @@ namespace pwg
 			VegetationKind kind,
 			float targetHeight,
 			float groundSink,
+			const glm::vec3& rotationDegrees,
 			bool submeshesAsVariants);
 
 		const std::filesystem::path& LibraryRoot() const;

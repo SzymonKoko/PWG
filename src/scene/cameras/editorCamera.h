@@ -20,6 +20,8 @@ namespace pwg
 		float minZoom{ 5.0f };					/**< Minimum zoom distance. */
 		float maxZoom{ 700.0f };				/**< Maximum zoom distance. */
 		float zoomSpeed{ 50.0f };				/**< Speed factor for zooming in/out. */
+		float orbitSensitivity{ 0.1f };
+		float panSpeed{ 0.0005f };
 	};
 
 	/**
@@ -79,6 +81,8 @@ namespace pwg
 		* @return 3D vector representing camera position.
 		*/
 		glm::vec3 GetCameraPosition() override;
+		CameraProperties& GetCameraProperties() { return m_cameraProperties; }
+		EditorCameraProperties& GetProperties() { return m_editorCameraProperties; }
 
 	protected:
 		/**

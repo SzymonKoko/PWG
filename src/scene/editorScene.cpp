@@ -445,6 +445,7 @@ pwg::EditorScene::EditorScene(GLFWwindow* window, MouseInput& minput, KeyboardIn
 	auto waterMaterial = materialManager->CreateMaterial("WaterMaterial", waterShader);
 	waterMaterial->SetUniformTexture("u_WaterNormalLarge", textureManager->GetTexture("WaterNormalLarge"));
 	waterMaterial->SetUniformTexture("u_WaterNormalDetail", textureManager->GetTexture("WaterNormalDetail"));
+	waterMaterial->SetCubeMapTexture("u_skybox", textureManager->GetCubeMapTexture("Skybox"));
     auto skyboxMaterial = materialManager->CreateMaterial("SkyboxMaterial", skyboxShader);
 
     m_terrainMaterialLibrary = std::make_shared<TerrainMaterialLibrary>(m_resourceManager, terrainMaterial);
@@ -701,6 +702,10 @@ void pwg::EditorScene::Draw()
 	{
 		DrawVegetationAssetLibrary();
 	}
+	if (m_showCameraSettings)
+	{
+		DrawCameraSettings();
+	}
 
     DrawWorldWindow();
 }
@@ -712,6 +717,7 @@ void pwg::EditorScene::NewProject()
     {
         terrainPipeline->ResetUniversalGraphToDefault();
     }
+	controls::TerrainGraphEditor::ResetHistory();
     m_terrainGraphViewState = controls::TerrainGraphViewState{};
 
     m_environment->ResetToDefaults();
@@ -779,7 +785,12 @@ bool pwg::EditorScene::ReloadSkybox()
 
     auto textureManager = m_resourceManager->GetTextureManager();
     textureManager->ReloadCubeMapTexture("Skybox", loadFaces, TextureType::ALBEDO);
-    m_skybox->SetCubeMapTexture(textureManager->GetCubeMapTexture("Skybox"));
+	auto skybox = textureManager->GetCubeMapTexture("Skybox");
+    m_skybox->SetCubeMapTexture(skybox);
+	if (auto waterMaterial = m_resourceManager->GetMaterialManager()->GetMaterial("WaterMaterial"))
+	{
+		waterMaterial->SetCubeMapTexture("u_skybox", skybox);
+	}
     m_skyboxStatus = transformStatus.empty() ? "Skybox loaded: " + m_skyboxDefinition.name : transformStatus;
     return true;
 }
@@ -900,6 +911,18 @@ bool pwg::EditorScene::ConsumeDirtyFlag()
     return dirty;
 }
 
+void pwg::EditorScene::ReloadVegetationAssets()
+{
+	if (m_vegetationAssetRegistry)
+	{
+		m_vegetationAssetRegistry->Reload();
+	}
+	if (m_vegetationSystem)
+	{
+		m_vegetationSystem->ReloadAssetModels();
+	}
+}
+
 bool& pwg::EditorScene::ShowMainView()
 {
     return m_showMainView;
@@ -927,6 +950,11 @@ bool& pwg::EditorScene::ShowDebugWindow()
 bool& pwg::EditorScene::ShowMaterialLibrary()
 {
     return m_showMaterialLibrary;
+}
+
+bool& pwg::EditorScene::ShowCameraSettings()
+{
+	return m_showCameraSettings;
 }
 
 bool& pwg::EditorScene::ShowVegetationLibrary()
@@ -973,6 +1001,7 @@ void pwg::EditorScene::ResetEditorWindows()
     m_showDebugWindow = true;
 	m_showMaterialLibrary = true;
 	m_showVegetationLibrary = true;
+	m_showCameraSettings = true;
     m_showTerrainGraph = true;
 }
 
@@ -1029,6 +1058,86 @@ void pwg::EditorScene::DrawWorldWindow()
     ImGui::End();
 }
 
+void pwg::EditorScene::DrawCameraSettings()
+{
+	ImGui::Begin("Camera Settings", &m_showCameraSettings);
+	bool changed = false;
+	auto commonSettings = [&](CameraProperties& properties)
+	{
+		changed |= ImGui::SliderFloat("Field of view", &properties.fov, 35.0f, 100.0f, "%.0f deg");
+		changed |= ImGui::DragFloat("Near clip", &properties.nearPlane, 0.01f, 0.01f, 5.0f, "%.2f");
+		changed |= ImGui::DragFloat("Far clip", &properties.farPlane, 100.0f, 1000.0f, 50000.0f, "%.0f");
+		properties.farPlane = std::max(properties.farPlane, properties.nearPlane + 1.0f);
+	};
+
+	if (ImGui::BeginTabBar("CameraSettingsTabs"))
+	{
+		if (ImGui::BeginTabItem("Editor"))
+		{
+			auto camera = m_cameraManager->GetEditorCamera();
+			auto& settings = camera->GetProperties();
+			commonSettings(camera->GetCameraProperties());
+			ImGui::Separator();
+			changed |= ImGui::SliderFloat("Orbit sensitivity", &settings.orbitSensitivity, 0.02f, 0.50f, "%.2f");
+			changed |= ImGui::SliderFloat("Pan speed", &settings.panSpeed, 0.0001f, 0.0050f, "%.4f");
+			changed |= ImGui::SliderFloat("Zoom speed", &settings.zoomSpeed, 5.0f, 200.0f, "%.0f");
+			changed |= ImGui::DragFloat("Minimum zoom", &settings.minZoom, 1.0f, 1.0f, 1000.0f, "%.0f");
+			changed |= ImGui::DragFloat("Maximum zoom", &settings.maxZoom, 10.0f, 100.0f, 50000.0f, "%.0f");
+			settings.maxZoom = std::max(settings.maxZoom, settings.minZoom + 1.0f);
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Flyover"))
+		{
+			auto camera = m_cameraManager->GetFlyoverCamera();
+			auto& settings = camera->GetProperties();
+			commonSettings(camera->GetCameraProperties());
+			ImGui::Separator();
+			changed |= ImGui::SliderFloat("Mouse sensitivity", &settings.sensitivity, 0.02f, 0.50f, "%.2f");
+			changed |= ImGui::SliderFloat("Acceleration", &settings.acceleration, 10.0f, 800.0f, "%.0f");
+			changed |= ImGui::SliderFloat("Maximum speed", &settings.maxSpeed, 10.0f, 1000.0f, "%.0f");
+			changed |= ImGui::SliderFloat("Flight drag", &settings.flightDrag, 0.0f, 5.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Braking", &settings.braking, 0.2f, 12.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Boost multiplier", &settings.boostMultiplier, 1.0f, 8.0f, "%.1fx");
+			ImGui::Separator();
+			changed |= ImGui::SliderFloat("Look smoothing", &settings.lookSmoothing, 1.0f, 30.0f, "%.1f");
+			changed |= ImGui::SliderFloat("Gimbal bank", &settings.gimbalStrengthDegrees, 0.0f, 12.0f, "%.1f deg");
+			changed |= ImGui::SliderFloat("Gimbal smoothing", &settings.gimbalSmoothing, 1.0f, 20.0f, "%.1f");
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Player"))
+		{
+			auto camera = m_cameraManager->GetPlayerCamera();
+			auto& settings = camera->GetProperties();
+			commonSettings(camera->GetCameraProperties());
+			ImGui::Separator();
+			changed |= ImGui::SliderFloat("Mouse sensitivity", &settings.cameraSensitivity, 0.02f, 0.50f, "%.2f");
+			changed |= ImGui::SliderFloat("Acceleration", &settings.acceleration, 10.0f, 200.0f, "%.0f");
+			changed |= ImGui::SliderFloat("Maximum speed", &settings.maxGroundSpeed, 5.0f, 100.0f, "%.0f");
+			changed |= ImGui::SliderFloat("Ground damping", &settings.groundDamping, 1.0f, 30.0f, "%.1f");
+			changed |= ImGui::SliderFloat("Air damping", &settings.airDamping, 0.0f, 8.0f, "%.1f");
+			changed |= ImGui::SliderFloat("Gravity", &settings.gravity, 10.0f, 200.0f, "%.0f");
+			changed |= ImGui::SliderFloat("Jump speed", &settings.jumpSpeed, 5.0f, 80.0f, "%.0f");
+			changed |= ImGui::SliderFloat("Eye height", &settings.eyeHeight, 1.0f, 15.0f, "%.1f");
+			changed |= ImGui::SliderFloat("Ground snap", &settings.groundSnapDistance, 0.1f, 6.0f, "%.1f");
+			ImGui::Separator();
+			changed |= ImGui::Checkbox("Head motion", &settings.headBobEnabled);
+			ImGui::BeginDisabled(!settings.headBobEnabled);
+			changed |= ImGui::SliderFloat("Step height", &settings.headBobHeight, 0.0f, 0.5f, "%.2f");
+			changed |= ImGui::SliderFloat("Step sway", &settings.headBobSide, 0.0f, 0.3f, "%.2f");
+			changed |= ImGui::SliderFloat("Stride length", &settings.headBobStrideLength, 2.0f, 12.0f, "%.1f");
+			changed |= ImGui::SliderFloat("Step roll", &settings.headBobRollDegrees, 0.0f, 2.0f, "%.2f deg");
+			changed |= ImGui::SliderFloat("Motion smoothing", &settings.headBobResponse, 2.0f, 25.0f, "%.1f");
+			ImGui::EndDisabled();
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
+	if (changed) m_dirty = true;
+	ImGui::End();
+}
+
 void pwg::EditorScene::DrawVegetationAssetLibrary()
 {
 	ImGui::Begin("Vegetation Library", &m_showVegetationLibrary);
@@ -1044,12 +1153,14 @@ void pwg::EditorScene::DrawVegetationAssetLibrary()
 	static int importKind = 0;
 	static float importHeight = 30.0f;
 	static float importGroundSink = 1.0f;
+	static glm::vec3 importRotation{ 0.0f };
 	static bool importVariants = false;
 	static std::string selectedAssetId;
 	static char editName[128]{};
 	static int editKind = 0;
 	static float editHeight = 1.0f;
 	static float editGroundSink = 0.0f;
+	static glm::vec3 editRotation{ 0.0f };
 	static bool editVariants = false;
 	auto kindIndex = [](VegetationKind kind)
 	{
@@ -1076,6 +1187,7 @@ void pwg::EditorScene::DrawVegetationAssetLibrary()
 		editKind = kindIndex(asset->kind);
 		editHeight = asset->targetHeight;
 		editGroundSink = asset->groundSink;
+		editRotation = asset->rotationDegrees;
 		editVariants = asset->submeshesAsVariants;
 	};
 
@@ -1089,6 +1201,7 @@ void pwg::EditorScene::DrawVegetationAssetLibrary()
 			importKind = 0;
 			importHeight = 30.0f;
 			importGroundSink = 1.0f;
+			importRotation = glm::vec3(0.0f);
 			importVariants = false;
 			ImGui::OpenPopup("Import Vegetation Model");
 		}
@@ -1153,6 +1266,10 @@ void pwg::EditorScene::DrawVegetationAssetLibrary()
 			ImGui::Combo("Kind", &editKind, editKinds, IM_ARRAYSIZE(editKinds));
 			ImGui::DragFloat("Target Height", &editHeight, 0.1f, 0.1f, 500.0f, "%.2f");
 			ImGui::DragFloat("Ground Sink", &editGroundSink, 0.01f, 0.0f, 20.0f, "%.2f");
+			ImGui::DragFloat3("Rotation X/Y/Z", &editRotation.x, 1.0f, -180.0f, 180.0f, "%.0f deg");
+			if (ImGui::Button("Z-up to Y-up")) editRotation.x = -90.0f;
+			ImGui::SameLine();
+			if (ImGui::Button("Reset rotation")) editRotation = glm::vec3(0.0f);
 			if (editKind != 0)
 			{
 				ImGui::Checkbox("Submeshes As Variants", &editVariants);
@@ -1169,6 +1286,7 @@ void pwg::EditorScene::DrawVegetationAssetLibrary()
 					kindFromIndex(editKind),
 					editHeight,
 					editGroundSink,
+					editRotation,
 					editVariants))
 				{
 					if (m_vegetationSystem) m_vegetationSystem->ReloadAssetModels();
@@ -1206,6 +1324,10 @@ void pwg::EditorScene::DrawVegetationAssetLibrary()
 		}
 		ImGui::DragFloat("Target Height", &importHeight, 0.1f, 0.1f, 500.0f, "%.2f");
 		ImGui::DragFloat("Ground Sink", &importGroundSink, 0.01f, 0.0f, 20.0f, "%.2f");
+		ImGui::DragFloat3("Rotation X/Y/Z", &importRotation.x, 1.0f, -180.0f, 180.0f, "%.0f deg");
+		if (ImGui::Button("Z-up to Y-up")) importRotation.x = -90.0f;
+		ImGui::SameLine();
+		if (ImGui::Button("Reset rotation")) importRotation = glm::vec3(0.0f);
 		if (importKind != 0)
 		{
 			ImGui::Checkbox("Submeshes As Variants", &importVariants);
@@ -1222,6 +1344,7 @@ void pwg::EditorScene::DrawVegetationAssetLibrary()
 				kindFromIndex(importKind),
 				importHeight,
 				importGroundSink,
+				importRotation,
 				importVariants);
 			if (imported)
 			{

@@ -13,6 +13,7 @@ uniform sampler2D u_SceneColor;
 uniform sampler2D u_SceneDepth;
 uniform sampler2D u_WaterNormalLarge;
 uniform sampler2D u_WaterNormalDetail;
+uniform samplerCube u_skybox;
 uniform vec2 u_viewportSize;
 uniform mat4 u_inverseProjection;
 uniform vec3 u_cameraPosition;
@@ -20,6 +21,8 @@ uniform vec3 u_lightDirection;
 uniform vec3 u_lightColor;
 uniform float u_lightIntensity;
 uniform vec3 u_skyTint;
+uniform int u_useSkybox;
+uniform float u_skyboxBlend;
 uniform float u_fogDensity;
 uniform float u_time;
 uniform bool u_useWaterRefraction;
@@ -47,6 +50,24 @@ float ViewDepth(float depth, vec2 screenUV)
 vec3 DecodeNormal(vec3 encoded)
 {
     return normalize(encoded * 2.0 - 1.0);
+}
+
+float HashNoise(vec2 point)
+{
+    point = fract(point * vec2(123.34, 456.21));
+    point += dot(point, point + 45.32);
+    return fract(point.x * point.y);
+}
+
+float SmoothNoise(vec2 point)
+{
+    vec2 cell = floor(point);
+    vec2 local = fract(point);
+    local = local * local * (3.0 - 2.0 * local);
+    return mix(
+        mix(HashNoise(cell), HashNoise(cell + vec2(1.0, 0.0)), local.x),
+        mix(HashNoise(cell + vec2(0.0, 1.0)), HashNoise(cell + vec2(1.0)), local.x),
+        local.y);
 }
 
 void main()
@@ -93,8 +114,12 @@ void main()
     vec3 transmitted = mix(refractedScene, bodyColor, tintStrength);
 
     float fresnel = 0.02 + 0.98 * pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 5.0);
-    vec3 skyReflection = u_skyTint * mix(0.72, 1.35, max(N.y, 0.0));
     float roughness = clamp(u_waterRoughness, 0.04, 0.5);
+    vec3 reflectionDirection = reflect(-V, N);
+    vec3 cubemapReflection = textureLod(u_skybox, reflectionDirection, roughness * 8.0).rgb;
+    vec3 proceduralReflection = u_skyTint * mix(0.72, 1.35, max(N.y, 0.0));
+    float cubemapWeight = float(u_useSkybox != 0) * clamp(u_skyboxBlend, 0.0, 1.0);
+    vec3 skyReflection = mix(proceduralReflection, cubemapReflection, cubemapWeight);
     float sunPower = mix(900.0, 48.0, roughness);
     float sunSpecular = pow(max(dot(N, H), 0.0), sunPower) * u_lightIntensity;
     vec3 reflected = skyReflection + u_lightColor * sunSpecular;
@@ -102,6 +127,9 @@ void main()
 
     float shoreFoam = 1.0 - smoothstep(0.04, max(u_waterFoamWidth, 0.05), opticalThickness);
     shoreFoam *= smoothstep(0.004, 0.035, f_WaterDepth);
+    float shoreBreakup = SmoothNoise(f_WorldPos.xz * 0.18 + vec2(u_time * 0.018, -u_time * 0.011));
+    shoreBreakup = mix(0.48, 1.0, smoothstep(0.18, 0.82, shoreBreakup));
+    shoreFoam *= shoreBreakup;
     float flowFoam = smoothstep(0.42, 0.92, f_Flow + f_Channel * 0.7) * (1.0 - depthColor * 0.7);
     float foam = clamp(max(shoreFoam, flowFoam * 0.55) * u_waterFoamIntensity, 0.0, 0.8);
     color = mix(color, vec3(0.82, 0.93, 0.94), foam);

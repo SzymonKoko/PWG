@@ -77,6 +77,7 @@ namespace pwg::controls
 	class TerrainGraphEditor
 	{
 	public:
+		static void ResetHistory();
 		static bool Show(std::shared_ptr<ChunkManager> chunkManager, TerrainGraphViewState& viewState, std::shared_ptr<VegetationAssetRegistry> assetRegistry = nullptr, bool* inputCaptured = nullptr, bool* viewChanged = nullptr);
 	};
 }

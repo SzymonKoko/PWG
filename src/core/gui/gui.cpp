@@ -254,6 +254,7 @@ void pwg::Gui::DrawMainMenuBar()
 		ImGui::MenuItem("Terrain Graph", nullptr, &editor->ShowTerrainGraph());
 		ImGui::MenuItem("Material Library", nullptr, &editor->ShowMaterialLibrary());
 		ImGui::MenuItem("Vegetation Library", nullptr, &editor->ShowVegetationLibrary());
+		ImGui::MenuItem("Camera Settings", nullptr, &editor->ShowCameraSettings());
 		ImGui::MenuItem("World", nullptr, &editor->ShowWorld());
 		ImGui::MenuItem("Debug", nullptr, &editor->ShowDebugWindow());
 		ImGui::EndMenu();

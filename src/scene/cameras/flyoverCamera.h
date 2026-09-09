@@ -12,9 +12,13 @@ namespace pwg
 		float pitch{ -20.0f };
 		float sensitivity{ 0.1f };
 		float acceleration{ 220.0f };
-		float damping{ 7.0f };
+		float flightDrag{ 0.8f };
+		float braking{ 3.5f };
 		float maxSpeed{ 260.0f };
 		float boostMultiplier{ 3.0f };
+		float lookSmoothing{ 12.0f };
+		float gimbalStrengthDegrees{ 4.0f };
+		float gimbalSmoothing{ 6.0f };
 		glm::vec3 velocity{ 0.0f };
 	};
 
@@ -31,6 +35,8 @@ namespace pwg
 		glm::mat4& GetViewMatrix() override;
 		glm::mat4& GetProjectionMatrix() override;
 		glm::vec3 GetCameraPosition() override;
+		CameraProperties& GetCameraProperties() { return m_cameraProperties; }
+		FlyoverCameraProperties& GetProperties() { return m_flyoverProperties; }
 
 	protected:
 		void HandleKeyboardInput(KeyboardInput& keyboardInput, float dt) override;
@@ -43,6 +49,10 @@ namespace pwg
 		Transform m_transform;
 		CameraProperties m_cameraProperties;
 		FlyoverCameraProperties m_flyoverProperties;
+		float m_targetYaw{ -45.0f };
+		float m_targetPitch{ -20.0f };
+		float m_gimbalRoll{ 0.0f };
+		float m_mouseTurn{ 0.0f };
 	};
 }
 

@@ -80,6 +80,13 @@ namespace pwg
 		std::vector<int> executionOrder;
 	};
 
+	struct TerrainGraphValueRange
+	{
+		float minimum{ 0.0f };
+		float maximum{ 1.0f };
+		bool valid{ true };
+	};
+
 	struct TerrainGraphAsset
 	{
 		std::vector<TerrainGraphNodeInstance> nodes;
@@ -105,6 +112,7 @@ namespace pwg
 	const TerrainGraphPortDefinition* FindTerrainGraphInput(const TerrainGraphNodeType& type, const std::string& portId);
 	const TerrainGraphPortDefinition* FindTerrainGraphOutput(const TerrainGraphNodeType& type, const std::string& portId);
 	TerrainGraphValidationResult ValidateTerrainGraphAsset(const TerrainGraphAsset& asset);
+	TerrainGraphValueRange EstimateTerrainGraphOutputRange(const TerrainGraphAsset& asset, int nodeId, const std::string& portId, int depth = 0);
 	TerrainGraphAsset BuildDefaultUniversalTerrainGraph();
 	const char* TerrainGraphValueTypeName(TerrainGraphValueType type);
 }

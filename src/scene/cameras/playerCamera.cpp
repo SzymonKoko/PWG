@@ -1,17 +1,23 @@
 #include "playerCamera.h"
+#include <glm/gtc/constants.hpp>
 #include <algorithm>
+#include <cmath>
 
 pwg::PlayerCamera::PlayerCamera()
 {
 	CalculateCameraForward();
+	ResetCameraMotion();
 	UpdateMatrices();
 }
 
 void pwg::PlayerCamera::Update(float dt, pwg::MouseInput& mouseInput, pwg::KeyboardInput& keyboardInput)
 {
 	dt = std::clamp(dt, 0.0f, 0.05f);
+	bool wasGrounded = m_playerCameraProperties.grounded;
+	float previousVerticalVelocity = m_playerCameraProperties.velocity.y;
 	HandleMouseInput(mouseInput, dt);
 	HandleKeyboardInput(keyboardInput, dt);
+	UpdateCameraMotion(dt, wasGrounded, previousVerticalVelocity);
 	UpdateMatrices();
 }
 
@@ -19,6 +25,7 @@ void pwg::PlayerCamera::SetDefaultCameraPosition(int size)
 {
 	m_transform.position = { 0.0f, 500.0f, 0.0f };
 	m_playerCameraProperties.velocity = { 0.0f, 0.0f, 0.0f };
+	ResetCameraMotion();
 	UpdateMatrices();
 }
 
@@ -26,6 +33,7 @@ void pwg::PlayerCamera::SetCameraPosition(float x, float y, float z)
 {
 	m_transform.position = { x, y, z };
 	m_playerCameraProperties.velocity = { 0.0f, 0.0f, 0.0f };
+	ResetCameraMotion();
 	UpdateMatrices();
 }
 
@@ -60,7 +68,7 @@ void pwg::PlayerCamera::SetTerrainHeightProvider(std::function<float(float, floa
 
 glm::vec3 pwg::PlayerCamera::GetCameraPosition()
 {
-	return m_transform.position;
+	return m_viewPosition;
 }
 
 void pwg::PlayerCamera::HandleKeyboardInput(pwg::KeyboardInput& keyboardInput, float dt)
@@ -156,9 +164,77 @@ void pwg::PlayerCamera::CalculateCameraForward()
 	m_cameraProperties.forward = glm::normalize(glm::vec3(cos(pitchRad) * cos(yawRad), sin(pitchRad), cos(pitchRad) * sin(yawRad)));
 }
 
+void pwg::PlayerCamera::UpdateCameraMotion(float dt, bool wasGrounded, float previousVerticalVelocity)
+{
+	float response = 1.0f - std::exp(-m_playerCameraProperties.headBobResponse * dt);
+	glm::vec2 horizontalVelocity(m_playerCameraProperties.velocity.x, m_playerCameraProperties.velocity.z);
+	float horizontalSpeed = glm::length(horizontalVelocity);
+	float speedWeight = glm::smoothstep(0.35f, 8.0f, horizontalSpeed);
+	float targetWeight = m_playerCameraProperties.grounded && m_playerCameraProperties.headBobEnabled ? speedWeight : 0.0f;
+	m_headBobWeight = glm::mix(m_headBobWeight, targetWeight, response);
+
+	if (m_playerCameraProperties.grounded && horizontalSpeed > 0.2f)
+	{
+		float strideLength = std::max(m_playerCameraProperties.headBobStrideLength, 0.5f);
+		m_headBobPhase = std::fmod(
+			m_headBobPhase + horizontalSpeed * dt * glm::two_pi<float>() / strideLength,
+			glm::two_pi<float>());
+	}
+
+	float targetSide = std::sin(m_headBobPhase) * m_playerCameraProperties.headBobSide * m_headBobWeight;
+	float targetHeight = std::sin(m_headBobPhase * 2.0f) * m_playerCameraProperties.headBobHeight * m_headBobWeight;
+	float targetRoll = -std::sin(m_headBobPhase) * glm::radians(m_playerCameraProperties.headBobRollDegrees) * m_headBobWeight;
+	m_headBobSideOffset = glm::mix(m_headBobSideOffset, targetSide, response);
+	m_headBobHeightOffset = glm::mix(m_headBobHeightOffset, targetHeight, response);
+	m_headBobRoll = glm::mix(m_headBobRoll, targetRoll, response);
+
+	if (!wasGrounded && m_playerCameraProperties.grounded && previousVerticalVelocity < -2.0f)
+	{
+		float impact = std::clamp(-previousVerticalVelocity * 0.012f, 0.04f, 0.32f);
+		m_landingOffset -= impact;
+	}
+	constexpr float landingSpring = 95.0f;
+	constexpr float landingDamping = 18.0f;
+	m_landingVelocity += (-landingSpring * m_landingOffset - landingDamping * m_landingVelocity) * dt;
+	m_landingOffset += m_landingVelocity * dt;
+
+	float verticalResponse = 1.0f - std::exp(-(m_playerCameraProperties.grounded ? 18.0f : 30.0f) * dt);
+	m_smoothedEyeY = glm::mix(m_smoothedEyeY, m_transform.position.y, verticalResponse);
+	float maxVerticalLag = m_playerCameraProperties.eyeHeight * 0.3f;
+	m_smoothedEyeY = glm::clamp(
+		m_smoothedEyeY,
+		m_transform.position.y - maxVerticalLag,
+		m_transform.position.y + maxVerticalLag);
+
+	glm::vec3 planarForward(m_cameraProperties.forward.x, 0.0f, m_cameraProperties.forward.z);
+	planarForward = glm::dot(planarForward, planarForward) < 0.0001f
+		? glm::vec3(0.0f, 0.0f, -1.0f)
+		: glm::normalize(planarForward);
+	glm::vec3 right = glm::normalize(glm::cross(planarForward, m_cameraProperties.up));
+	m_viewPosition = glm::vec3(m_transform.position.x, m_smoothedEyeY, m_transform.position.z)
+		+ right * m_headBobSideOffset
+		+ m_cameraProperties.up * (m_headBobHeightOffset + m_landingOffset);
+}
+
+void pwg::PlayerCamera::ResetCameraMotion()
+{
+	m_viewPosition = m_transform.position;
+	m_smoothedEyeY = m_transform.position.y;
+	m_headBobPhase = 0.0f;
+	m_headBobWeight = 0.0f;
+	m_headBobSideOffset = 0.0f;
+	m_headBobHeightOffset = 0.0f;
+	m_headBobRoll = 0.0f;
+	m_landingOffset = 0.0f;
+	m_landingVelocity = 0.0f;
+}
+
 void pwg::PlayerCamera::UpdateMatrices()
 {
-	m_cameraProperties.viewMatrix = glm::lookAt(m_transform.position, m_transform.position + m_cameraProperties.forward, m_cameraProperties.up);
+	glm::vec3 right = glm::normalize(glm::cross(m_cameraProperties.forward, m_cameraProperties.up));
+	glm::vec3 cameraUp = glm::normalize(glm::cross(right, m_cameraProperties.forward));
+	glm::vec3 rolledUp = glm::normalize(cameraUp * std::cos(m_headBobRoll) + right * std::sin(m_headBobRoll));
+	m_cameraProperties.viewMatrix = glm::lookAt(m_viewPosition, m_viewPosition + m_cameraProperties.forward, rolledUp);
 	m_cameraProperties.projectionMatrix = glm::perspective(glm::radians(m_cameraProperties.fov), m_cameraProperties.aspectRatio, m_cameraProperties.nearPlane, m_cameraProperties.farPlane);
 }
 

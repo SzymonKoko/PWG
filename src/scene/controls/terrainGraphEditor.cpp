@@ -6,10 +6,12 @@
 #include "vegetation/vegetationAssetRegistry.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
 #include <limits>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -87,6 +89,157 @@ namespace pwg::controls
 		ImVec2 Mul(ImVec2 value, float scale)
 		{
 			return ImVec2(value.x * scale, value.y * scale);
+		}
+
+		constexpr size_t UniversalGraphHistoryLimit = 100;
+
+		struct UniversalGraphEditorState
+		{
+			std::vector<int> selectedNodeIds;
+			std::vector<TerrainGraphNodeInstance> clipboardNodes;
+			std::vector<TerrainGraphLink> clipboardLinks;
+			std::vector<TerrainGraphAsset> undoStack;
+			std::vector<TerrainGraphAsset> redoStack;
+			TerrainGraphAsset observedAsset;
+			TerrainGraphAsset transactionStart;
+			bool hasObservedAsset{ false };
+			bool transactionActive{ false };
+			bool showMaskPreviews{ true };
+		};
+
+		UniversalGraphEditorState& UniversalEditorState()
+		{
+			static UniversalGraphEditorState state;
+			return state;
+		}
+
+		bool GraphParametersEqual(const TerrainGraphParameter& lhs, const TerrainGraphParameter& rhs)
+		{
+			return lhs.id == rhs.id && lhs.displayName == rhs.displayName && lhs.type == rhs.type &&
+				lhs.floatValue == rhs.floatValue && lhs.minValue == rhs.minValue && lhs.maxValue == rhs.maxValue &&
+				lhs.intValue == rhs.intValue && lhs.boolValue == rhs.boolValue && lhs.stringValue == rhs.stringValue;
+		}
+
+		bool GraphNodesEqual(const TerrainGraphNodeInstance& lhs, const TerrainGraphNodeInstance& rhs)
+		{
+			if (lhs.id != rhs.id || lhs.typeId != rhs.typeId || lhs.displayName != rhs.displayName || lhs.enabled != rhs.enabled ||
+				lhs.position.x != rhs.position.x || lhs.position.y != rhs.position.y || lhs.parameters.size() != rhs.parameters.size())
+			{
+				return false;
+			}
+			for (size_t i = 0; i < lhs.parameters.size(); ++i)
+			{
+				if (!GraphParametersEqual(lhs.parameters[i], rhs.parameters[i])) return false;
+			}
+			return true;
+		}
+
+		bool GraphAssetsEqual(const TerrainGraphAsset& lhs, const TerrainGraphAsset& rhs)
+		{
+			if (lhs.nodes.size() != rhs.nodes.size() || lhs.links.size() != rhs.links.size() ||
+				lhs.nextNodeId != rhs.nextNodeId || lhs.nextLinkId != rhs.nextLinkId || lhs.useUniversalGraph != rhs.useUniversalGraph)
+			{
+				return false;
+			}
+			for (size_t i = 0; i < lhs.nodes.size(); ++i)
+			{
+				if (!GraphNodesEqual(lhs.nodes[i], rhs.nodes[i])) return false;
+			}
+			for (size_t i = 0; i < lhs.links.size(); ++i)
+			{
+				const auto& a = lhs.links[i];
+				const auto& b = rhs.links[i];
+				if (a.id != b.id || a.fromNodeId != b.fromNodeId || a.fromPortId != b.fromPortId ||
+					a.toNodeId != b.toNodeId || a.toPortId != b.toPortId) return false;
+			}
+			return true;
+		}
+
+		void PushGraphSnapshot(std::vector<TerrainGraphAsset>& stack, const TerrainGraphAsset& asset)
+		{
+			if (!stack.empty() && GraphAssetsEqual(stack.back(), asset)) return;
+			if (stack.size() >= UniversalGraphHistoryLimit) stack.erase(stack.begin());
+			stack.push_back(asset);
+		}
+
+		void RestoreGraphAsset(TerrainGraphAsset& target, const TerrainGraphAsset& snapshot)
+		{
+			const ImVec2 pan = target.pan;
+			const float zoom = target.zoom;
+			target = snapshot;
+			target.pan = pan;
+			target.zoom = zoom;
+		}
+
+		void EnsureGraphHistory(const TerrainGraphAsset& asset)
+		{
+			auto& state = UniversalEditorState();
+			if (!state.hasObservedAsset)
+			{
+				state.observedAsset = asset;
+				state.hasObservedAsset = true;
+			}
+		}
+
+		void RecordGraphHistory(const TerrainGraphAsset& asset, bool interactionActive)
+		{
+			auto& state = UniversalEditorState();
+			EnsureGraphHistory(asset);
+			const bool changed = !GraphAssetsEqual(state.observedAsset, asset);
+			if (changed)
+			{
+				if (interactionActive)
+				{
+					if (!state.transactionActive)
+					{
+						state.transactionStart = state.observedAsset;
+						state.transactionActive = true;
+					}
+					state.observedAsset = asset;
+					state.redoStack.clear();
+					return;
+				}
+				PushGraphSnapshot(state.undoStack, state.transactionActive ? state.transactionStart : state.observedAsset);
+				state.redoStack.clear();
+				state.observedAsset = asset;
+				state.transactionActive = false;
+				return;
+			}
+			if (state.transactionActive && !interactionActive)
+			{
+				PushGraphSnapshot(state.undoStack, state.transactionStart);
+				state.transactionActive = false;
+			}
+		}
+
+		bool UndoGraph(TerrainGraphAsset& asset)
+		{
+			auto& state = UniversalEditorState();
+			EnsureGraphHistory(asset);
+			if (state.transactionActive)
+			{
+				PushGraphSnapshot(state.undoStack, state.transactionStart);
+				state.transactionActive = false;
+			}
+			if (state.undoStack.empty()) return false;
+			PushGraphSnapshot(state.redoStack, asset);
+			RestoreGraphAsset(asset, state.undoStack.back());
+			state.undoStack.pop_back();
+			state.observedAsset = asset;
+			return true;
+		}
+
+		bool RedoGraph(TerrainGraphAsset& asset)
+		{
+			auto& state = UniversalEditorState();
+			EnsureGraphHistory(asset);
+			if (state.redoStack.empty()) return false;
+			PushGraphSnapshot(state.undoStack, asset);
+			RestoreGraphAsset(asset, state.redoStack.back());
+			state.redoStack.pop_back();
+			state.observedAsset = asset;
+			state.transactionActive = false;
+			return true;
 		}
 
 		float DistanceSquared(ImVec2 a, ImVec2 b)
@@ -1175,6 +1328,80 @@ namespace pwg::controls
 			}
 		}
 
+		void CopySelectedGraphNodes(const TerrainGraphAsset& asset)
+		{
+			auto& state = UniversalEditorState();
+			state.clipboardNodes.clear();
+			state.clipboardLinks.clear();
+			std::unordered_set<int> copiedIds;
+			for (const auto& node : asset.nodes)
+			{
+				if (ContainsSelectedNode(state.selectedNodeIds, node.id))
+				{
+					state.clipboardNodes.push_back(node);
+					copiedIds.insert(node.id);
+				}
+			}
+			for (const auto& link : asset.links)
+			{
+				if (copiedIds.contains(link.fromNodeId) && copiedIds.contains(link.toNodeId))
+				{
+					state.clipboardLinks.push_back(link);
+				}
+			}
+		}
+
+		bool DeleteSelectedGraphNodes(TerrainGraphAsset& asset, int& selectedNodeId)
+		{
+			auto& selectedNodeIds = UniversalEditorState().selectedNodeIds;
+			if (selectedNodeIds.empty()) return false;
+			const std::vector<int> idsToDelete = selectedNodeIds;
+			bool removed = false;
+			for (int nodeId : idsToDelete) removed = asset.RemoveNode(nodeId) || removed;
+			selectedNodeIds.clear();
+			selectedNodeId = asset.nodes.empty() ? 0 : asset.nodes.front().id;
+			if (selectedNodeId != 0) selectedNodeIds.push_back(selectedNodeId);
+			return removed;
+		}
+
+		bool PasteGraphNodes(TerrainGraphAsset& asset, int& selectedNodeId, std::optional<ImVec2> targetPosition)
+		{
+			auto& state = UniversalEditorState();
+			if (state.clipboardNodes.empty()) return false;
+			ImVec2 sourceMin = state.clipboardNodes.front().position;
+			for (const auto& node : state.clipboardNodes)
+			{
+				sourceMin.x = std::min(sourceMin.x, node.position.x);
+				sourceMin.y = std::min(sourceMin.y, node.position.y);
+			}
+			const ImVec2 target = targetPosition.value_or(Add(sourceMin, ImVec2(32.0f, 32.0f)));
+			const ImVec2 offset = Sub(target, sourceMin);
+			std::unordered_map<int, int> remappedIds;
+			state.selectedNodeIds.clear();
+			for (const auto& source : state.clipboardNodes)
+			{
+				TerrainGraphNodeInstance pasted = source;
+				pasted.id = asset.nextNodeId++;
+				pasted.position = Add(source.position, offset);
+				remappedIds[source.id] = pasted.id;
+				state.selectedNodeIds.push_back(pasted.id);
+				asset.nodes.push_back(std::move(pasted));
+			}
+			for (const auto& source : state.clipboardLinks)
+			{
+				auto from = remappedIds.find(source.fromNodeId);
+				auto to = remappedIds.find(source.toNodeId);
+				if (from == remappedIds.end() || to == remappedIds.end()) continue;
+				TerrainGraphLink pasted = source;
+				pasted.id = asset.nextLinkId++;
+				pasted.fromNodeId = from->second;
+				pasted.toNodeId = to->second;
+				asset.links.push_back(std::move(pasted));
+			}
+			selectedNodeId = state.selectedNodeIds.front();
+			return true;
+		}
+
 		bool RectsOverlap(ImVec2 aMin, ImVec2 aMax, ImVec2 bMin, ImVec2 bMax)
 		{
 			return aMin.x <= bMax.x && aMax.x >= bMin.x && aMin.y <= bMax.y && aMax.y >= bMin.y;
@@ -1190,10 +1417,72 @@ namespace pwg::controls
 			return ImVec2(std::max(a.x, b.x), std::max(a.y, b.y));
 		}
 
-		bool DrawUniversalGraphCanvas(TerrainGraphAsset& asset, int& selectedNodeId, bool* viewChanged)
+		struct GraphMaskPreview
 		{
-			const ImVec2 nodeSize(230.0f, 154.0f);
-			static std::vector<int> selectedNodeIds;
+			std::string label;
+			std::shared_ptr<TerrainMask> mask;
+		};
+
+		bool HasMaskPreviewSlot(const TerrainGraphNodeType& type)
+		{
+			return std::any_of(type.outputs.begin(), type.outputs.end(), [](const TerrainGraphPortDefinition& port)
+			{
+				return port.valueType == TerrainGraphValueType::FloatMask;
+			}) || std::any_of(type.inputs.begin(), type.inputs.end(), [](const TerrainGraphPortDefinition& port)
+			{
+				return port.valueType == TerrainGraphValueType::FloatMask;
+			});
+		}
+
+		float MaskPreviewTop(const TerrainGraphNodeType& type)
+		{
+			const size_t portRows = std::max(type.inputs.size(), type.outputs.size());
+			return std::max(82.0f, 68.0f + static_cast<float>(portRows) * 18.0f);
+		}
+
+		ImVec2 UniversalNodeSize(const TerrainGraphNodeType& type, bool showPreviews)
+		{
+			if (showPreviews && HasMaskPreviewSlot(type))
+			{
+				return ImVec2(230.0f, MaskPreviewTop(type) + 224.0f);
+			}
+			return ImVec2(230.0f, 154.0f);
+		}
+
+		std::vector<GraphMaskPreview> FindGraphMaskPreviews(const TerrainGraphAsset& asset, const TerrainGraphNodeInstance& node,
+			const TerrainGraphNodeType& type, const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+		{
+			std::vector<GraphMaskPreview> previews;
+			for (const auto& output : type.outputs)
+			{
+				if (output.valueType != TerrainGraphValueType::FloatMask) continue;
+				auto found = masks.find("preview_node_" + std::to_string(node.id) + "_" + output.id);
+				if (found != masks.end() && found->second && found->second->texture)
+				{
+					previews.push_back({ output.displayName, found->second });
+				}
+			}
+			if (!previews.empty()) return previews;
+
+			for (const auto& input : type.inputs)
+			{
+				if (input.valueType != TerrainGraphValueType::FloatMask) continue;
+				const TerrainGraphLink* link = asset.FindInputLink(node.id, input.id);
+				if (!link) continue;
+				auto found = masks.find("preview_node_" + std::to_string(link->fromNodeId) + "_" + link->fromPortId);
+				if (found != masks.end() && found->second && found->second->texture)
+				{
+					previews.push_back({ input.displayName, found->second });
+				}
+			}
+			return previews;
+		}
+
+		bool DrawUniversalGraphCanvas(TerrainGraphAsset& asset, int& selectedNodeId,
+			const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool* viewChanged, bool* graphChanged)
+		{
+			auto& editorState = UniversalEditorState();
+			auto& selectedNodeIds = editorState.selectedNodeIds;
 			static bool selectionDragActive = false;
 			static ImVec2 selectionStart;
 			static ImVec2 selectionEnd;
@@ -1201,6 +1490,7 @@ namespace pwg::controls
 			{
 				*viewChanged = false;
 			}
+			if (graphChanged) *graphChanged = false;
 			if (selectedNodeId != 0 && selectedNodeIds.empty())
 			{
 				SelectSingleNode(selectedNodeIds, selectedNodeId);
@@ -1209,6 +1499,7 @@ namespace pwg::controls
 			{
 				return asset.FindNode(nodeId) == nullptr;
 			}), selectedNodeIds.end());
+			if (!asset.FindNode(selectedNodeId)) selectedNodeId = selectedNodeIds.empty() ? 0 : selectedNodeIds.front();
 
 			ImVec2 viewportSize = ImGui::GetContentRegionAvail();
 			viewportSize.x = std::max(viewportSize.x, 360.0f);
@@ -1251,7 +1542,7 @@ namespace pwg::controls
 			{
 				ImVec2 pos = toScreen(node.position);
 				float y = pos.y + (58.0f + static_cast<float>(portIndex) * 18.0f) * asset.zoom;
-				return output ? ImVec2(pos.x + nodeSize.x * asset.zoom, y) : ImVec2(pos.x, y);
+				return output ? ImVec2(pos.x + 230.0f * asset.zoom, y) : ImVec2(pos.x, y);
 			};
 
 			drawList->PushClipRect(origin, viewportMax, true);
@@ -1312,10 +1603,11 @@ namespace pwg::controls
 			if (hoveredLink >= 0)
 			{
 				ImGui::SetTooltip("Press C to cut link");
-				if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_C))
+				if (!io.WantTextInput && !io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C))
 				{
 					asset.RemoveLink(hoveredLink);
 					if (viewChanged) *viewChanged = true;
+					if (graphChanged) *graphChanged = true;
 				}
 			}
 
@@ -1349,6 +1641,7 @@ namespace pwg::controls
 					continue;
 				}
 				ImVec2 pos = toScreen(node.position);
+				const ImVec2 nodeSize = UniversalNodeSize(*type, editorState.showMaskPreviews);
 				ImVec2 scaledNode = Mul(nodeSize, asset.zoom);
 				ImVec2 max(pos.x + scaledNode.x, pos.y + scaledNode.y);
 				bool selected = selectedNodeId == node.id || ContainsSelectedNode(selectedNodeIds, node.id);
@@ -1449,6 +1742,27 @@ namespace pwg::controls
 				drawList->AddText(ImGui::GetFont(), fontSize, ImVec2(pos.x + 10.0f * asset.zoom, pos.y + 18.0f * asset.zoom), IM_COL32(235, 238, 240, 255), node.displayName.c_str());
 				drawList->AddText(ImGui::GetFont(), fontSize, ImVec2(pos.x + 10.0f * asset.zoom, pos.y + 40.0f * asset.zoom), IM_COL32(150, 155, 164, 230), type->category.c_str());
 
+				if (editorState.showMaskPreviews && HasMaskPreviewSlot(*type))
+				{
+					const float previewTop = MaskPreviewTop(*type);
+					ImVec2 previewMin(pos.x + 10.0f * asset.zoom, pos.y + previewTop * asset.zoom);
+					ImVec2 previewMax(pos.x + 220.0f * asset.zoom, pos.y + (previewTop + 210.0f) * asset.zoom);
+					drawList->AddRectFilled(previewMin, previewMax, IM_COL32(8, 10, 12, 255), 2.0f * asset.zoom);
+					auto previews = FindGraphMaskPreviews(asset, node, *type, masks);
+					if (!previews.empty())
+					{
+						drawList->AddImage((ImTextureID)(intptr_t)previews.front().mask->texture->GetTextureID(),
+							previewMin, previewMax, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+					}
+					else if (asset.zoom >= 0.55f)
+					{
+						drawList->AddText(ImGui::GetFont(), fontSize * 0.82f,
+							ImVec2(previewMin.x + 8.0f * asset.zoom, previewMin.y + 95.0f * asset.zoom),
+							IM_COL32(125, 132, 140, 220), "Run Graph to preview");
+					}
+					drawList->AddRect(previewMin, previewMax, IM_COL32(78, 86, 94, 220), 2.0f * asset.zoom);
+				}
+
 				float portRadius = std::max(3.0f, 4.0f * asset.zoom);
 				float portFontSize = ImGui::GetFontSize() * std::clamp(asset.zoom, 0.45f, 0.90f);
 				for (int i = 0; i < static_cast<int>(type->inputs.size()); ++i)
@@ -1500,8 +1814,10 @@ namespace pwg::controls
 				{
 					for (const auto& node : asset.nodes)
 					{
+						const auto* type = FindTerrainGraphNodeType(node.typeId);
+						if (!type) continue;
 						ImVec2 nodeMin = toScreen(node.position);
-						ImVec2 nodeMax = Add(nodeMin, Mul(nodeSize, asset.zoom));
+						ImVec2 nodeMax = Add(nodeMin, Mul(UniversalNodeSize(*type, editorState.showMaskPreviews), asset.zoom));
 						if (RectsOverlap(rectMin, rectMax, nodeMin, nodeMax) && !ContainsSelectedNode(selectedNodeIds, node.id))
 						{
 							selectedNodeIds.push_back(node.id);
@@ -1531,9 +1847,10 @@ namespace pwg::controls
 						float hitRadius = std::max(12.0f, 10.0f * asset.zoom);
 						if (DistanceSquared(io.MousePos, portPos) <= hitRadius * hitRadius && CanConnectGraphPorts(asset, dragNodeId, dragPortId, node.id, type->inputs[i].id))
 						{
-							if (asset.AddLink(dragNodeId, dragPortId, node.id, type->inputs[i].id) && viewChanged)
+							if (asset.AddLink(dragNodeId, dragPortId, node.id, type->inputs[i].id))
 							{
-								*viewChanged = true;
+								if (viewChanged) *viewChanged = true;
+								if (graphChanged) *graphChanged = true;
 							}
 							selectedNodeId = node.id;
 						}
@@ -1543,15 +1860,69 @@ namespace pwg::controls
 				dragPortId.clear();
 			}
 
+			const bool acceptsShortcuts = (hovered || canvasActive || ImGui::IsWindowFocused()) && !io.WantTextInput;
+			bool shortcutChanged = false;
+			if (acceptsShortcuts)
+			{
+				if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A))
+				{
+					selectedNodeIds.clear();
+					for (const auto& node : asset.nodes) selectedNodeIds.push_back(node.id);
+					selectedNodeId = selectedNodeIds.empty() ? 0 : selectedNodeIds.front();
+				}
+				else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C))
+				{
+					CopySelectedGraphNodes(asset);
+				}
+				else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_X))
+				{
+					CopySelectedGraphNodes(asset);
+					shortcutChanged = DeleteSelectedGraphNodes(asset, selectedNodeId);
+				}
+				else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V))
+				{
+					std::optional<ImVec2> pastePosition;
+					if (hovered) pastePosition = toWorld(io.MousePos);
+					shortcutChanged = PasteGraphNodes(asset, selectedNodeId, pastePosition);
+				}
+				else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D))
+				{
+					CopySelectedGraphNodes(asset);
+					shortcutChanged = PasteGraphNodes(asset, selectedNodeId, std::nullopt);
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace))
+				{
+					shortcutChanged = DeleteSelectedGraphNodes(asset, selectedNodeId);
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+				{
+					selectedNodeIds.clear();
+					selectedNodeId = 0;
+					dragNodeId = 0;
+					dragPortId.clear();
+				}
+			}
+			if (shortcutChanged)
+			{
+				selectedNodeIds.erase(std::remove_if(selectedNodeIds.begin(), selectedNodeIds.end(), [&](int nodeId)
+				{
+					return asset.FindNode(nodeId) == nullptr;
+				}), selectedNodeIds.end());
+				if (!asset.FindNode(selectedNodeId)) selectedNodeId = selectedNodeIds.empty() ? 0 : selectedNodeIds.front();
+				if (viewChanged) *viewChanged = true;
+				if (graphChanged) *graphChanged = true;
+			}
+
 			drawList->AddText(ImVec2(origin.x + 10.0f, viewportMax.y - 24.0f), IM_COL32(190, 195, 200, 210), ("Zoom " + std::to_string(static_cast<int>(asset.zoom * 100.0f)) + "%").c_str());
 			std::string selectionLabel = "Selected " + std::to_string(static_cast<int>(selectedNodeIds.size()));
 			drawList->AddText(ImVec2(origin.x + 100.0f, viewportMax.y - 24.0f), IM_COL32(170, 178, 188, 210), selectionLabel.c_str());
-			drawList->AddText(ImVec2(origin.x + 190.0f, viewportMax.y - 24.0f), IM_COL32(140, 145, 150, 190), "Box select empty canvas | Shift/Ctrl click add | Drag selected group | C cuts link");
+			drawList->AddText(ImVec2(origin.x + 190.0f, viewportMax.y - 24.0f), IM_COL32(140, 145, 150, 190), "Ctrl+C/V copy/paste | Ctrl+D duplicate | Delete removes | Ctrl+Z/Y undo/redo");
 			drawList->PopClipRect();
 			return capturedInput;
 		}
 
-		bool DrawUniversalGraphInspector(TerrainGraphAsset& asset, int& selectedNodeId, const std::shared_ptr<VegetationAssetRegistry>& assetRegistry, bool* viewChanged)
+		bool DrawUniversalGraphInspector(TerrainGraphAsset& asset, int& selectedNodeId, const std::shared_ptr<VegetationAssetRegistry>& assetRegistry,
+			const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool* viewChanged)
 		{
 			bool changed = false;
 			TerrainGraphNodeInstance* node = asset.FindNode(selectedNodeId);
@@ -1573,6 +1944,25 @@ namespace pwg::controls
 			ImGui::Text("%s", node->displayName.c_str());
 			ImGui::TextDisabled("%s / %s", type->category.c_str(), type->typeId.c_str());
 			ImGui::Separator();
+			auto previews = FindGraphMaskPreviews(asset, *node, *type, masks);
+			if (HasMaskPreviewSlot(*type))
+			{
+				if (!previews.empty())
+				{
+					for (const auto& preview : previews)
+					{
+						ImGui::TextDisabled("%s preview", preview.label.c_str());
+						float previewSize = std::clamp(ImGui::GetContentRegionAvail().x, 160.0f, 320.0f);
+						ImGui::Image((ImTextureID)(intptr_t)preview.mask->texture->GetTextureID(),
+							ImVec2(previewSize, previewSize), ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+					}
+				}
+				else
+				{
+					ImGui::TextDisabled("Run Graph to generate preview.");
+				}
+				ImGui::Separator();
+			}
 			changed |= ImGui::Checkbox("Enabled", &node->enabled);
 			char nameBuffer[96]{};
 			std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", node->displayName.c_str());
@@ -1591,6 +1981,7 @@ namespace pwg::controls
 				duplicate.position.y += 32.0f;
 				asset.nodes.push_back(std::move(duplicate));
 				selectedNodeId = asset.nodes.back().id;
+				SelectSingleNode(UniversalEditorState().selectedNodeIds, selectedNodeId);
 				changed = true;
 			}
 			ImGui::SameLine();
@@ -1598,6 +1989,7 @@ namespace pwg::controls
 			{
 				asset.RemoveNode(node->id);
 				selectedNodeId = asset.nodes.empty() ? 0 : asset.nodes.front().id;
+				SelectSingleNode(UniversalEditorState().selectedNodeIds, selectedNodeId);
 				changed = true;
 				if (viewChanged) *viewChanged = true;
 				return true;
@@ -1689,6 +2081,11 @@ namespace pwg::controls
 			}
 			return changed;
 		}
+	}
+
+	void TerrainGraphEditor::ResetHistory()
+	{
+		UniversalEditorState() = UniversalGraphEditorState{};
 	}
 
 	bool TerrainGraphEditor::Show(std::shared_ptr<ChunkManager> chunkManager, TerrainGraphViewState& viewState, std::shared_ptr<VegetationAssetRegistry> assetRegistry, bool* inputCaptured, bool* viewChanged)
@@ -1825,14 +2222,50 @@ namespace pwg::controls
 			if (ImGui::BeginTabItem("Universal Graph"))
 			{
 				auto& asset = terrainComputePipeline->GetUniversalGraphAsset();
+				EnsureGraphHistory(asset);
 				bool universalViewChanged = false;
 				bool universalCapturedInput = false;
+				ImGuiIO& graphIo = ImGui::GetIO();
+				const bool graphHasKeyboardFocus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !graphIo.WantTextInput;
+				const bool undoShortcut = graphHasKeyboardFocus && graphIo.KeyCtrl && !graphIo.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z);
+				const bool redoShortcut = graphHasKeyboardFocus && graphIo.KeyCtrl &&
+					(ImGui::IsKeyPressed(ImGuiKey_Y) || (graphIo.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z)));
+				if ((undoShortcut && UndoGraph(asset)) || (redoShortcut && RedoGraph(asset)))
+				{
+					universalViewChanged = true;
+					changed = true;
+				}
 				bool useUniversal = asset.useUniversalGraph;
 				if (ImGui::Checkbox("Use universal graph for regeneration", &useUniversal))
 				{
 					asset.useUniversalGraph = useUniversal;
 					universalViewChanged = true;
 				}
+				ImGui::SameLine();
+				auto& editorState = UniversalEditorState();
+				ImGui::BeginDisabled(editorState.undoStack.empty() && !editorState.transactionActive);
+				if (ImGui::Button("Undo"))
+				{
+					if (UndoGraph(asset))
+					{
+						universalViewChanged = true;
+						changed = true;
+					}
+				}
+				ImGui::EndDisabled();
+				if (ImGui::IsItemHovered()) ImGui::SetTooltip("Undo graph edit (Ctrl+Z)");
+				ImGui::SameLine();
+				ImGui::BeginDisabled(editorState.redoStack.empty());
+				if (ImGui::Button("Redo"))
+				{
+					if (RedoGraph(asset))
+					{
+						universalViewChanged = true;
+						changed = true;
+					}
+				}
+				ImGui::EndDisabled();
+				if (ImGui::IsItemHovered()) ImGui::SetTooltip("Redo graph edit (Ctrl+Y or Ctrl+Shift+Z)");
 				ImGui::SameLine();
 				if (ImGui::Button("Add Node"))
 				{
@@ -1859,6 +2292,7 @@ namespace pwg::controls
 							ImVec2 position((-asset.pan.x + available.x * 0.45f) / asset.zoom, (-asset.pan.y + available.y * 0.35f) / asset.zoom);
 							auto& node = asset.AddNode(type, position);
 							selectedUniversalNodeId = node.id;
+							SelectSingleNode(editorState.selectedNodeIds, node.id);
 							universalViewChanged = true;
 						}
 					}
@@ -1891,6 +2325,7 @@ namespace pwg::controls
 					terrainComputePipeline->ResetUniversalGraphToDefault();
 					auto& resetAsset = terrainComputePipeline->GetUniversalGraphAsset();
 					selectedUniversalNodeId = resetAsset.nodes.empty() ? 0 : resetAsset.nodes.front().id;
+					SelectSingleNode(editorState.selectedNodeIds, selectedUniversalNodeId);
 					universalViewChanged = true;
 				}
 
@@ -1899,14 +2334,19 @@ namespace pwg::controls
 					validation.valid ? "Valid graph" : "Graph needs attention");
 				ImGui::SameLine();
 				ImGui::TextDisabled("%d nodes | %d links", static_cast<int>(asset.nodes.size()), static_cast<int>(asset.links.size()));
+				ImGui::SameLine();
+				ImGui::Checkbox("Previews", &editorState.showMaskPreviews);
 
 				ImVec2 available = ImGui::GetContentRegionAvail();
 				float detailsWidth = std::clamp(available.x * 0.34f, 260.0f, 380.0f);
 				float graphWidth = std::max(available.x - detailsWidth - 8.0f, 340.0f);
 				ImGui::BeginChild("UniversalTerrainGraphCanvas", ImVec2(graphWidth, 0.0f), true, ImGuiWindowFlags_HorizontalScrollbar);
 				bool canvasViewChanged = false;
-				universalCapturedInput = DrawUniversalGraphCanvas(asset, selectedUniversalNodeId, &canvasViewChanged);
+				bool canvasGraphChanged = false;
+				const auto& graphMasks = chunkManager->GetMasks();
+				universalCapturedInput = DrawUniversalGraphCanvas(asset, selectedUniversalNodeId, graphMasks, &canvasViewChanged, &canvasGraphChanged);
 				universalViewChanged = universalViewChanged || canvasViewChanged;
+				changed = changed || canvasGraphChanged;
 				ImGui::EndChild();
 				ImGui::SameLine();
 				ImGui::BeginChild("UniversalTerrainGraphInspector", ImVec2(0.0f, 0.0f), true);
@@ -1917,9 +2357,12 @@ namespace pwg::controls
 						ImGui::BulletText("%s", message.c_str());
 					}
 				}
-				bool inspectorChanged = DrawUniversalGraphInspector(asset, selectedUniversalNodeId, assetRegistry, &universalViewChanged);
+				bool inspectorChanged = DrawUniversalGraphInspector(asset, selectedUniversalNodeId, assetRegistry, graphMasks, &universalViewChanged);
 				changed = changed || inspectorChanged;
 				ImGui::EndChild();
+				const bool graphInteractionActive = ImGui::IsAnyItemActive() || ImGui::IsMouseDown(ImGuiMouseButton_Left) ||
+					ImGui::IsMouseDown(ImGuiMouseButton_Right) || ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+				RecordGraphHistory(asset, graphInteractionActive);
 				if (inputCaptured)
 				{
 					*inputCaptured = universalCapturedInput;

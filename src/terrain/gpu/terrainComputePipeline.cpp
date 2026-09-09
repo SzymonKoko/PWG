@@ -59,6 +59,12 @@ namespace pwg
 			}
 			auto mask = std::make_shared<TerrainMask>(name, std::make_shared<Texture>(size, size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 			mask->texture->SetTextureWrapping(ToGL(TextureWrapMode::CLAMP_TO_EDGE), ToGL(TextureWrapMode::CLAMP_TO_EDGE));
+			glBindTexture(GL_TEXTURE_2D, mask->texture->GetTextureID());
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE);
+			glBindTexture(GL_TEXTURE_2D, 0);
 			masks[name] = mask;
 			return mask;
 		}
@@ -90,6 +96,7 @@ namespace pwg
 		m_shaderManager->LoadCompute("universalLerpShader", terrainShadersPath + "masks/universalLerp.comp");
 		m_shaderManager->LoadCompute("universalUnaryOpShader", terrainShadersPath + "masks/universalUnaryOp.comp");
 		m_shaderManager->LoadCompute("universalMaskFilterShader", terrainShadersPath + "masks/universalMaskFilter.comp");
+		m_shaderManager->LoadCompute("universalGraphPreviewShader", terrainShadersPath + "masks/universalGraphPreview.comp");
 
 		auto elevationShader = m_shaderManager->GetShader<pwg::ComputeShader>("elevationMaskShader");
 		auto mountainMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("mountainMaskShader");
@@ -107,6 +114,7 @@ namespace pwg
 		auto universalLerpShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalLerpShader");
 		auto universalUnaryOpShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalUnaryOpShader");
 		auto universalMaskFilterShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalMaskFilterShader");
+		auto universalGraphPreviewShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalGraphPreviewShader");
 
 		AddComputeShader("Elevation", elevationShader);
 		AddComputeShader("MountainMask", mountainMaskShader);
@@ -124,6 +132,7 @@ namespace pwg
 		AddComputeShader("UniversalLerp", universalLerpShader);
 		AddComputeShader("UniversalUnaryOp", universalUnaryOpShader);
 		AddComputeShader("UniversalMaskFilter", universalMaskFilterShader);
+		AddComputeShader("UniversalGraphPreview", universalGraphPreviewShader);
 
 		m_universalGraphAsset = BuildDefaultUniversalTerrainGraph();
 	}
@@ -425,6 +434,36 @@ namespace pwg
 		}
 
 		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
+		auto previewShader = m_computeShaders["UniversalGraphPreview"];
+		constexpr int previewSize = 256;
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			const auto* type = FindTerrainGraphNodeType(node.typeId);
+			if (!node.enabled || !type) continue;
+			for (const auto& output : type->outputs)
+			{
+				if (output.valueType != TerrainGraphValueType::FloatMask) continue;
+				auto source = masks.find(TempMaskName(node.id, output.id));
+				if (source == masks.end() || !source->second || !source->second->texture) continue;
+				auto range = EstimateTerrainGraphOutputRange(m_universalGraphAsset, node.id, output.id);
+				if (!range.valid) range = { 0.0f, 1.0f, true };
+				if (std::abs(range.maximum - range.minimum) < 0.0001f)
+				{
+					range.minimum = std::min(0.0f, range.minimum);
+					range.maximum = std::max(1.0f, range.maximum);
+				}
+				auto preview = EnsureFloatMask(masks, "preview_" + TempMaskName(node.id, output.id), previewSize);
+				previewShader->ActivateShader();
+				source->second->texture->Bind(0);
+				previewShader->SetUniformInt("u_value", 0);
+				previewShader->SetUniformInt("u_size", previewSize);
+				previewShader->SetUniformFloat("u_minValue", range.minimum);
+				previewShader->SetUniformFloat("u_maxValue", range.maximum);
+				previewShader->BindImage(0, preview->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				previewShader->DispatchForTexture(previewSize, previewSize);
+				previewShader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+			}
+		}
 		m_terrainMasks = masks;
 		m_vegetationLayers = std::move(vegetationLayers);
 		++m_vegetationRevision;

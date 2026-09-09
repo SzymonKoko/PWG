@@ -123,6 +123,11 @@ namespace pwg
 		std::filesystem::path folder = std::filesystem::path(path).parent_path();
 		std::unordered_map<std::string, std::shared_ptr<Texture>> textureCache;
 		std::vector<glm::vec3> groundingPositions;
+		glm::mat4 orientationCorrection(1.0f);
+		orientationCorrection = glm::rotate(orientationCorrection, glm::radians(definition.rotationDegrees.x), glm::vec3(1.0f, 0.0f, 0.0f));
+		orientationCorrection = glm::rotate(orientationCorrection, glm::radians(definition.rotationDegrees.y), glm::vec3(0.0f, 1.0f, 0.0f));
+		orientationCorrection = glm::rotate(orientationCorrection, glm::radians(definition.rotationDegrees.z), glm::vec3(0.0f, 0.0f, 1.0f));
+		glm::mat3 normalCorrection(orientationCorrection);
 
 		for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
 		{
@@ -142,9 +147,10 @@ namespace pwg
 			for (unsigned int i = 0; i < source->mNumVertices; ++i)
 			{
 				Vertex vertex{};
-				vertex.position = { source->mVertices[i].x, source->mVertices[i].y, source->mVertices[i].z };
+				glm::vec3 sourcePosition(source->mVertices[i].x, source->mVertices[i].y, source->mVertices[i].z);
+				vertex.position = glm::vec3(orientationCorrection * glm::vec4(sourcePosition, 1.0f));
 				vertex.normal = source->HasNormals()
-					? glm::vec3(source->mNormals[i].x, source->mNormals[i].y, source->mNormals[i].z)
+					? glm::normalize(normalCorrection * glm::vec3(source->mNormals[i].x, source->mNormals[i].y, source->mNormals[i].z))
 					: glm::vec3(0.0f, 1.0f, 0.0f);
 				vertex.uv = source->HasTextureCoords(0)
 					? glm::vec2(source->mTextureCoords[0][i].x, source->mTextureCoords[0][i].y)
