@@ -16,8 +16,6 @@ void pwg::LightingUploader::Upload(std::shared_ptr<Material> material, const Env
 	material->SetUniformVec3("u_groundAlbedo", lighting.groundAlbedo);
 	material->SetUniformFloat("u_fogDensity", lighting.fogDensity);
 	material->SetUniformFloat("u_normalStrength", lighting.normalStrength);
-	material->SetUniformFloat("u_snowHeight", lighting.snowHeight);
-	material->SetUniformFloat("u_snowSoftness", lighting.snowSoftness);
 	material->SetUniformFloat("u_wetnessStrength", lighting.wetnessStrength);
 	material->SetUniformFloat("u_waterAlpha", lighting.waterAlpha);
 	material->SetUniformVec3("u_waterShallowColor", lighting.waterShallowColor);

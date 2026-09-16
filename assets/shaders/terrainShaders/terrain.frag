@@ -31,8 +31,6 @@ uniform sampler2DArray u_TexturesNormal;
 uniform sampler2DArray u_TexturesData;
 uniform vec3 u_cameraPosition;
 uniform float u_normalStrength;
-uniform float u_snowHeight;
-uniform float u_snowSoftness;
 uniform float u_wetnessStrength;
 uniform float u_waterAlpha;
 uniform float u_fogDensity;
@@ -49,10 +47,18 @@ uniform float u_materialTiling[32];
 uniform float u_materialNormalStrength[32];
 uniform float u_materialRoughnessScale[32];
 uniform float u_materialHeightStrength[32];
+uniform float u_materialAmount[32];
+uniform float u_materialMinHeight[32];
+uniform float u_materialMaxHeight[32];
+uniform float u_materialMinSlope[32];
+uniform float u_materialMaxSlope[32];
+uniform float u_materialBlendSoftness[32];
+uniform float u_terrainHeightMin;
+uniform float u_terrainHeightMax;
 
 int DataRoughnessIndex(int layer) { return layer; }
-int DataAoIndex(int layer) { return layer + 32; }
-int DataHeightIndex(int layer) { return layer + 64; }
+int DataAoIndex(int layer) { return layer + 8; }
+int DataHeightIndex(int layer) { return layer + 12; }
 
 float SampleShadowMap(int cascadeIndex, vec2 uv)
 {
@@ -150,7 +156,7 @@ struct SurfaceSample
 // =========================
 // HEIGHT SAMPLING (BLEND)
 // =========================
-float SampleHeight(vec2 uv, float rock)
+float SampleHeight(vec2 uv, vec4 weights)
 {
     vec2 gUv = uv * max(u_materialTiling[0], 0.001);
     vec2 rUv = uv * max(u_materialTiling[1], 0.001);
@@ -160,14 +166,13 @@ float SampleHeight(vec2 uv, float rock)
     float rH = texture(u_TexturesData, vec3(rUv, 13)).r * u_materialHeightStrength[1];
     float sH = texture(u_TexturesData, vec3(sUv, 14)).r * u_materialHeightStrength[2];
     float snH = texture(u_TexturesData, vec3(snUv, 15)).r * u_materialHeightStrength[3];
-    float terrainH = mix(mix(gH, rH, rock), sH, 0.25);
-    return mix(terrainH, snH, 0.10);
+    return dot(vec4(gH, rH, sH, snH), weights);
 }
 
 // =========================
 // PARALLAX OCCLUSION MAPPING
 // =========================
-vec2 ParallaxMapping(vec2 texCoords, vec3 viewDirTS, float heightScale, float rock)
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDirTS, float heightScale, vec4 weights)
 {
     float minLayers = 8.0;
     float maxLayers = 32.0;
@@ -182,13 +187,13 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDirTS, float heightScale, float ro
 
     vec2 currentTexCoords = texCoords;
 
-    float currentDepthMapValue = SampleHeight(currentTexCoords, rock);
+    float currentDepthMapValue = SampleHeight(currentTexCoords, weights);
 
     // marching
     while (currentLayerDepth < currentDepthMapValue)
     {
         currentTexCoords -= deltaTexCoords;
-        currentDepthMapValue = SampleHeight(currentTexCoords, rock);
+        currentDepthMapValue = SampleHeight(currentTexCoords, weights);
         currentLayerDepth += layerDepth;
     }
 
@@ -196,11 +201,28 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDirTS, float heightScale, float ro
     vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
 
     float afterDepth = currentDepthMapValue - currentLayerDepth;
-    float beforeDepth = SampleHeight(prevTexCoords, rock) - (currentLayerDepth - layerDepth);
+    float beforeDepth = SampleHeight(prevTexCoords, weights) - (currentLayerDepth - layerDepth);
 
-    float weight = afterDepth / (afterDepth - beforeDepth);
+    float denominator = afterDepth - beforeDepth;
+    float weight = abs(denominator) > 0.000001 ? afterDepth / denominator : 0.5;
 
     return mix(currentTexCoords, prevTexCoords, weight);
+}
+
+float PlacementBand(float value, float minimum, float maximum, float softness)
+{
+    if (maximum <= minimum + 0.00001) return 0.0;
+    float width = max(min(softness, (maximum - minimum) * 0.5), 0.00001);
+    float lower = minimum <= 0.0001 ? 1.0 : smoothstep(minimum, minimum + width, value);
+    float upper = maximum >= 0.9999 ? 1.0 : 1.0 - smoothstep(maximum - width, maximum, value);
+    return clamp(lower * upper, 0.0, 1.0);
+}
+
+float PlacementWeight(int layer, float normalizedHeight, float normalizedSlope)
+{
+    float heightBand = PlacementBand(normalizedHeight, u_materialMinHeight[layer], u_materialMaxHeight[layer], u_materialBlendSoftness[layer]);
+    float slopeBand = PlacementBand(normalizedSlope, u_materialMinSlope[layer] / 90.0, u_materialMaxSlope[layer] / 90.0, u_materialBlendSoftness[layer]);
+    return clamp(u_materialAmount[layer] * heightBand * slopeBand, 0.0, 1.0);
 }
 
 // =========================
@@ -229,18 +251,33 @@ void main()
 
     float depositMask = texture(u_Depositmap, debugUV).r;
 
+    float normalizedHeight = clamp((f_Pos.y - u_terrainHeightMin) / max(u_terrainHeightMax - u_terrainHeightMin, 0.001), 0.0, 1.0);
+    float normalizedSlope = clamp(degrees(acos(clamp(normal.y, 0.0, 1.0))) / 90.0, 0.0, 1.0);
+    float cliffRock = smoothstep(0.12, 0.82, slope);
+    float exposedHighRock = smoothstep(0.35, 0.95, normalizedHeight) * 0.35;
+    float channelRock = smoothstep(0.18, 0.7, riverChannel) * smoothstep(0.08, 0.45, slope) * 0.35;
+    float rockMask = clamp(max(cliffRock, exposedHighRock) + channelRock, 0.0, 1.0) * PlacementWeight(1, normalizedHeight, normalizedSlope);
+
+    float depositAmount = smoothstep(0.02, 0.16, depositMask);
+    float flatGround = 1.0 - smoothstep(0.10, 0.30, slope);
+    float channelArea = max(smoothstep(0.15, 0.55, flowAccumulation), smoothstep(0.20, 0.60, riverChannel));
+    float alluviumMask = depositAmount * clamp(max(flatGround, channelArea), 0.0, 1.0) *
+        (1.0 - smoothstep(0.45, 0.85, rockMask)) * PlacementWeight(2, normalizedHeight, normalizedSlope);
+    float snowMask = PlacementWeight(3, normalizedHeight, normalizedSlope);
+
+    vec4 materialWeights = vec4(PlacementWeight(0, normalizedHeight, normalizedSlope), 0.0, 0.0, 0.0);
+    materialWeights = mix(materialWeights, vec4(0.0, 1.0, 0.0, 0.0), rockMask);
+    materialWeights = mix(materialWeights, vec4(0.0, 0.0, 1.0, 0.0), alluviumMask);
+    materialWeights = mix(materialWeights, vec4(0.0, 0.0, 0.0, 1.0), snowMask);
+    float weightSum = dot(materialWeights, vec4(1.0));
+    materialWeights = weightSum > 0.0001 ? materialWeights / weightSum : vec4(1.0, 0.0, 0.0, 0.0);
+
     vec3 albedo;
     vec3 normalTex;
     float roughness;
     float metallic = 0.0;
     float ao;
-    float rock = 0.0;
-    float snowMask = 0.0;
     float wetness = 0.0;
-    float cliffRock = smoothstep(0.12, 0.82, slope);
-    float exposedHighRock = smoothstep(u_snowHeight * 0.35, u_snowHeight * 0.95, f_Pos.y) * 0.35;
-    float channelRock = smoothstep(0.18, 0.7, riverChannel) * smoothstep(0.08, 0.45, slope) * 0.35;
-    rock = clamp(max(cliffRock, exposedHighRock) + channelRock, 0.0, 1.0);
 
     vec2 gUv = uv * max(u_materialTiling[0], 0.001);
     vec3 gA = texture(u_TexturesAlbedo, vec3(gUv, 0)).rgb;
@@ -270,32 +307,19 @@ void main()
     float snR = clamp(texture(u_TexturesData, vec3(snUv, 3)).r * u_materialRoughnessScale[3], 0.02, 1.0);
     float snAO = texture(u_TexturesData, vec3(snUv, 11)).r;
 
-    albedo = mix(gA, rA, rock);
-    normalTex = normalize(mix(gN, rN, rock));
-    roughness = mix(gR, rR, rock);
-    ao = mix(gAO, rAO, rock);
-
-    float depositAmount = smoothstep(0.02, 0.16, depositMask);
-    float flatGround = 1.0 - smoothstep(0.10, 0.30, slope);
-    float channelArea = max(smoothstep(0.15, 0.55, flowAccumulation), smoothstep(0.20, 0.60, riverChannel));
-    float alluvium = depositAmount * clamp(max(flatGround, channelArea), 0.0, 1.0) * (1.0 - smoothstep(0.45, 0.85, rock));
-    albedo = mix(albedo, sA, alluvium * 0.88);
-    normalTex = normalize(mix(normalTex, sN, alluvium * 0.75));
-    roughness = mix(roughness, sR, alluvium * 0.85);
-    ao = mix(ao, sAO, alluvium * 0.65);
+    albedo = gA * materialWeights.x + rA * materialWeights.y + sA * materialWeights.z + snA * materialWeights.w;
+    normalTex = SafeNormalize(gN * materialWeights.x + rN * materialWeights.y + sN * materialWeights.z + snN * materialWeights.w,
+        vec3(0.0, 0.0, 1.0));
+    roughness = dot(vec4(gR, rR, sR, snR), materialWeights);
+    ao = dot(vec4(gAO, rAO, sAO, snAO), materialWeights);
 
     float standingWater = smoothstep(0.008, 0.09, waterDepth);
     float flowWetness = max(smoothstep(0.08, 0.55, flowAccumulation), smoothstep(0.12, 0.65, riverChannel)) * 0.38;
-    wetness = clamp(max(standingWater, flowWetness) * u_wetnessStrength * (1.0 - rock * 0.35), 0.0, 1.0);
+    wetness = clamp(max(standingWater, flowWetness) * u_wetnessStrength * (1.0 - materialWeights.y * 0.35), 0.0, 1.0);
     albedo = mix(albedo, albedo * vec3(0.42, 0.48, 0.50), wetness);
     roughness = mix(roughness, 0.42, wetness * 0.75);
 
-    snowMask = clamp(smoothstep(u_snowHeight, u_snowHeight + max(u_snowSoftness, 1.0), f_Pos.y), 0.0, 1.0);
-    albedo = mix(albedo, snA, snowMask);
-    normalTex = normalize(mix(normalTex, snN, snowMask * 0.65));
-    roughness = mix(roughness, snR, snowMask);
-    metallic = mix(metallic, 0.0, snowMask);
-    ao = mix(ao, snAO, snowMask * 0.65);
+    snowMask = materialWeights.w;
 
     // ===== TBN + view dir
     mat3 TBN = ComputeTBN(normal, uv, f_Pos);
@@ -308,10 +332,10 @@ void main()
     float fade = clamp(1.0 - cameraDistance / 50.0, 0.0, 1.0);
 
     // ===== PARALLAX
-    float heightScale = mix(0.018, 0.045, rock);
+    float heightScale = dot(vec4(0.018, 0.045, 0.024, 0.012), materialWeights);
     if (!u_renderWaterOverlay && fade > 0.01 && cameraDistance > 0.08)
     {
-        vec2 parallaxUV = ParallaxMapping(uv, viewDirTS, heightScale, rock);
+        vec2 parallaxUV = ParallaxMapping(uv, viewDirTS, heightScale, materialWeights);
         uv = mix(uv, parallaxUV, fade);
     }
 
@@ -358,7 +382,9 @@ void main()
             vec3 refractedGrass = texture(u_TexturesAlbedo, vec3(uv + refractionOffset, 0)).rgb;
             vec3 refractedRock = texture(u_TexturesAlbedo, vec3(uv + refractionOffset, 1)).rgb;
             vec3 refractedSediment = texture(u_TexturesAlbedo, vec3(uv + refractionOffset, 2)).rgb;
-            refractedScene = mix(refractedGrass, refractedRock, rock);
+            vec3 refractedSnow = texture(u_TexturesAlbedo, vec3(uv + refractionOffset, 3)).rgb;
+            refractedScene = refractedGrass * materialWeights.x + refractedRock * materialWeights.y +
+                refractedSediment * materialWeights.z + refractedSnow * materialWeights.w;
         }
         float foam = smoothstep(0.22, 0.85, riverChannel + flowAccumulation) * smoothstep(0.02, 0.12, waterDepth) * (1.0 - deepWater);
         vec3 transparentWater = mix(refractedScene, waterColor, 0.26 + deepWater * 0.34 + riverTrace * 0.12);

@@ -31,7 +31,7 @@ namespace pwg
 		/**
 		* @brief Destructor. Deletes the OpenGL texture array.
 		*/
-		~TextureArray() = default;
+		~TextureArray();
 
 		/**
 		* @brief Sets the pixel data for a specific layer in the texture array.
@@ -49,7 +49,10 @@ namespace pwg
 		* @brief Loads multiple textures from files into the texture array.
 		* @param texturePaths Vector of file paths to the textures to load.
 		*/
-		void LoadTexturesIntoArray(std::vector<std::string> texturePaths);
+		bool LoadTexturesIntoArray(
+			const std::vector<std::string>& texturePaths,
+			const std::vector<unsigned char>& fallbackValues = {},
+			std::string* error = nullptr);
 
 		/**
 		* @brief Binds the texture array to a specified texture slot.

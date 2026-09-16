@@ -40,8 +40,14 @@ namespace pwg
 		* @param name Unique identifier for the texture array.
 		* @param texturePaths Vector of file paths for the individual layers.
 		*/
-		void LoadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureType type);
-		void ReloadTextureArray(const std::string& name, std::vector<std::string> texturePaths, TextureType type);
+		bool LoadTextureArray(const std::string& name, const std::vector<std::string>& texturePaths, TextureType type);
+		bool ReloadTextureArray(const std::string& name, const std::vector<std::string>& texturePaths, TextureType type);
+		std::shared_ptr<TextureArray> CreateTextureArray(
+			const std::vector<std::string>& texturePaths,
+			TextureType type,
+			const std::vector<unsigned char>& fallbackValues = {},
+			std::string* error = nullptr);
+		void SetTextureArray(const std::string& name, std::shared_ptr<TextureArray> textureArray);
 
 		void LoadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths, TextureType type);
 		void ReloadCubeMapTexture(const std::string& name, std::vector<std::string> cubemapPaths, TextureType type);

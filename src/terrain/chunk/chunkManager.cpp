@@ -801,8 +801,19 @@ namespace pwg
 
 		m_heightCache = heightMask->second->texture->ReadFloatData();
 		m_heightCacheValid = m_heightCache.size() >= static_cast<size_t>(m_worldSize) * static_cast<size_t>(m_worldSize);
+		if (m_heightCacheValid && !m_heightCache.empty())
+		{
+			auto [minimum, maximum] = std::minmax_element(m_heightCache.begin(), m_heightCache.end());
+			m_terrainHeightMin = *minimum;
+			m_terrainHeightMax = std::max(*maximum, m_terrainHeightMin + 0.001f);
+			m_terrainMaterial->SetUniformFloat("u_terrainHeightMin", m_terrainHeightMin);
+			m_terrainMaterial->SetUniformFloat("u_terrainHeightMax", m_terrainHeightMax);
+		}
 		m_heightCacheAccumulator = 0.0f;
 	}
+
+	float ChunkManager::GetTerrainHeightMin() const { return m_terrainHeightMin; }
+	float ChunkManager::GetTerrainHeightMax() const { return m_terrainHeightMax; }
 
 	bool ChunkManager::MaybeUpdateHeightCache(float dt)
 	{

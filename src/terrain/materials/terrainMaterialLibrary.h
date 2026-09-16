@@ -34,6 +34,22 @@ namespace pwg
 		float normalStrength{ 1.0f };
 		float roughnessScale{ 1.0f };
 		float heightStrength{ 1.0f };
+		float amount{ 1.0f };
+		float minHeight{ 0.0f };
+		float maxHeight{ 1.0f };
+		float minSlope{ 0.0f };
+		float maxSlope{ 90.0f };
+		float blendSoftness{ 0.08f };
+	};
+
+	struct PbrMaterialCatalogEntry
+	{
+		TerrainMaterialDefinition material;
+		std::string preview;
+		bool valid{ false };
+		std::string validationMessage;
+		int width{ 0 };
+		int height{ 0 };
 	};
 
 	struct TerrainMaterialValidation
@@ -52,8 +68,13 @@ namespace pwg
 		void ResetToDefaults();
 		bool ReloadTerrainMaterials();
 		bool LoadPbrFolder(TerrainMaterialRole role, const std::string& folder);
+		void RefreshCatalog();
+		const std::vector<PbrMaterialCatalogEntry>& GetCatalog() const;
+		bool SelectCatalogMaterial(TerrainMaterialRole role, const PbrMaterialCatalogEntry& entry);
 		bool ShowGui();
 		void ApplyMaterialSettings();
+		void MarkLegacySnowPlacement();
+		void MigrateLegacySnowPlacement(float snowHeight, float snowSoftness, float terrainMin, float terrainMax);
 
 		std::array<TerrainMaterialDefinition, TERRAIN_MATERIAL_SLOT_COUNT>& GetMaterials();
 		const std::array<TerrainMaterialDefinition, TERRAIN_MATERIAL_SLOT_COUNT>& GetMaterials() const;
@@ -76,18 +97,27 @@ namespace pwg
 		static std::string FindTextureByToken(const std::string& folder, const std::vector<std::string>& tokens);
 		static bool ReadImageSize(const std::string& path, int& width, int& height);
 		static std::string PickFolderDialog();
+		static PbrMaterialCatalogEntry DiscoverCatalogEntry(const std::string& folder);
 
 		void RefreshPreviews();
 		void RefreshPreview(TerrainMaterialRole role);
 		void DrawMaterialSlot(TerrainMaterialRole role, bool& changed);
+		void DrawCatalogBrowser(bool& changed);
 		std::vector<std::string> BuildAlbedoPaths() const;
 		std::vector<std::string> BuildNormalPaths() const;
 		std::vector<std::string> BuildDataPaths() const;
+		std::vector<unsigned char> BuildDataFallbackValues() const;
 
 		std::shared_ptr<ResourceManager> m_resourceManager;
 		std::shared_ptr<Material> m_terrainMaterial;
 		std::array<TerrainMaterialDefinition, TERRAIN_MATERIAL_SLOT_COUNT> m_materials;
 		std::array<MaterialPreview, TERRAIN_MATERIAL_SLOT_COUNT> m_previews;
+		std::vector<PbrMaterialCatalogEntry> m_catalog;
+		std::vector<std::shared_ptr<Texture>> m_catalogPreviews;
+		TerrainMaterialRole m_catalogTargetRole{ TerrainMaterialRole::Grass };
+		char m_catalogSearch[128]{};
+		bool m_openCatalog{ false };
+		bool m_needsLegacySnowMigration{ false };
 		std::string m_status{ "Ready" };
 	};
 }

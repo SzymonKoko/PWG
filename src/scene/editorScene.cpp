@@ -720,7 +720,12 @@ void pwg::EditorScene::NewProject()
 	controls::TerrainGraphEditor::ResetHistory();
     m_terrainGraphViewState = controls::TerrainGraphViewState{};
 
-    m_environment->ResetToDefaults();
+	m_environment->ResetToDefaults();
+	if (m_terrainMaterialLibrary)
+	{
+		m_terrainMaterialLibrary->ResetToDefaults();
+		m_terrainMaterialLibrary->RefreshCatalog();
+	}
     if (m_vegetationSystem)
     {
         m_vegetationSystem->Clear();

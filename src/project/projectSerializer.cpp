@@ -99,6 +99,12 @@ namespace pwg
 				materialNode["normalStrength"] = material.normalStrength;
 				materialNode["roughnessScale"] = material.roughnessScale;
 				materialNode["heightStrength"] = material.heightStrength;
+				materialNode["amount"] = material.amount;
+				materialNode["minHeight"] = material.minHeight;
+				materialNode["maxHeight"] = material.maxHeight;
+				materialNode["minSlope"] = material.minSlope;
+				materialNode["maxSlope"] = material.maxSlope;
+				materialNode["blendSoftness"] = material.blendSoftness;
 				node.push_back(materialNode);
 			}
 			return node;
@@ -468,6 +474,7 @@ namespace pwg
 			}
 
 			auto materials = library.GetMaterials();
+			bool hasPlacementSettings = false;
 			for (const auto& materialNode : node)
 			{
 				TerrainMaterialRole role = ReadRole(materialNode["role"] ? materialNode["role"].as<std::string>() : "Grass");
@@ -485,8 +492,16 @@ namespace pwg
 				ReadValue(materialNode, "normalStrength", material.normalStrength);
 				ReadValue(materialNode, "roughnessScale", material.roughnessScale);
 				ReadValue(materialNode, "heightStrength", material.heightStrength);
+				hasPlacementSettings = hasPlacementSettings || static_cast<bool>(materialNode["minHeight"]);
+				ReadValue(materialNode, "amount", material.amount);
+				ReadValue(materialNode, "minHeight", material.minHeight);
+				ReadValue(materialNode, "maxHeight", material.maxHeight);
+				ReadValue(materialNode, "minSlope", material.minSlope);
+				ReadValue(materialNode, "maxSlope", material.maxSlope);
+				ReadValue(materialNode, "blendSoftness", material.blendSoftness);
 			}
 			library.SetMaterials(materials);
+			if (!hasPlacementSettings) library.MarkLegacySnowPlacement();
 			library.ReloadTerrainMaterials();
 		}
 
@@ -1247,6 +1262,14 @@ namespace pwg
 		if (ReadSimulationSidecar(SimulationSidecarPath(path), snapshot))
 		{
 			chunkManager->RestoreSimulationState(snapshot);
+		}
+		if (scene.GetTerrainMaterialLibrary())
+		{
+			scene.GetTerrainMaterialLibrary()->MigrateLegacySnowPlacement(
+				environmentSettings.snowHeight,
+				environmentSettings.snowSoftness,
+				chunkManager->GetTerrainHeightMin(),
+				chunkManager->GetTerrainHeightMax());
 		}
 		return true;
 	}

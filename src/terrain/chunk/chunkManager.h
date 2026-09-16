@@ -103,6 +103,8 @@ namespace pwg
 		void SetThermalErosionSpeed(float speed);
 		std::string GetThermalErosionStatus() const;
 		float SampleHeightAtWorld(float worldX, float worldZ);
+		float GetTerrainHeightMin() const;
+		float GetTerrainHeightMax() const;
 		void UpdateHeightCache();
 		bool MaybeUpdateHeightCache(float dt);
 
@@ -129,6 +131,8 @@ namespace pwg
 
 		std::vector<float> m_heightCache;
 		bool m_heightCacheValid{ false };
+		float m_terrainHeightMin{ 0.0f };
+		float m_terrainHeightMax{ 1.0f };
 		std::uint64_t m_generationRevision{ 0 };
 		std::shared_ptr<TerrainDebug> m_terrainDebug;
 		std::shared_ptr<Texture> m_sceneColorCopy;

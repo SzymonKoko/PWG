@@ -31,6 +31,14 @@ pwg::TextureArray::TextureArray(int width, int height, int numberOfLayers, Textu
 	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }
 
+pwg::TextureArray::~TextureArray()
+{
+	if (m_textureArrayID != 0)
+	{
+		glDeleteTextures(1, &m_textureArrayID);
+	}
+}
+
 void pwg::TextureArray::SetLayerData(int layer, unsigned char* data)
 {
 	glBindTexture(GL_TEXTURE_2D_ARRAY, m_textureArrayID);
@@ -51,12 +59,45 @@ void pwg::TextureArray::SubmitTextureArray()
 	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }
 
-void pwg::TextureArray::LoadTexturesIntoArray(std::vector<std::string> texturePaths)
+bool pwg::TextureArray::LoadTexturesIntoArray(
+	const std::vector<std::string>& texturePaths,
+	const std::vector<unsigned char>& fallbackValues,
+	std::string* error)
 {
+	if (static_cast<int>(texturePaths.size()) != m_numberOfLayers)
+	{
+		if (error) *error = "Texture layer count mismatch";
+		return false;
+	}
+	if (!fallbackValues.empty() && fallbackValues.size() != texturePaths.size())
+	{
+		if (error) *error = "Texture fallback count mismatch";
+		return false;
+	}
+
 	stbi_set_flip_vertically_on_load(true);
 
 	for (int i = 0; i < m_numberOfLayers; i++)
 	{
+		if (texturePaths[i].empty())
+		{
+			const unsigned char fallback = fallbackValues.empty() ? 255u : fallbackValues[i];
+			const int channels = (m_textureType == TextureType::ALBEDO || m_textureType == TextureType::NORMAL) ? 4 : 1;
+			std::vector<unsigned char> pixels(static_cast<size_t>(m_width) * m_height * channels, fallback);
+			if (m_textureType == TextureType::NORMAL && channels == 4)
+			{
+				for (size_t pixel = 0; pixel < pixels.size(); pixel += 4)
+				{
+					pixels[pixel] = 128;
+					pixels[pixel + 1] = 128;
+					pixels[pixel + 2] = 255;
+					pixels[pixel + 3] = 255;
+				}
+			}
+			SetLayerData(i, pixels.data());
+			continue;
+		}
+
 		int width = 0;
 		int height = 0;
 		int nrChannels = 0;
@@ -75,7 +116,16 @@ void pwg::TextureArray::LoadTexturesIntoArray(std::vector<std::string> texturePa
 		if (!data)
 		{
 			PWG_ERROR("Failed to load texture: {}", texturePaths[i]);
-			continue;
+			if (error) *error = "Failed to load texture: " + texturePaths[i];
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+			return false;
+		}
+		if (width != m_width || height != m_height)
+		{
+			stbi_image_free(data);
+			if (error) *error = "Texture size mismatch: " + texturePaths[i];
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+			return false;
 		}
 
 		SetLayerData(i, data);
@@ -84,6 +134,8 @@ void pwg::TextureArray::LoadTexturesIntoArray(std::vector<std::string> texturePa
 	}
 
 	SubmitTextureArray();
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	return true;
 }
 
 void pwg::TextureArray::Bind(int slot)

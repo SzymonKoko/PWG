@@ -68,8 +68,6 @@ namespace pwg::controls
 			ImGui::Separator();
 			ImGui::Text("Terrain material");
 			changed |= ImGui::SliderFloat("Normal strength", &settings.normalStrength, 0.0f, 1.5f, "%.2f");
-			changed |= ImGui::SliderFloat("Snow height", &settings.snowHeight, 0.0f, 5000.0f, "%.0f");
-			changed |= ImGui::SliderFloat("Snow softness", &settings.snowSoftness, 50.0f, 2500.0f, "%.0f");
 			changed |= ImGui::SliderFloat("Wetness strength", &settings.wetnessStrength, 0.0f, 1.5f, "%.2f");
 
 			ImGui::Separator();
