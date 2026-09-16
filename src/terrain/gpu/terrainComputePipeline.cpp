@@ -875,10 +875,8 @@ namespace pwg
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
 		PauseThermalErosion();
-		if (m_thermalErosionInitialized)
-		{
-			masks.at("FinalHeight")->texture->CopyFrom(*masks.at("ThermalBaseHeight")->texture);
-		}
+		if (!m_thermalErosionInitialized) return false;
+		masks.at("FinalHeight")->texture->CopyFrom(*masks.at("ThermalBaseHeight")->texture);
 		for (const char* name : { "ThermalBaseHeight", "ThermalDebris", "ThermalDebrisMask",
 			"ThermalErosionMask", "ThermalDepositionMask" })
 		{
@@ -928,6 +926,7 @@ namespace pwg
 	{
 		return m_thermalErosionInitialized && m_gpuThermalErosion && m_gpuThermalErosion->IsStable();
 	}
+	bool TerrainComputePipeline::HasThermalErosionState() const { return m_thermalErosionInitialized; }
 	float TerrainComputePipeline::GetThermalErosionSpeed() const
 	{
 		return m_terrainPassContext.thermalSettings.simulationSpeed;

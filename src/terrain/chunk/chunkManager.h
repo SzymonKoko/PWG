@@ -40,6 +40,7 @@ namespace pwg
 		std::vector<float> thermalDebrisMask;
 		std::vector<float> thermalErosion;
 		std::vector<float> thermalDeposition;
+		bool thermalInitialized{ false };
 
 		bool HasData() const { return worldSize > 0 && !finalHeight.empty(); }
 	};

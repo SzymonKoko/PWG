@@ -964,7 +964,7 @@ namespace pwg
 			}
 
 			const char magic[4] = { 'P', 'W', 'G', 'S' };
-			uint32_t version = 6;
+			uint32_t version = 7;
 			int32_t worldSize = snapshot.worldSize;
 			out.write(magic, 4);
 			out.write(reinterpret_cast<const char*>(&version), sizeof(version));
@@ -997,6 +997,8 @@ namespace pwg
 			writeLayer(snapshot.thermalDebrisMask);
 			writeLayer(snapshot.thermalErosion);
 			writeLayer(snapshot.thermalDeposition);
+			const uint8_t thermalInitialized = snapshot.thermalInitialized ? 1u : 0u;
+			out.write(reinterpret_cast<const char*>(&thermalInitialized), sizeof(thermalInitialized));
 			return true;
 		}
 
@@ -1087,6 +1089,25 @@ namespace pwg
 				readLayer(snapshot.thermalDebrisMask);
 				readLayer(snapshot.thermalErosion);
 				readLayer(snapshot.thermalDeposition);
+				if (version >= 7)
+				{
+					uint8_t thermalInitialized = 0;
+					in.read(reinterpret_cast<char*>(&thermalInitialized), sizeof(thermalInitialized));
+					snapshot.thermalInitialized = in.good() && thermalInitialized != 0;
+				}
+				else
+				{
+					auto hasData = [](const std::vector<float>& values)
+					{
+						return std::any_of(values.begin(), values.end(), [](float value)
+						{
+							return std::isfinite(value) && std::abs(value) > 0.000001f;
+						});
+					};
+					snapshot.thermalInitialized = hasData(snapshot.thermalBaseHeight) ||
+						hasData(snapshot.thermalDebris) || hasData(snapshot.thermalErosion) ||
+						hasData(snapshot.thermalDeposition);
+				}
 			}
 			else
 			{
@@ -1095,6 +1116,7 @@ namespace pwg
 				snapshot.thermalDebrisMask.clear();
 				snapshot.thermalErosion.clear();
 				snapshot.thermalDeposition.clear();
+				snapshot.thermalInitialized = false;
 			}
 			return snapshot.HasData();
 		}

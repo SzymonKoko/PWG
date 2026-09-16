@@ -87,6 +87,7 @@ namespace pwg
 		bool IsThermalErosionActive() const;
 		bool IsThermalErosionReady() const;
 		bool IsThermalErosionStable() const;
+		bool HasThermalErosionState() const;
 		float GetThermalErosionSpeed() const;
 		void SetThermalErosionSpeed(float speed);
 		std::string GetThermalErosionStatus() const;

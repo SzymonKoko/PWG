@@ -434,11 +434,15 @@ namespace pwg
 		snapshot.waterVelocity = read("WaterVelocityMap");
 		snapshot.riverCarveDelta = read("RiverCarveDelta");
 		snapshot.hydrologyBaseHeight = read("HydrologyBaseHeight");
-		snapshot.thermalBaseHeight = read("ThermalBaseHeight");
-		snapshot.thermalDebris = read("ThermalDebris");
-		snapshot.thermalDebrisMask = read("ThermalDebrisMask");
-		snapshot.thermalErosion = read("ThermalErosionMask");
-		snapshot.thermalDeposition = read("ThermalDepositionMask");
+		snapshot.thermalInitialized = m_terrainComputePipeline->HasThermalErosionState();
+		if (snapshot.thermalInitialized)
+		{
+			snapshot.thermalBaseHeight = read("ThermalBaseHeight");
+			snapshot.thermalDebris = read("ThermalDebris");
+			snapshot.thermalDebrisMask = read("ThermalDebrisMask");
+			snapshot.thermalErosion = read("ThermalErosionMask");
+			snapshot.thermalDeposition = read("ThermalDepositionMask");
+		}
 		return snapshot;
 	}
 
@@ -479,13 +483,17 @@ namespace pwg
 			m_globalMasks["WaterVelocityMap"]->texture->UpdateFloatData(snapshot.waterVelocity, m_worldSize, m_worldSize);
 		write("RiverCarveDelta", snapshot.riverCarveDelta);
 		write("HydrologyBaseHeight", snapshot.hydrologyBaseHeight);
-		write("ThermalBaseHeight", snapshot.thermalBaseHeight);
-		write("ThermalDebris", snapshot.thermalDebris);
-		write("ThermalDebrisMask", snapshot.thermalDebrisMask);
-		write("ThermalErosionMask", snapshot.thermalErosion);
-		write("ThermalDepositionMask", snapshot.thermalDeposition);
+		if (snapshot.thermalInitialized)
+		{
+			write("ThermalBaseHeight", snapshot.thermalBaseHeight);
+			write("ThermalDebris", snapshot.thermalDebris);
+			write("ThermalDebrisMask", snapshot.thermalDebrisMask);
+			write("ThermalErosionMask", snapshot.thermalErosion);
+			write("ThermalDepositionMask", snapshot.thermalDeposition);
+		}
 		m_terrainComputePipeline->MarkHydrologyRestored(m_globalMasks, snapshot.hydrologyBaseHeight.size() >= expected);
-		m_terrainComputePipeline->MarkThermalErosionRestored(m_globalMasks, snapshot.thermalBaseHeight.size() >= expected);
+		m_terrainComputePipeline->MarkThermalErosionRestored(
+			m_globalMasks, snapshot.thermalInitialized && snapshot.thermalBaseHeight.size() >= expected);
 
 		m_globalMasks["ErodedHeight"] = m_globalMasks["FinalHeight"];
 
@@ -503,7 +511,8 @@ namespace pwg
 
 	void ChunkManager::StartParticleErosion()
 	{
-		m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
+		if (m_terrainComputePipeline->HasThermalErosionState())
+			m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
 		if (m_terrainComputePipeline->ResetHydrology(m_globalMasks)) UpdateHeightCache();
 		m_terrainComputePipeline->StartParticleErosion();
 	}
@@ -537,7 +546,8 @@ namespace pwg
 
 	bool ChunkManager::StepParticleErosion()
 	{
-		m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
+		if (m_terrainComputePipeline->HasThermalErosionState())
+			m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
 		if (!m_terrainComputePipeline->StepParticleErosion(m_globalMasks)) return false;
 		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
 		UpdateHeightCache();
@@ -547,7 +557,8 @@ namespace pwg
 
 	bool ChunkManager::ResetParticleErosion()
 	{
-		m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
+		if (m_terrainComputePipeline->HasThermalErosionState())
+			m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
 		const bool reset = m_terrainComputePipeline->ResetParticleErosionState(m_globalMasks);
 		UpdateHeightCache();
 		++m_generationRevision;
