@@ -1,0 +1,26 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8) in;
+layout (r32f, binding = 0) writeonly uniform image2D u_surfaceOut;
+layout (r32f, binding = 1) writeonly uniform image2D u_coverageOut;
+
+uniform sampler2D u_height;
+uniform sampler2D u_water;
+uniform sampler2D u_flow;
+uniform sampler2D u_channels;
+uniform int u_size;
+uniform float u_minimumDepth;
+
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(id, ivec2(u_size)))) return;
+    float height = texelFetch(u_height, id, 0).r;
+    float water = max(texelFetch(u_water, id, 0).r, 0.0);
+    float movingWater = max(texelFetch(u_flow, id, 0).r, texelFetch(u_channels, id, 0).r);
+    float depthCoverage = smoothstep(u_minimumDepth, u_minimumDepth + max(0.01, u_minimumDepth * 0.75), water);
+    float thinWater = smoothstep(max(0.0005, u_minimumDepth * 0.05), max(0.002, u_minimumDepth * 0.40), water);
+    float coverage = max(depthCoverage, thinWater * smoothstep(0.10, 0.32, movingWater));
+    imageStore(u_surfaceOut, id, vec4(height + water));
+    imageStore(u_coverageOut, id, vec4(clamp(coverage, 0.0, 1.0)));
+}

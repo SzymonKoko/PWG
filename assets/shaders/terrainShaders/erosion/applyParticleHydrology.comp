@@ -1,0 +1,41 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8) in;
+
+layout (r32f, binding = 0) uniform image2D u_height;
+layout (r32f, binding = 1) uniform image2D u_water;
+layout (r32f, binding = 2) uniform image2D u_flow;
+layout (r32f, binding = 3) uniform image2D u_channels;
+layout (r32f, binding = 4) uniform image2D u_deposition;
+layout (r32f, binding = 5) uniform image2D u_erosion;
+layout (r32f, binding = 6) uniform image2D u_erosionDelta;
+uniform isampler2D u_heightDelta;
+uniform isampler2D u_flowDelta;
+uniform isampler2D u_waterDelta;
+
+uniform int u_size;
+uniform float u_amount;
+
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(id, ivec2(u_size)))) return;
+
+    float change = float(texelFetch(u_heightDelta, id, 0).r) / 100000.0;
+    float waterAdded = float(texelFetch(u_waterDelta, id, 0).r) / 100000.0;
+    float flowAdded = float(texelFetch(u_flowDelta, id, 0).r) / 4096.0;
+    float maxChange = mix(0.004, 0.05, u_amount);
+    change = clamp(change, -maxChange, maxChange);
+
+    float height = imageLoad(u_height, id).r;
+    if (isnan(height) || isinf(height)) height = 0.0;
+    imageStore(u_height, id, vec4(height + change));
+    imageStore(u_water, id, vec4(clamp(imageLoad(u_water, id).r + waterAdded, 0.0, 20.0)));
+    float flow = clamp(imageLoad(u_flow, id).r * 0.997 + flowAdded * 0.00012, 0.0, 1.0);
+    imageStore(u_flow, id, vec4(flow));
+    imageStore(u_channels, id, vec4(max(imageLoad(u_channels, id).r * 0.999, smoothstep(0.08, 0.55, flow))));
+    imageStore(u_deposition, id, vec4(clamp(imageLoad(u_deposition, id).r * 0.999 + max(change, 0.0), 0.0, 1.0)));
+    imageStore(u_erosion, id, vec4(clamp(imageLoad(u_erosion, id).r * 0.999 + max(-change, 0.0), 0.0, 1.0)));
+    imageStore(u_erosionDelta, id, vec4(imageLoad(u_erosionDelta, id).r + change));
+
+}

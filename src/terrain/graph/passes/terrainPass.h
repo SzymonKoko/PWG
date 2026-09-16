@@ -19,8 +19,7 @@ namespace pwg
 		COMPOSITION,
 		ANALYSIS,
 		SIMULATION,
-		HYDROLOGY,
-		EROSION
+		HYDROLOGY
 	};
 	
 	enum class ParameterType

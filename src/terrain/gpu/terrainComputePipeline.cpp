@@ -1,6 +1,10 @@
 #include "terrainComputePipeline.h"
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstring>
 #include <glad/glad.h>
+#include <limits>
 #include <unordered_map>
 
 namespace pwg
@@ -87,9 +91,12 @@ namespace pwg
 		m_shaderManager->LoadCompute("finalHeightShader", terrainShadersPath + "masks/finalHeight.comp");
 		m_shaderManager->LoadCompute("normalMaskShader", terrainShadersPath + "masks/normalMask.comp");
 		m_shaderManager->LoadCompute("slopeMaskShader", terrainShadersPath + "masks/slopeMask.comp");
-		m_shaderManager->LoadCompute("hydraulicFluxShader", terrainShadersPath + "masks/hydraulicFlux.comp");
-		m_shaderManager->LoadCompute("hydraulicWaterShader", terrainShadersPath + "masks/hydraulicWater.comp");
-		m_shaderManager->LoadCompute("erosionMaskShader", terrainShadersPath + "masks/erosionMask.comp");
+		m_shaderManager->LoadCompute("buildWaterRenderCacheShader", terrainShadersPath + "water/buildWaterRenderCache.comp");
+		m_shaderManager->LoadCompute("downsampleWaterRenderCacheShader", terrainShadersPath + "water/downsampleWaterRenderCache.comp");
+		m_shaderManager->LoadCompute("particleHydrologyShader", terrainShadersPath + "erosion/particleHydrology.comp");
+		m_shaderManager->LoadCompute("applyParticleHydrologyShader", terrainShadersPath + "erosion/applyParticleHydrology.comp");
+		m_shaderManager->LoadCompute("talusRelaxShader", terrainShadersPath + "erosion/talusRelax.comp");
+		m_shaderManager->Load("particleHydrologyDebugShader", terrainShadersPath + "erosion/particleDebug.vert", terrainShadersPath + "erosion/particleDebug.frag");
 		m_shaderManager->LoadCompute("universalConstantShader", terrainShadersPath + "masks/universalConstant.comp");
 		m_shaderManager->LoadCompute("universalNoiseHeightShader", terrainShadersPath + "masks/universalNoiseHeight.comp");
 		m_shaderManager->LoadCompute("universalBinaryOpShader", terrainShadersPath + "masks/universalBinaryOp.comp");
@@ -105,9 +112,9 @@ namespace pwg
 		auto finalHeightShader = m_shaderManager->GetShader<pwg::ComputeShader>("finalHeightShader");
 		auto normalMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("normalMaskShader");
 		auto slopeMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("slopeMaskShader");
-		auto hydraulicFluxShader = m_shaderManager->GetShader<pwg::ComputeShader>("hydraulicFluxShader");
-		auto hydraulicWaterShader = m_shaderManager->GetShader<pwg::ComputeShader>("hydraulicWaterShader");
-		auto erosionMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("erosionMaskShader");
+		auto particleHydrologyShader = m_shaderManager->GetShader<pwg::ComputeShader>("particleHydrologyShader");
+		auto applyParticleHydrologyShader = m_shaderManager->GetShader<pwg::ComputeShader>("applyParticleHydrologyShader");
+		auto talusRelaxShader = m_shaderManager->GetShader<pwg::ComputeShader>("talusRelaxShader");
 		auto universalConstantShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalConstantShader");
 		auto universalNoiseHeightShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalNoiseHeightShader");
 		auto universalBinaryOpShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalBinaryOpShader");
@@ -123,9 +130,9 @@ namespace pwg
 		AddComputeShader("FinalHeight", finalHeightShader);
 		AddComputeShader("NormalMask", normalMaskShader);
 		AddComputeShader("SlopeMask", slopeMaskShader);
-		AddComputeShader("HydraulicFlux", hydraulicFluxShader);
-		AddComputeShader("HydraulicWater", hydraulicWaterShader);
-		AddComputeShader("ErosionMask", erosionMaskShader);
+		AddComputeShader("ParticleHydrology", particleHydrologyShader);
+		AddComputeShader("ApplyParticleHydrology", applyParticleHydrologyShader);
+		AddComputeShader("TalusRelax", talusRelaxShader);
 		AddComputeShader("UniversalConstant", universalConstantShader);
 		AddComputeShader("UniversalNoiseHeight", universalNoiseHeightShader);
 		AddComputeShader("UniversalBinaryOp", universalBinaryOpShader);
@@ -135,10 +142,23 @@ namespace pwg
 		AddComputeShader("UniversalGraphPreview", universalGraphPreviewShader);
 
 		m_universalGraphAsset = BuildDefaultUniversalTerrainGraph();
+		m_gpuParticleErosion = std::make_unique<GpuParticleErosion>(
+			m_size,
+			particleHydrologyShader,
+			applyParticleHydrologyShader,
+			talusRelaxShader,
+			m_shaderManager->GetShader<pwg::Shader>("particleHydrologyDebugShader"));
+		m_waterClipmapRenderer = std::make_unique<WaterClipmapRenderer>(
+			m_size,
+			m_shaderManager->GetShader<pwg::ComputeShader>("buildWaterRenderCacheShader"),
+			m_shaderManager->GetShader<pwg::ComputeShader>("downsampleWaterRenderCacheShader"));
+		m_drainageNetworkGenerator = std::make_unique<DrainageNetworkGenerator>();
 	}
 
 	TerrainComputePipeline::~TerrainComputePipeline()
 	{
+		CancelHydrology();
+		PauseParticleErosion();
 	}
 
 	void TerrainComputePipeline::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
@@ -171,10 +191,14 @@ namespace pwg
 		m_terrainPassContext.cpuRiverChannels.clear();
 		m_terrainPassContext.cpuErosionDelta.clear();
 		m_terrainMasks = masks;
+		InvalidateWaterRenderCache();
 	}
 
 	bool TerrainComputePipeline::ExecuteUniversalGraph(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
+		PauseParticleErosion();
+		m_particleErosionReady = false;
+		ApplyUniversalGraphSimulationSettings();
 		auto validation = ValidateTerrainGraphAsset(m_universalGraphAsset);
 		if (!validation.valid)
 		{
@@ -186,7 +210,6 @@ namespace pwg
 		}
 
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> outputs;
-		std::vector<VegetationLayerDescriptor> vegetationLayers;
 		auto outputFor = [&](int nodeId, const std::string& portId) -> std::shared_ptr<TerrainMask>
 		{
 			auto it = outputs.find(OutputKey(nodeId, portId));
@@ -209,8 +232,28 @@ namespace pwg
 		for (int nodeId : validation.executionOrder)
 		{
 			const auto* node = m_universalGraphAsset.FindNode(nodeId);
-			if (!node || !node->enabled)
+			if (!node)
 			{
+				continue;
+			}
+			if (!node->enabled)
+			{
+				if (node->typeId == "particleErosion")
+				{
+					auto source = inputFor(*node, "height");
+					if (!source) return false;
+					setOutput(*node, "height", source);
+					for (const char* port : { "flow", "deposition", "erosion" })
+					{
+						auto output = makeOutput(*node, port);
+						output->texture->ClearTexture();
+						setOutput(*node, port, output);
+					}
+					masks.at("DepositMask")->texture->ClearTexture();
+					masks.at("FlowAccumulationMask")->texture->ClearTexture();
+					masks.at("RiverChannelMask")->texture->ClearTexture();
+					masks.at("ErosionDelta")->texture->ClearTexture();
+				}
 				continue;
 			}
 
@@ -386,6 +429,31 @@ namespace pwg
 				shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 				setOutput(*node, "mask", output);
 			}
+			else if (node->typeId == "particleErosion")
+			{
+				auto source = inputFor(*node, "height");
+				if (!source) return false;
+				float amount = std::clamp(GetFloatParameter(*node, "amount", 0.35f), 0.0f, 1.0f);
+				int seed = GetIntParameter(*node, "seed", 1337);
+				setOutput(*node, "height", source);
+				setOutput(*node, "flow", masks.at("ErosionFlowMask"));
+				setOutput(*node, "deposition", masks.at("DepositMask"));
+				setOutput(*node, "erosion", masks.at("ErosionMask"));
+				masks[TempMaskName(node->id, "flow")] = masks.at("ErosionFlowMask");
+				masks[TempMaskName(node->id, "deposition")] = masks.at("DepositMask");
+				masks[TempMaskName(node->id, "erosion")] = masks.at("ErosionMask");
+				m_gpuParticleErosion->Reset(seed, amount);
+				m_particleErosionReady = amount > 0.0001f;
+				m_particleStepCount = 0;
+				m_particleStepAccumulator = 0.0f;
+			}
+			else if (node->typeId == "drainageNetwork")
+			{
+				setOutput(*node, "water", masks.at("WaterMask"));
+				setOutput(*node, "flow", masks.at("FlowAccumulationMask"));
+				setOutput(*node, "rivers", masks.at("RiverChannelMask"));
+				setOutput(*node, "lakes", masks.at("LakeMask"));
+			}
 			else if (node->typeId == "outputHeight")
 			{
 				auto source = inputFor(*node, "height");
@@ -406,34 +474,58 @@ namespace pwg
 				auto target = EnsureFloatMask(masks, targetName, m_size);
 				target->texture->CopyFrom(*source->texture);
 			}
-			else if (node->typeId == "treeAssetA" || node->typeId == "treeAssetB" || node->typeId == "grassAsset" || node->typeId == "vegetationAsset")
-			{
-				VegetationLayerDescriptor layer;
-				layer.nodeId = node->id;
-				layer.assetId = node->typeId == "treeAssetA"
-					? "builtin.tree_a"
-					: (node->typeId == "treeAssetB"
-						? "builtin.tree_b"
-						: (node->typeId == "grassAsset" ? "builtin.grass" : GetStringParameter(*node, "assetId", "builtin.tree_a")));
-				layer.seed = GetIntParameter(*node, "seed", 1337);
-				layer.density = std::clamp(GetFloatParameter(*node, "density", 0.5f), 0.0f, 1.0f);
-				layer.spacing = std::max(GetFloatParameter(*node, "spacing", 50.0f), 1.0f);
-				layer.minScale = GetFloatParameter(*node, "minScale", 0.8f);
-				layer.maxScale = GetFloatParameter(*node, "maxScale", 1.2f);
-				if (layer.minScale > layer.maxScale)
-				{
-					std::swap(layer.minScale, layer.maxScale);
-				}
-				layer.maxSlopeDegrees = std::clamp(GetFloatParameter(*node, "maxSlope", 30.0f), 0.0f, 89.0f);
-				layer.alignToSlope = GetBoolParameter(*node, "alignToSlope", false);
-				layer.maxTiltDegrees = std::clamp(GetFloatParameter(*node, "maxTilt", 30.0f), 0.0f, 89.0f);
-				layer.renderDistance = std::max(GetFloatParameter(*node, "renderDistance", 1000.0f), 1.0f);
-				layer.densityMask = inputFor(*node, "density");
-				vegetationLayers.push_back(std::move(layer));
-			}
+			// Asset nodes are compiled separately so spawning cannot reset erosion or water.
 		}
 
+		masks.at("WaterMask")->texture->ClearTexture();
+		masks.at("SedimentMask")->texture->ClearTexture();
+		masks.at("FlowAccumulationMask")->texture->ClearTexture();
+		masks.at("RiverChannelMask")->texture->ClearTexture();
+		masks.at("DepositMask")->texture->ClearTexture();
+		masks.at("ErosionMask")->texture->ClearTexture();
+		masks.at("ErosionDelta")->texture->ClearTexture();
+		masks.at("ErosionWaterMask")->texture->ClearTexture();
+		masks.at("ErosionFlowMask")->texture->ClearTexture();
+		masks.at("ErosionChannelMask")->texture->ClearTexture();
+		masks.at("LakeMask")->texture->ClearTexture();
+		masks.at("WaterVelocityMap")->texture->ClearTexture();
+		masks.at("RiverCarveDelta")->texture->ClearTexture();
+		m_hydrologyGenerated = false;
+		m_hydrologyStatus = "Hydrology ready to generate";
 		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "particleErosion") continue;
+			masks[TempMaskName(node.id, "height")] = masks.at("FinalHeight");
+			masks[TempMaskName(node.id, "flow")] = masks.at("ErosionFlowMask");
+			masks[TempMaskName(node.id, "deposition")] = masks.at("DepositMask");
+			masks[TempMaskName(node.id, "erosion")] = masks.at("ErosionMask");
+		}
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "drainageNetwork") continue;
+			masks[TempMaskName(node.id, "water")] = masks.at("WaterMask");
+			masks[TempMaskName(node.id, "flow")] = masks.at("FlowAccumulationMask");
+			masks[TempMaskName(node.id, "rivers")] = masks.at("RiverChannelMask");
+			masks[TempMaskName(node.id, "lakes")] = masks.at("LakeMask");
+
+			auto previewShader = m_computeShaders["UniversalGraphPreview"];
+			for (const auto& [port, source] : std::array<std::pair<const char*, const char*>, 4>{ {
+				{ "water", "WaterMask" }, { "flow", "FlowAccumulationMask" },
+				{ "rivers", "RiverChannelMask" }, { "lakes", "LakeMask" } } })
+			{
+				auto preview = EnsureFloatMask(masks, "preview_" + TempMaskName(node.id, port), 256);
+				previewShader->ActivateShader();
+				masks.at(source)->texture->Bind(0);
+				previewShader->SetUniformInt("u_value", 0);
+				previewShader->SetUniformInt("u_size", 256);
+				previewShader->SetUniformFloat("u_minValue", 0.0f);
+				previewShader->SetUniformFloat("u_maxValue", 1.0f);
+				previewShader->BindImage(0, preview->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				previewShader->DispatchForTexture(256, 256);
+				previewShader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+			}
+		}
 		auto previewShader = m_computeShaders["UniversalGraphPreview"];
 		constexpr int previewSize = 256;
 		for (const auto& node : m_universalGraphAsset.nodes)
@@ -465,94 +557,504 @@ namespace pwg
 			}
 		}
 		m_terrainMasks = masks;
-		m_vegetationLayers = std::move(vegetationLayers);
-		++m_vegetationRevision;
+		InvalidateWaterRenderCache();
 		return true;
 	}
 
-	void TerrainComputePipeline::StepSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	bool TerrainComputePipeline::RefreshProceduralAssets(const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
-		ApplyUniversalGraphSimulationSettings();
-		m_terrainPassContext.offset = glm::vec2(0, 0);
-		m_terrainPassContext.deferParticleTextureUpload = false;
-		for (int i = 0; i < m_terrainPassContext.hydraulicSettings.stepsPerUpdate; i++)
+		std::vector<VegetationLayerDescriptor> layers;
+		for (const auto& node : m_universalGraphAsset.nodes)
 		{
-			m_graph->ExecutePasses(TerrainPassTypes::HYDROLOGY, masks, m_terrainPassContext);
-			if (m_terrainPassContext.hydraulicSettings.erosionEnabled)
+			if (!node.enabled || (node.typeId != "treeAssetA" && node.typeId != "treeAssetB" &&
+				node.typeId != "grassAsset" && node.typeId != "vegetationAsset")) continue;
+
+			VegetationLayerDescriptor layer;
+			layer.nodeId = node.id;
+			layer.assetId = node.typeId == "treeAssetA" ? "builtin.tree_a"
+				: (node.typeId == "treeAssetB" ? "builtin.tree_b"
+					: (node.typeId == "grassAsset" ? "builtin.grass" : GetStringParameter(node, "assetId", "builtin.tree_a")));
+			layer.seed = GetIntParameter(node, "seed", 1337);
+			layer.density = std::clamp(GetFloatParameter(node, "density", 0.5f), 0.0f, 1.0f);
+			layer.spacing = std::max(GetFloatParameter(node, "spacing", 50.0f), 1.0f);
+			layer.minScale = GetFloatParameter(node, "minScale", 0.8f);
+			layer.maxScale = GetFloatParameter(node, "maxScale", 1.2f);
+			if (layer.minScale > layer.maxScale) std::swap(layer.minScale, layer.maxScale);
+			layer.maxSlopeDegrees = std::clamp(GetFloatParameter(node, "maxSlope", 30.0f), 0.0f, 89.0f);
+			layer.alignToSlope = GetBoolParameter(node, "alignToSlope", false);
+			layer.maxTiltDegrees = std::clamp(GetFloatParameter(node, "maxTilt", 30.0f), 0.0f, 89.0f);
+			layer.renderDistance = std::max(GetFloatParameter(node, "renderDistance", 1000.0f), 1.0f);
+
+			if (const auto* link = m_universalGraphAsset.FindInputLink(node.id, "density"))
 			{
-				m_graph->ExecutePasses(TerrainPassTypes::EROSION, masks, m_terrainPassContext);
+				auto found = masks.find(TempMaskName(link->fromNodeId, link->fromPortId));
+				if (found == masks.end() || !found->second || !found->second->texture)
+				{
+					m_proceduralAssetStatus = "Run Graph first to calculate connected masks";
+					return false;
+				}
+				layer.densityMask = found->second;
+			}
+			layers.push_back(std::move(layer));
+		}
+
+		m_vegetationLayers = std::move(layers);
+		++m_vegetationRevision;
+		m_proceduralAssetStatus = "Spawned " + std::to_string(m_vegetationLayers.size()) + " asset layers";
+		return true;
+	}
+
+	const std::string& TerrainComputePipeline::GetProceduralAssetStatus() const { return m_proceduralAssetStatus; }
+
+	bool TerrainComputePipeline::StepParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		if (!m_particleErosionReady || !m_gpuParticleErosion) return false;
+		m_gpuParticleErosion->Step(
+			masks.at("FinalHeight")->texture,
+			masks.at("ErosionWaterMask")->texture,
+			masks.at("ErosionFlowMask")->texture,
+			masks.at("ErosionChannelMask")->texture,
+			masks.at("DepositMask")->texture,
+			masks.at("ErosionMask")->texture,
+			masks.at("ErosionDelta")->texture);
+		++m_particleStepCount;
+		if ((m_particleStepCount & 3u) == 0u)
+		{
+			RefreshMaskPass(masks);
+			RefreshParticleErosionPreviews(masks);
+		}
+		m_terrainMasks = masks;
+		return true;
+	}
+
+	bool TerrainComputePipeline::ResetParticleErosionState(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		PauseParticleErosion();
+		masks.at("FinalHeight")->texture->CopyFrom(*masks.at("BaseHeight")->texture);
+		for (const char* name : { "ErosionWaterMask", "ErosionFlowMask", "ErosionChannelMask",
+			"DepositMask", "ErosionMask", "ErosionDelta" })
+		{
+			masks.at(name)->texture->ClearTexture();
+		}
+
+		float amount = 0.0f;
+		int seed = 1337;
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "particleErosion") continue;
+			amount = std::clamp(GetFloatParameter(node, "amount", 0.35f), 0.0f, 1.0f);
+			seed = GetIntParameter(node, "seed", 1337);
+			masks[TempMaskName(node.id, "height")] = masks.at("FinalHeight");
+			masks[TempMaskName(node.id, "flow")] = masks.at("ErosionFlowMask");
+			masks[TempMaskName(node.id, "deposition")] = masks.at("DepositMask");
+			masks[TempMaskName(node.id, "erosion")] = masks.at("ErosionMask");
+			break;
+		}
+		m_gpuParticleErosion->Reset(seed, amount);
+		m_particleErosionReady = amount > 0.0001f;
+		m_particleStepCount = 0;
+		RefreshMaskPass(masks);
+		RefreshParticleErosionPreviews(masks);
+		m_terrainMasks = masks;
+		InvalidateWaterRenderCache();
+		return true;
+	}
+
+	void TerrainComputePipeline::RefreshParticleErosionPreviews(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		auto shader = m_computeShaders.at("UniversalGraphPreview");
+		constexpr int previewSize = 256;
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "particleErosion") continue;
+			for (const char* port : { "height", "flow", "deposition", "erosion" })
+			{
+				auto source = masks.find(TempMaskName(node.id, port));
+				if (source == masks.end() || !source->second || !source->second->texture) continue;
+				auto range = EstimateTerrainGraphOutputRange(m_universalGraphAsset, node.id, port);
+				if (!range.valid || std::abs(range.maximum - range.minimum) < 0.0001f)
+				{
+					range = { 0.0f, 1.0f, true };
+				}
+				auto preview = EnsureFloatMask(masks, "preview_" + TempMaskName(node.id, port), previewSize);
+				shader->ActivateShader();
+				shader->SetUniformInt("u_value", 0);
+				shader->SetUniformInt("u_size", previewSize);
+				shader->SetUniformFloat("u_minValue", range.minimum);
+				shader->SetUniformFloat("u_maxValue", range.maximum);
+				shader->BindTextureSampler(0, source->second->texture->GetTextureID());
+				shader->BindImage(0, preview->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				shader->DispatchForTexture(previewSize, previewSize);
 			}
 		}
+		shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+	}
+
+	bool TerrainComputePipeline::UpdateParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, float deltaTime)
+	{
+		if (!m_particleErosionRunning || !m_particleErosionReady) return false;
+		m_particleStepAccumulator += std::clamp(deltaTime, 0.0f, 0.1f) * 60.0f * m_terrainPassContext.hydraulicSettings.particleSimulationSpeed;
+		int steps = std::min(static_cast<int>(m_particleStepAccumulator), 4);
+		if (steps <= 0) return false;
+		m_particleStepAccumulator -= static_cast<float>(steps);
+		for (int i = 0; i < steps; ++i) StepParticleErosion(masks);
+		return true;
+	}
+
+	void TerrainComputePipeline::StartParticleErosion()
+	{
+		if (m_particleErosionReady) m_particleErosionRunning = true;
+	}
+
+	void TerrainComputePipeline::PauseParticleErosion()
+	{
+		m_particleErosionRunning = false;
+		m_particleStepAccumulator = 0.0f;
+	}
+
+	void TerrainComputePipeline::CancelParticleErosion() { PauseParticleErosion(); }
+	bool TerrainComputePipeline::IsParticleErosionActive() const { return m_particleErosionRunning; }
+	bool TerrainComputePipeline::IsParticleErosionReady() const { return m_particleErosionReady; }
+	float TerrainComputePipeline::GetParticleErosionSpeed() const { return m_terrainPassContext.hydraulicSettings.particleSimulationSpeed; }
+	void TerrainComputePipeline::SetParticleErosionSpeed(float speed) { m_terrainPassContext.hydraulicSettings.particleSimulationSpeed = std::clamp(speed, 0.25f, 4.0f); }
+	bool TerrainComputePipeline::GetShowErosionParticles() const { return m_terrainPassContext.hydraulicSettings.showErosionParticles; }
+	void TerrainComputePipeline::SetShowErosionParticles(bool show) { m_terrainPassContext.hydraulicSettings.showErosionParticles = show; }
+	int TerrainComputePipeline::GetActiveParticleCount() const { return m_gpuParticleErosion ? m_gpuParticleErosion->GetParticleCount() : 0; }
+
+	void TerrainComputePipeline::DrawErosionParticles(const glm::mat4& view, const glm::mat4& projection)
+	{
+		if (!m_terrainPassContext.hydraulicSettings.showErosionParticles || !m_particleErosionReady || !m_gpuParticleErosion) return;
+		auto height = m_terrainMasks.find("FinalHeight");
+		if (height == m_terrainMasks.end()) return;
+		m_gpuParticleErosion->DrawDebug(&view[0][0], &projection[0][0], height->second->texture);
+	}
+
+	void TerrainComputePipeline::InvalidateWaterRenderCache()
+	{
+		if (m_waterClipmapRenderer) m_waterClipmapRenderer->Invalidate();
+	}
+
+	void TerrainComputePipeline::DrawWaterClipmap(const std::shared_ptr<Shader>& shader, const glm::vec3& cameraPosition,
+		const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		if (!m_waterClipmapRenderer || !shader) return;
+		auto findTexture = [&](const char* name) -> std::shared_ptr<Texture>
+		{
+			auto it = masks.find(name);
+			return it != masks.end() && it->second ? it->second->texture : nullptr;
+		};
+		m_waterClipmapRenderer->Refresh(
+			findTexture("FinalHeight"), findTexture("WaterMask"),
+			findTexture("FlowAccumulationMask"), findTexture("RiverChannelMask"),
+			m_terrainPassContext.hydraulicSettings.minVisibleWaterDepth);
+		m_waterClipmapRenderer->Draw(shader, cameraPosition);
+	}
+
+	bool TerrainComputePipeline::GenerateHydrology(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		if (!m_drainageNetworkGenerator || m_drainageNetworkGenerator->IsRunning() || IsParticleErosionActive()) return false;
+		if (m_hydrologyGenerated) ResetHydrology(masks);
+
+		DrainageNetworkSettings settings;
+		bool foundDrainageNode = false;
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "drainageNetwork") continue;
+			settings.riverAmount = GetFloatParameter(node, "riverAmount", 0.5f);
+			settings.lakeAmount = GetFloatParameter(node, "lakeAmount", 0.5f);
+			settings.seed = GetIntParameter(node, "seed", 1337);
+			foundDrainageNode = true;
+			break;
+		}
+		if (!foundDrainageNode)
+		{
+			m_hydrologyStatus = "Add a Drainage Network node first";
+			return false;
+		}
+		auto height = masks.at("FinalHeight")->texture->ReadFloatData();
+		if (!m_drainageNetworkGenerator->Start(std::move(height), m_size, settings)) return false;
+		m_hydrologyStatus = "Preparing heightmap";
+		return true;
+	}
+
+	bool TerrainComputePipeline::UpdateHydrology(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		if (!m_drainageNetworkGenerator) return false;
+		if (m_drainageNetworkGenerator->IsRunning()) m_hydrologyStatus = m_drainageNetworkGenerator->GetStage();
+		DrainageNetworkResult result;
+		if (!m_drainageNetworkGenerator->TryTakeResult(result)) return false;
+		if (!result.IsValid())
+		{
+			m_hydrologyStatus = result.cancelled ? "Hydrology cancelled" : "Hydrology generation failed";
+			return false;
+		}
+
+		auto upload = [&](const char* name, const std::vector<float>& values)
+		{
+			masks.at(name)->texture->UpdateFloatData(values, m_size, m_size);
+		};
+		upload("HydrologyBaseHeight", result.baseHeight);
+		upload("FinalHeight", result.finalHeight);
+		upload("WaterMask", result.water);
+		upload("FlowAccumulationMask", result.flow);
+		upload("RiverChannelMask", result.rivers);
+		upload("LakeMask", result.lakes);
+		upload("WaterVelocityMap", result.velocity);
+		upload("RiverCarveDelta", result.carveDelta);
+
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "drainageNetwork") continue;
+			masks[TempMaskName(node.id, "water")] = masks.at("WaterMask");
+			masks[TempMaskName(node.id, "flow")] = masks.at("FlowAccumulationMask");
+			masks[TempMaskName(node.id, "rivers")] = masks.at("RiverChannelMask");
+			masks[TempMaskName(node.id, "lakes")] = masks.at("LakeMask");
+		}
+		RefreshHydrologyGraphOutputs(masks);
 		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
 		m_terrainMasks = masks;
+		m_hydrologyGenerated = true;
+		m_hydrologyStatus = "Hydrology ready";
+		InvalidateWaterRenderCache();
+		return true;
 	}
 
-	void TerrainComputePipeline::StepErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void TerrainComputePipeline::CancelHydrology()
 	{
-		StepSimulation(masks);
+		if (m_drainageNetworkGenerator) m_drainageNetworkGenerator->Cancel();
 	}
 
-	void TerrainComputePipeline::StepParticleBake(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool uploadPreview)
+	bool TerrainComputePipeline::ResetHydrology(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
-		ApplyUniversalGraphSimulationSettings();
-		m_terrainPassContext.offset = glm::vec2(0, 0);
-		m_terrainPassContext.deferParticleTextureUpload = !uploadPreview;
-		if (m_terrainPassContext.hydraulicSettings.erosionEnabled)
-		{
-			m_graph->ExecutePasses(TerrainPassTypes::EROSION, masks, m_terrainPassContext);
-		}
-		m_terrainPassContext.deferParticleTextureUpload = false;
-
-		if (uploadPreview)
-		{
-			m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
-		}
+		CancelHydrology();
+		if (!m_hydrologyGenerated) return false;
+		masks.at("FinalHeight")->texture->CopyFrom(*masks.at("HydrologyBaseHeight")->texture);
+		for (const char* name : { "WaterMask", "FlowAccumulationMask", "RiverChannelMask", "LakeMask", "WaterVelocityMap", "RiverCarveDelta" })
+			masks.at(name)->texture->ClearTexture();
+		RefreshHydrologyGraphOutputs(masks);
+		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
 		m_terrainMasks = masks;
+		m_hydrologyGenerated = false;
+		m_hydrologyStatus = "Hydrology ready to generate";
+		InvalidateWaterRenderCache();
+		return true;
 	}
 
-	void TerrainComputePipeline::BakeParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	void TerrainComputePipeline::RefreshHydrologyGraphOutputs(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
-		ApplyUniversalGraphSimulationSettings();
-		m_terrainPassContext.offset = glm::vec2(0, 0);
-		int bakeSteps = std::max(m_terrainPassContext.hydraulicSettings.bakeParticleSteps, 1);
-		for (int i = 0; i < bakeSteps; ++i)
+		auto validation = ValidateTerrainGraphAsset(m_universalGraphAsset);
+		if (!validation.valid) return;
+
+		std::unordered_map<int, bool> dependsOnHydrology;
+		auto inputFor = [&](const TerrainGraphNodeInstance& node, const std::string& portId) -> std::shared_ptr<TerrainMask>
 		{
-			StepParticleBake(masks, i == bakeSteps - 1);
+			const auto* link = m_universalGraphAsset.FindInputLink(node.id, portId);
+			if (!link) return nullptr;
+			auto found = masks.find(TempMaskName(link->fromNodeId, link->fromPortId));
+			return found != masks.end() ? found->second : nullptr;
+		};
+		auto makeOutput = [&](const TerrainGraphNodeInstance& node, const std::string& portId)
+		{
+			return EnsureFloatMask(masks, TempMaskName(node.id, portId), m_size);
+		};
+
+		for (int nodeId : validation.executionOrder)
+		{
+			const auto* node = m_universalGraphAsset.FindNode(nodeId);
+			if (!node || !node->enabled) continue;
+			if (node->typeId == "drainageNetwork")
+			{
+				dependsOnHydrology[nodeId] = true;
+				continue;
+			}
+
+			bool dependent = false;
+			for (const auto& link : m_universalGraphAsset.links)
+			{
+				if (link.toNodeId == nodeId && dependsOnHydrology[link.fromNodeId])
+				{
+					dependent = true;
+					break;
+				}
+			}
+			dependsOnHydrology[nodeId] = dependent;
+			if (!dependent) continue;
+
+			if (node->typeId == "add" || node->typeId == "subtract" || node->typeId == "multiply" ||
+				node->typeId == "divide" || node->typeId == "min" || node->typeId == "max")
+			{
+				auto a = inputFor(*node, "a");
+				auto b = inputFor(*node, "b");
+				if (!a || !b) continue;
+				auto output = makeOutput(*node, "result");
+				int operation = 0;
+				if (node->typeId == "subtract") operation = 1;
+				else if (node->typeId == "multiply") operation = 2;
+				else if (node->typeId == "divide") operation = 3;
+				else if (node->typeId == "min") operation = 4;
+				else if (node->typeId == "max") operation = 5;
+				auto shader = m_computeShaders["UniversalBinaryOp"];
+				shader->ActivateShader();
+				a->texture->Bind(0);
+				b->texture->Bind(1);
+				shader->SetUniformInt("u_a", 0);
+				shader->SetUniformInt("u_b", 1);
+				shader->SetUniformInt("u_size", m_size);
+				shader->SetUniformInt("u_operation", operation);
+				shader->BindImage(0, output->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				shader->DispatchForTexture(m_size, m_size);
+				shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+			}
+			else if (node->typeId == "lerp")
+			{
+				auto a = inputFor(*node, "a");
+				auto b = inputFor(*node, "b");
+				auto t = inputFor(*node, "t");
+				if (!a || !b) continue;
+				auto output = makeOutput(*node, "result");
+				auto shader = m_computeShaders["UniversalLerp"];
+				shader->ActivateShader();
+				a->texture->Bind(0);
+				b->texture->Bind(1);
+				if (t) t->texture->Bind(2);
+				shader->SetUniformInt("u_a", 0);
+				shader->SetUniformInt("u_b", 1);
+				shader->SetUniformInt("u_t", 2);
+				shader->SetUniformInt("u_size", m_size);
+				shader->SetUniformFloat("u_defaultT", 0.5f);
+				shader->SetUniformInt("u_useTextureT", t ? 1 : 0);
+				shader->BindImage(0, output->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				shader->DispatchForTexture(m_size, m_size);
+				shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+			}
+			else if (node->typeId == "clamp" || node->typeId == "normalize" || node->typeId == "power" ||
+				node->typeId == "thresholdMask" || node->typeId == "heightBandMask" || node->typeId == "abs" ||
+				node->typeId == "invert" || node->typeId == "fitRange" || node->typeId == "smoothstep" ||
+				node->typeId == "terrace" || node->typeId == "posterizeMask")
+			{
+				const char* inputPort = "value";
+				const char* outputPort = "result";
+				if (node->typeId == "thresholdMask" || node->typeId == "heightBandMask" || node->typeId == "terrace")
+				{
+					inputPort = "height";
+					outputPort = node->typeId == "terrace" ? "height" : "mask";
+				}
+				else if (node->typeId == "posterizeMask")
+				{
+					inputPort = "mask";
+					outputPort = "mask";
+				}
+				auto value = inputFor(*node, inputPort);
+				if (!value) continue;
+				auto output = makeOutput(*node, outputPort);
+				int operation = 0;
+				if (node->typeId == "normalize") operation = 1;
+				else if (node->typeId == "power") operation = 2;
+				else if (node->typeId == "thresholdMask" || node->typeId == "heightBandMask") operation = 3;
+				else if (node->typeId == "abs") operation = 4;
+				else if (node->typeId == "invert") operation = 5;
+				else if (node->typeId == "fitRange") operation = 6;
+				else if (node->typeId == "smoothstep") operation = 7;
+				else if (node->typeId == "terrace") operation = 8;
+				else if (node->typeId == "posterizeMask") operation = 9;
+				auto shader = m_computeShaders["UniversalUnaryOp"];
+				shader->ActivateShader();
+				value->texture->Bind(0);
+				shader->SetUniformInt("u_value", 0);
+				shader->SetUniformInt("u_size", m_size);
+				shader->SetUniformInt("u_operation", operation);
+				shader->SetUniformFloat("u_min", node->typeId == "fitRange" ? GetFloatParameter(*node, "inMin", 0.0f) : GetFloatParameter(*node, "min", 0.0f));
+				shader->SetUniformFloat("u_max", node->typeId == "fitRange" ? GetFloatParameter(*node, "inMax", 1.0f) : GetFloatParameter(*node, "max", 1.0f));
+				shader->SetUniformFloat("u_power", GetFloatParameter(*node, "power", GetFloatParameter(*node, "pivot", 1.0f)));
+				shader->SetUniformFloat("u_outMin", GetFloatParameter(*node, "outMin", 0.0f));
+				shader->SetUniformFloat("u_outMax", GetFloatParameter(*node, "outMax", 1.0f));
+				shader->SetUniformInt("u_steps", GetIntParameter(*node, "steps", 8));
+				shader->BindImage(0, output->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				shader->DispatchForTexture(m_size, m_size);
+				shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+			}
+			else if (node->typeId == "slopeMask" || node->typeId == "curvatureMask" || node->typeId == "blurMask")
+			{
+				const char* inputPort = node->typeId == "blurMask" ? "mask" : "height";
+				auto value = inputFor(*node, inputPort);
+				if (!value) continue;
+				auto output = makeOutput(*node, "mask");
+				int operation = node->typeId == "curvatureMask" ? 1 : (node->typeId == "blurMask" ? 2 : 0);
+				auto shader = m_computeShaders["UniversalMaskFilter"];
+				shader->ActivateShader();
+				value->texture->Bind(0);
+				shader->SetUniformInt("u_value", 0);
+				shader->SetUniformInt("u_size", m_size);
+				shader->SetUniformInt("u_operation", operation);
+				shader->SetUniformInt("u_radius", GetIntParameter(*node, "radius", 2));
+				shader->SetUniformInt("u_mode", GetIntParameter(*node, "mode", 0));
+				shader->SetUniformFloat("u_scale", GetFloatParameter(*node, "scale", 0.05f));
+				shader->SetUniformFloat("u_min", GetFloatParameter(*node, "min", 0.0f));
+				shader->SetUniformFloat("u_max", GetFloatParameter(*node, "max", 1.0f));
+				shader->SetUniformFloat("u_bias", GetFloatParameter(*node, "bias", 0.5f));
+				shader->BindImage(0, output->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				shader->DispatchForTexture(m_size, m_size);
+				shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+			}
+			else if (node->typeId == "outputMask")
+			{
+				auto source = inputFor(*node, "mask");
+				if (!source) continue;
+				auto target = EnsureFloatMask(masks, GetStringParameter(*node, "target", "FinalMask"), m_size);
+				target->texture->CopyFrom(*source->texture);
+			}
 		}
-		m_terrainMasks = masks;
+
+		auto previewShader = m_computeShaders["UniversalGraphPreview"];
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || !dependsOnHydrology[node.id]) continue;
+			const auto* type = FindTerrainGraphNodeType(node.typeId);
+			if (!type) continue;
+			for (const auto& output : type->outputs)
+			{
+				if (output.valueType != TerrainGraphValueType::FloatMask) continue;
+				auto source = masks.find(TempMaskName(node.id, output.id));
+				if (source == masks.end() || !source->second || !source->second->texture) continue;
+				auto preview = EnsureFloatMask(masks, "preview_" + TempMaskName(node.id, output.id), 256);
+				previewShader->ActivateShader();
+				source->second->texture->Bind(0);
+				previewShader->SetUniformInt("u_value", 0);
+				previewShader->SetUniformInt("u_size", 256);
+				previewShader->SetUniformFloat("u_minValue", 0.0f);
+				previewShader->SetUniformFloat("u_maxValue", 1.0f);
+				previewShader->BindImage(0, preview->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				previewShader->DispatchForTexture(256, 256);
+				previewShader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+			}
+		}
 	}
 
-	void TerrainComputePipeline::StepWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	bool TerrainComputePipeline::IsHydrologyRunning() const
 	{
-		ApplyUniversalGraphSimulationSettings();
-		m_terrainPassContext.offset = glm::vec2(0, 0);
-		for (int i = 0; i < m_terrainPassContext.hydraulicSettings.stepsPerUpdate; i++)
-		{
-			m_graph->ExecutePasses(TerrainPassTypes::HYDROLOGY, masks, m_terrainPassContext);
-		}
-		m_terrainMasks = masks;
+		return m_drainageNetworkGenerator && m_drainageNetworkGenerator->IsRunning();
 	}
 
-	void TerrainComputePipeline::SettleWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, int iterations)
+	float TerrainComputePipeline::GetHydrologyProgress() const
 	{
-		ApplyUniversalGraphSimulationSettings();
-		m_terrainPassContext.offset = glm::vec2(0, 0);
-		m_terrainPassContext.deferParticleTextureUpload = false;
+		return m_drainageNetworkGenerator ? m_drainageNetworkGenerator->GetProgress() : 0.0f;
+	}
 
-		// Settle existing water without adding new rain and without eroding, so the
-		// remaining water just keeps flowing downhill until it pools in the lowest
-		// points. We temporarily zero the rain so the simulation drains to rest.
-		float savedRain = m_terrainPassContext.hydraulicSettings.rainRate;
-		m_terrainPassContext.hydraulicSettings.rainRate = 0.0f;
-
-		int steps = std::max(iterations, 1);
-		for (int i = 0; i < steps; i++)
+	std::string TerrainComputePipeline::GetHydrologyStatus() const { return m_hydrologyStatus; }
+	void TerrainComputePipeline::MarkHydrologyRestored(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool restored)
+	{
+		m_hydrologyGenerated = restored;
+		m_hydrologyStatus = restored ? "Hydrology restored from project" : "Hydrology ready to generate";
+		if (!restored) return;
+		for (const auto& node : m_universalGraphAsset.nodes)
 		{
-			m_graph->ExecutePasses(TerrainPassTypes::HYDROLOGY, masks, m_terrainPassContext);
+			if (!node.enabled || node.typeId != "drainageNetwork") continue;
+			masks[TempMaskName(node.id, "water")] = masks.at("WaterMask");
+			masks[TempMaskName(node.id, "flow")] = masks.at("FlowAccumulationMask");
+			masks[TempMaskName(node.id, "rivers")] = masks.at("RiverChannelMask");
+			masks[TempMaskName(node.id, "lakes")] = masks.at("LakeMask");
 		}
-
-		m_terrainPassContext.hydraulicSettings.rainRate = savedRain;
-		m_terrainMasks = masks;
+		RefreshHydrologyGraphOutputs(masks);
 	}
 
 	void TerrainComputePipeline::RefreshMaskPass(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
@@ -583,113 +1085,13 @@ namespace pwg
 				continue;
 			}
 
-			if (node.typeId == "hydraulicSimulation")
+			if (node.typeId == "drainageNetwork")
 			{
-				settings.autoWaterSimulation = GetBoolParameter(node, "autoWaterSimulation", settings.autoWaterSimulation);
-				settings.stepsPerUpdate = GetIntParameter(node, "stepsPerUpdate", settings.stepsPerUpdate);
-				settings.waterStepsPerSecond = GetIntParameter(node, "waterStepsPerSecond", settings.waterStepsPerSecond);
-				settings.waterSubsteps = GetIntParameter(node, "waterSubsteps", settings.waterSubsteps);
-				settings.rainRate = GetFloatParameter(node, "rainRate", settings.rainRate);
-				settings.rainElevationBias = GetFloatParameter(node, "rainElevationBias", settings.rainElevationBias);
-				settings.rainMinHeight = GetFloatParameter(node, "rainMinHeight", settings.rainMinHeight);
-				settings.rainMaxHeight = GetFloatParameter(node, "rainMaxHeight", settings.rainMaxHeight);
-				settings.evaporation = GetFloatParameter(node, "evaporation", settings.evaporation);
-				settings.infiltrationRate = GetFloatParameter(node, "infiltrationRate", settings.infiltrationRate);
-				settings.boundaryDrain = GetFloatParameter(node, "boundaryDrain", settings.boundaryDrain);
-				settings.maxWaterDepth = GetFloatParameter(node, "maxWaterDepth", settings.maxWaterDepth);
-				settings.pipeFlow = GetFloatParameter(node, "pipeFlow", settings.pipeFlow);
-				settings.pipeDamping = GetFloatParameter(node, "pipeDamping", settings.pipeDamping);
-				settings.flowConcentration = GetFloatParameter(node, "flowConcentration", settings.flowConcentration);
-				settings.useDiagonalFlow = GetBoolParameter(node, "useDiagonalFlow", settings.useDiagonalFlow);
-			}
-			else if (node.typeId == "streamErosion")
-			{
-				settings.erosionEnabled = GetBoolParameter(node, "erosionEnabled", settings.erosionEnabled);
-				settings.sedimentCapacity = GetFloatParameter(node, "sedimentCapacity", settings.sedimentCapacity);
-				settings.erosionStrength = GetFloatParameter(node, "erosionStrength", settings.erosionStrength);
-				settings.depositionStrength = GetFloatParameter(node, "depositionStrength", settings.depositionStrength);
-				settings.flatteningStrength = GetFloatParameter(node, "flatteningStrength", settings.flatteningStrength);
-				settings.minWaterToErode = GetFloatParameter(node, "minWaterToErode", settings.minWaterToErode);
-				settings.minFlowToErode = GetFloatParameter(node, "minFlowToErode", settings.minFlowToErode);
-				settings.maxHeightChange = GetFloatParameter(node, "maxHeightChange", settings.maxHeightChange);
-				settings.maxErosionDepth = GetFloatParameter(node, "maxErosionDepth", settings.maxErosionDepth);
-				settings.maxDepositHeight = GetFloatParameter(node, "maxDepositHeight", settings.maxDepositHeight);
-				settings.flowAccumulationGrowth = GetFloatParameter(node, "flowAccumulationGrowth", settings.flowAccumulationGrowth);
-				settings.flowAccumulationDecay = GetFloatParameter(node, "flowAccumulationDecay", settings.flowAccumulationDecay);
-				settings.riverChannelGrowth = GetFloatParameter(node, "riverChannelGrowth", settings.riverChannelGrowth);
-				settings.riverChannelDecay = GetFloatParameter(node, "riverChannelDecay", settings.riverChannelDecay);
-				settings.riverChannelInfluence = GetFloatParameter(node, "riverChannelInfluence", settings.riverChannelInfluence);
-				settings.riverChannelDepth = GetFloatParameter(node, "riverChannelDepth", settings.riverChannelDepth);
-			}
-			else if (node.typeId == "particleErosion")
-			{
-				settings.particleErosionEnabled = GetBoolParameter(node, "particleErosionEnabled", settings.particleErosionEnabled);
-				settings.bakeParticleSteps = GetIntParameter(node, "bakeParticleSteps", settings.bakeParticleSteps);
-				settings.bakeStepsPerFrame = GetIntParameter(node, "bakeStepsPerFrame", settings.bakeStepsPerFrame);
-				settings.bakeUploadInterval = GetIntParameter(node, "bakeUploadInterval", settings.bakeUploadInterval);
-				settings.particlesPerStep = GetIntParameter(node, "particlesPerStep", settings.particlesPerStep);
-				settings.dropletLifetime = GetIntParameter(node, "dropletLifetime", settings.dropletLifetime);
-				settings.particleSeed = GetIntParameter(node, "particleSeed", settings.particleSeed);
-				settings.particleInertia = GetFloatParameter(node, "particleInertia", settings.particleInertia);
-				settings.particleGravity = GetFloatParameter(node, "particleGravity", settings.particleGravity);
-				settings.particleInitialWater = GetFloatParameter(node, "particleInitialWater", settings.particleInitialWater);
-				settings.particleEvaporation = GetFloatParameter(node, "particleEvaporation", settings.particleEvaporation);
-				settings.particleMinSlope = GetFloatParameter(node, "particleMinSlope", settings.particleMinSlope);
-				settings.particleCapacity = GetFloatParameter(node, "particleCapacity", settings.particleCapacity);
-				settings.particleErosionStrength = GetFloatParameter(node, "particleErosionStrength", settings.particleErosionStrength);
-				settings.particleDepositionStrength = GetFloatParameter(node, "particleDepositionStrength", settings.particleDepositionStrength);
-				settings.particleBrushRadius = GetFloatParameter(node, "particleBrushRadius", settings.particleBrushRadius);
-				settings.particleDepositRadius = GetFloatParameter(node, "particleDepositRadius", settings.particleDepositRadius);
-				settings.particleChannelStrength = GetFloatParameter(node, "particleChannelStrength", settings.particleChannelStrength);
-				settings.particleFlowStrength = GetFloatParameter(node, "particleFlowStrength", settings.particleFlowStrength);
-			}
-			else if (node.typeId == "lakeCleanup")
-			{
-				settings.lakeMinDepth = GetFloatParameter(node, "lakeMinDepth", settings.lakeMinDepth);
-				settings.lakeLeveling = GetFloatParameter(node, "lakeLeveling", settings.lakeLeveling);
-				settings.lakeFillEnabled = GetFloatParameter(node, "lakeFillEnabled", settings.lakeFillEnabled);
-				settings.lakeMinFlow = GetFloatParameter(node, "lakeMinFlow", settings.lakeMinFlow);
-				settings.lakeMaxDepth = GetFloatParameter(node, "lakeMaxDepth", settings.lakeMaxDepth);
-				settings.lakeBedSmoothing = GetFloatParameter(node, "lakeBedSmoothing", settings.lakeBedSmoothing);
-				settings.lakeWaterSmoothing = GetFloatParameter(node, "lakeWaterSmoothing", settings.lakeWaterSmoothing);
-				settings.lakeInfiltrationScale = GetFloatParameter(node, "lakeInfiltrationScale", settings.lakeInfiltrationScale);
+				settings.riverAmount = GetFloatParameter(node, "riverAmount", settings.riverAmount);
+				settings.lakeAmount = GetFloatParameter(node, "lakeAmount", settings.lakeAmount);
+				settings.hydrologySeed = GetIntParameter(node, "seed", settings.hydrologySeed);
 			}
 		}
-	}
-
-	void TerrainComputePipeline::ResetWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
-	{
-		m_terrainPassContext.deferParticleTextureUpload = false;
-		masks.at("WaterMask")->texture->ClearTexture();
-		masks.at("WaterFlux")->texture->ClearTexture();
-		masks.at("WaterFluxDiagonal")->texture->ClearTexture();
-		masks.at("FlowAccumulationMask")->texture->ClearTexture();
-		masks.at("RiverChannelMask")->texture->ClearTexture();
-		if (m_terrainPassContext.cpuTerrainCacheValid)
-		{
-			std::fill(m_terrainPassContext.cpuWater.begin(), m_terrainPassContext.cpuWater.end(), 0.0f);
-			std::fill(m_terrainPassContext.cpuFlowAccumulation.begin(), m_terrainPassContext.cpuFlowAccumulation.end(), 0.0f);
-			std::fill(m_terrainPassContext.cpuRiverChannels.begin(), m_terrainPassContext.cpuRiverChannels.end(), 0.0f);
-		}
-		m_terrainMasks = masks;
-	}
-
-	void TerrainComputePipeline::ResetErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
-	{
-		m_terrainPassContext.deferParticleTextureUpload = false;
-		masks.at("FinalHeight")->texture->CopyFrom(*masks.at("BaseHeight")->texture);
-		masks["ErodedHeight"] = masks.at("FinalHeight");
-		m_terrainPassContext.cpuTerrainCacheValid = false;
-		m_terrainPassContext.cpuHeight.clear();
-		m_terrainPassContext.cpuBaseHeight.clear();
-		m_terrainPassContext.cpuDeposit.clear();
-		m_terrainPassContext.cpuWater.clear();
-		m_terrainPassContext.cpuSediment.clear();
-		m_terrainPassContext.cpuFlowAccumulation.clear();
-		m_terrainPassContext.cpuRiverChannels.clear();
-		m_terrainPassContext.cpuErosionDelta.clear();
-		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
-		m_terrainMasks = masks;
 	}
 
 	void TerrainComputePipeline::BuildGraph()
@@ -701,12 +1103,6 @@ namespace pwg
 		auto finalHeightPass = std::make_shared<FinalHeightPass>(m_computeShaders["FinalHeight"], m_size);
 		auto normalMaskPass = std::make_shared<NormalMaskPass>(m_computeShaders["NormalMask"], m_size);
 		auto slopeMaskPass = std::make_shared<SlopeMaskPass>(m_computeShaders["SlopeMask"], m_size);
-		auto hydraulicFluxPass = std::make_shared<HydraulicFluxPass>(m_computeShaders["HydraulicFlux"], m_size);
-		auto hydraulicWaterPass = std::make_shared<HydraulicWaterPass>(m_computeShaders["HydraulicWater"], m_size);
-		auto erosionPass = std::make_shared<ErosionPass>(m_computeShaders["ErosionMask"], m_size);
-		hydraulicFluxPass->SetHydraulicSettings(&m_terrainPassContext.hydraulicSettings);
-		hydraulicWaterPass->SetHydraulicSettings(&m_terrainPassContext.hydraulicSettings);
-		erosionPass->SetHydraulicSettings(&m_terrainPassContext.hydraulicSettings);
 
 		m_graph->AddPass(elevationPass);
 		m_graph->AddPass(mountainMaskPass);
@@ -715,9 +1111,6 @@ namespace pwg
 		m_graph->AddPass(finalHeightPass);
 		m_graph->AddPass(normalMaskPass);
 		m_graph->AddPass(slopeMaskPass);
-		m_graph->AddPass(hydraulicFluxPass);
-		m_graph->AddPass(hydraulicWaterPass);
-		m_graph->AddPass(erosionPass);
 
 		PWG_INFO("Graph builded successfully");
 	}
@@ -748,13 +1141,19 @@ namespace pwg
 		terrainMasks["SlopeMask"] = std::make_shared<TerrainMask>("SlopeMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["ErodedHeight"] = std::make_shared<TerrainMask>("ErodedHeight", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["WaterMask"] = std::make_shared<TerrainMask>("WaterMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["ErosionMask"] = std::make_shared<TerrainMask>("ErosionMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["SedimentMask"] = std::make_shared<TerrainMask>("SedimentMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["DepositMask"] = std::make_shared<TerrainMask>("DepositMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
-		terrainMasks["WaterFlux"] = std::make_shared<TerrainMask>("WaterFlux", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT4), MaskUsage::WEIGHTS, 1.0f);
-		terrainMasks["WaterFluxDiagonal"] = std::make_shared<TerrainMask>("WaterFluxDiagonal", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT4), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["ErosionDelta"] = std::make_shared<TerrainMask>("ErosionDelta", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["FlowAccumulationMask"] = std::make_shared<TerrainMask>("FlowAccumulationMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["RiverChannelMask"] = std::make_shared<TerrainMask>("RiverChannelMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["LakeMask"] = std::make_shared<TerrainMask>("LakeMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["WaterVelocityMap"] = std::make_shared<TerrainMask>("WaterVelocityMap", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT2), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["RiverCarveDelta"] = std::make_shared<TerrainMask>("RiverCarveDelta", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["HydrologyBaseHeight"] = std::make_shared<TerrainMask>("HydrologyBaseHeight", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["ErosionWaterMask"] = std::make_shared<TerrainMask>("ErosionWaterMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["ErosionFlowMask"] = std::make_shared<TerrainMask>("ErosionFlowMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["ErosionChannelMask"] = std::make_shared<TerrainMask>("ErosionChannelMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 
 		for (const auto& mask : terrainMasks)
 		{

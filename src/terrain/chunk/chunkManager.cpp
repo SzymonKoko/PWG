@@ -21,6 +21,7 @@ namespace pwg
 		m_lodManager->GenerateLODMeshes();
 
 		m_globalMasks = m_terrainComputePipeline->CreateMasks();
+		m_proceduralAssetsInitialized = false;
 
 
 		m_terrainDebug->RegisterTexture("NONE", DebugMode::DEBUG_NONE, nullptr, false);		
@@ -30,8 +31,7 @@ namespace pwg
 		m_terrainDebug->RegisterTexture("Water", DebugMode::DEBUG_WATER, m_globalMasks["WaterMask"]->texture, true);
 		m_terrainDebug->RegisterTexture("Sediment", DebugMode::DEBUG_SEDIMENT, m_globalMasks["SedimentMask"]->texture, true);
 		m_terrainDebug->RegisterTexture("Deposited Sediment", DebugMode::DEBUG_DEPOSIT, m_globalMasks["DepositMask"]->texture, true);
-		m_terrainDebug->RegisterTexture("Flow - Cardinal", DebugMode::DEBUG_WATER_FLUX, m_globalMasks["WaterFlux"]->texture, true);
-		m_terrainDebug->RegisterTexture("Flow - Diagonal", DebugMode::DEBUG_DIAGONAL_FLUX, m_globalMasks["WaterFluxDiagonal"]->texture, true);
+		m_terrainDebug->RegisterTexture("Generated Flow", DebugMode::DEBUG_WATER_FLUX, m_globalMasks["FlowAccumulationMask"]->texture, true);
 		m_terrainDebug->RegisterTexture("Erosion / Deposit Delta", DebugMode::DEBUG_EROSION_DELTA, m_globalMasks["ErosionDelta"]->texture, true);
 		m_terrainDebug->RegisterTexture("Flow Accumulation", DebugMode::DEBUG_FLOW_ACCUMULATION, m_globalMasks["FlowAccumulationMask"]->texture, true);
 		m_terrainDebug->RegisterTexture("Accumulated River Channels", DebugMode::DEBUG_RIVER_CHANNELS, m_globalMasks["RiverChannelMask"]->texture, true);
@@ -87,91 +87,24 @@ namespace pwg
 		}
 
 		m_cameraPosition = camera->GetCameraPosition();
+		m_cameraView = camera->GetViewMatrix();
+		m_cameraProjection = camera->GetProjectionMatrix();
 		UpdateFrustum(camera);
 
 		if (m_needRegenerate)
 		{
 			Regenerate();
 		}
-
-		m_terrainComputePipeline->ApplyUniversalGraphSimulationSettings();
-		auto& hydraulicSettings = m_terrainComputePipeline->GetHydraulicSettings();
-		if (hydraulicSettings.autoWaterSimulation)
+		if (m_terrainComputePipeline->UpdateParticleErosion(m_globalMasks, dt))
 		{
-			float stepsPerSecond = static_cast<float>(std::max(hydraulicSettings.waterStepsPerSecond, 1));
-			float stepInterval = 1.0f / stepsPerSecond;
-			int substeps = std::clamp(hydraulicSettings.waterSubsteps, 1, 8);
-			int maxStepsThisFrame = 2;
-
-			m_waterSimulationAccumulator += std::clamp(dt, 0.0f, 0.1f);
-			while (m_waterSimulationAccumulator >= stepInterval && maxStepsThisFrame > 0)
-			{
-				for (int i = 0; i < substeps; ++i)
-				{
-					StepSimulation();
-				}
-
-				m_waterSimulationAccumulator -= stepInterval;
-				maxStepsThisFrame--;
-			}
-
-			if (maxStepsThisFrame == 0)
-			{
-				m_waterSimulationAccumulator = 0.0f;
-			}
-
 			MaybeUpdateHeightCache(dt);
 		}
-		else
+		if (m_terrainComputePipeline->UpdateHydrology(m_globalMasks))
 		{
-			m_waterSimulationAccumulator = 0.0f;
+			UpdateHeightCache();
+			++m_generationRevision;
 		}
 
-		// When the simulation stops, keep the water physics alive: any water still
-		// sitting on slopes keeps flowing downhill (no rain, no erosion) until it
-		// drains into the lowest points / pools into lakes.
-		bool simulatingNow = hydraulicSettings.autoWaterSimulation || m_simulationRanThisTick;
-		if (simulatingNow)
-		{
-			m_waterSettling = false;
-		}
-		else if (m_prevSimulating)
-		{
-			BeginWaterSettle();
-		}
-		m_prevSimulating = simulatingNow;
-
-		if (!simulatingNow && m_waterSettling)
-		{
-			int substeps = std::clamp(hydraulicSettings.waterSubsteps, 1, 8);
-			int iterationsThisFrame = std::min(substeps * 2, m_settleMaxSteps - m_settleStepsDone);
-			if (iterationsThisFrame > 0)
-			{
-				m_terrainComputePipeline->SettleWaterSimulation(m_globalMasks, iterationsThisFrame);
-				m_settleStepsDone += iterationsThisFrame;
-			}
-			if (m_settleStepsDone >= m_settleMaxSteps)
-			{
-				m_waterSettling = false;
-			}
-		}
-
-		m_simulationRanThisTick = false;
-	}
-
-	void ChunkManager::BeginWaterSettle()
-	{
-		m_waterSettling = true;
-		m_settleStepsDone = 0;
-		// Enough iterations for water to traverse the map and reach the lowest points,
-		// bounded so we never spin the GPU forever once everything has pooled.
-		m_settleMaxSteps = std::clamp(m_worldSize, 400, 2000);
-	}
-
-	void ChunkManager::CancelWaterSettle()
-	{
-		m_waterSettling = false;
-		m_settleStepsDone = 0;
 	}
 
 	void ChunkManager::UpdateFrustum(std::shared_ptr<ICamera> camera)
@@ -268,10 +201,8 @@ namespace pwg
 			tex = m_globalMasks["DepositMask"]->texture;
 			break;
 		case DebugMode::DEBUG_WATER_FLUX:
-			tex = m_globalMasks["WaterFlux"]->texture;
-			break;
 		case DebugMode::DEBUG_DIAGONAL_FLUX:
-			tex = m_globalMasks["WaterFluxDiagonal"]->texture;
+			tex = m_globalMasks["FlowAccumulationMask"]->texture;
 			break;
 		case DebugMode::DEBUG_EROSION_DELTA:
 			tex = m_globalMasks["ErosionDelta"]->texture;
@@ -326,7 +257,7 @@ namespace pwg
 				}
 
 				auto mesh = m_lodManager->GetMesh(chunk.lod);
-				glm::vec2 uvOffset = glm::vec2(chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1), chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1)) / glm::vec2(m_worldSize);
+				glm::vec2 uvOffset = (glm::vec2(chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1), chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1)) + glm::vec2(0.5f)) / glm::vec2(m_worldSize);
 				glm::vec2 uvScale = glm::vec2(m_terrainSettings.chunkSize - 1) / glm::vec2(m_worldSize);
 				float chunkWorldX = chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1);
 				float chunkWorldZ = chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1);
@@ -367,7 +298,7 @@ namespace pwg
 			{
 				auto& chunk = m_chunks[static_cast<size_t>(j) * m_chunkCount + i];
 				auto mesh = m_lodManager->GetMesh(chunk.lod);
-				glm::vec2 uvOffset = glm::vec2(chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1), chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1)) / glm::vec2(m_worldSize);
+				glm::vec2 uvOffset = (glm::vec2(chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1), chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1)) + glm::vec2(0.5f)) / glm::vec2(m_worldSize);
 				glm::vec2 uvScale = glm::vec2(m_terrainSettings.chunkSize - 1) / glm::vec2(m_worldSize);
 				float chunkWorldX = chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1);
 				float chunkWorldZ = chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1);
@@ -391,6 +322,7 @@ namespace pwg
 
 		SetupSharedTerrainUniforms(false);
 		DrawTerrainChunks(m_terrainMaterial);
+		m_terrainComputePipeline->DrawErosionParticles(m_cameraView, m_cameraProjection);
 	}
 
 	void ChunkManager::DrawWater(Renderer& renderer)
@@ -437,6 +369,7 @@ namespace pwg
 		m_waterMaterial->SetUniformTexture("u_Watermap", m_globalMasks["WaterMask"]->texture);
 		m_waterMaterial->SetUniformTexture("u_FlowAccumulationmap", m_globalMasks["FlowAccumulationMask"]->texture);
 		m_waterMaterial->SetUniformTexture("u_RiverChannelmap", m_globalMasks["RiverChannelMask"]->texture);
+		m_waterMaterial->SetUniformTexture("u_WaterVelocityMap", m_globalMasks["WaterVelocityMap"]->texture);
 		m_waterMaterial->SetUniformTexture("u_SceneColor", m_sceneColorCopy);
 		m_waterMaterial->SetUniformVec2("u_viewportSize", glm::vec2(viewportWidth, viewportHeight));
 		m_waterMaterial->SetUniformFloat("u_time", m_waterTime);
@@ -447,28 +380,17 @@ namespace pwg
 		glActiveTexture(GL_TEXTURE15);
 		glBindTexture(GL_TEXTURE_2D, m_sceneDepthCopy);
 		waterShader->SetUniformInt("u_SceneDepth", 15);
-		DrawTerrainChunks(m_waterMaterial);
+		m_terrainComputePipeline->DrawWaterClipmap(waterShader, m_cameraPosition, m_globalMasks);
 
 		glDepthMask(GL_TRUE);
 	}
 
 	void pwg::ChunkManager::Regenerate()
 	{
-		m_particleBakeActive = false;
-		m_globalMasks["FinalHeight"]->texture->ClearTexture();
-		m_globalMasks["BaseHeight"]->texture->ClearTexture();
-		m_globalMasks["NormalMask"]->texture->ClearTexture();
-		m_globalMasks["WaterMask"]->texture->ClearTexture();
-		m_globalMasks["SedimentMask"]->texture->ClearTexture();
-		m_globalMasks["DepositMask"]->texture->ClearTexture();
-		m_globalMasks["WaterFlux"]->texture->ClearTexture();
-		m_globalMasks["WaterFluxDiagonal"]->texture->ClearTexture();
-		m_globalMasks["ErosionDelta"]->texture->ClearTexture();
-		m_globalMasks["FlowAccumulationMask"]->texture->ClearTexture();
-		m_globalMasks["RiverChannelMask"]->texture->ClearTexture();
-
+		CancelHydrology();
+		m_terrainComputePipeline->CancelParticleErosion();
 		m_terrainComputePipeline->RegenerateTerrain(m_globalMasks);
-		UpdateHeightCache();
+		if (!m_terrainComputePipeline->IsParticleErosionActive()) UpdateHeightCache();
 
 		m_needRegenerate = false;
 	}
@@ -492,8 +414,14 @@ namespace pwg
 		snapshot.water = read("WaterMask");
 		snapshot.sediment = read("SedimentMask");
 		snapshot.deposit = read("DepositMask");
+		snapshot.erosion = read("ErosionMask");
+		snapshot.erosionDelta = read("ErosionDelta");
 		snapshot.flowAccumulation = read("FlowAccumulationMask");
 		snapshot.riverChannels = read("RiverChannelMask");
+		snapshot.lakes = read("LakeMask");
+		snapshot.waterVelocity = read("WaterVelocityMap");
+		snapshot.riverCarveDelta = read("RiverCarveDelta");
+		snapshot.hydrologyBaseHeight = read("HydrologyBaseHeight");
 		return snapshot;
 	}
 
@@ -503,6 +431,7 @@ namespace pwg
 		{
 			return;
 		}
+		m_terrainComputePipeline->CancelParticleErosion();
 
 		size_t expected = static_cast<size_t>(m_worldSize) * static_cast<size_t>(m_worldSize);
 		auto write = [&](const char* name, const std::vector<float>& data)
@@ -523,84 +452,85 @@ namespace pwg
 		write("WaterMask", snapshot.water);
 		write("SedimentMask", snapshot.sediment);
 		write("DepositMask", snapshot.deposit);
+		write("ErosionMask", snapshot.erosion);
+		write("ErosionDelta", snapshot.erosionDelta);
 		write("FlowAccumulationMask", snapshot.flowAccumulation);
 		write("RiverChannelMask", snapshot.riverChannels);
+		write("LakeMask", snapshot.lakes);
+		if (snapshot.waterVelocity.size() >= expected * 2)
+			m_globalMasks["WaterVelocityMap"]->texture->UpdateFloatData(snapshot.waterVelocity, m_worldSize, m_worldSize);
+		write("RiverCarveDelta", snapshot.riverCarveDelta);
+		write("HydrologyBaseHeight", snapshot.hydrologyBaseHeight);
+		m_terrainComputePipeline->MarkHydrologyRestored(m_globalMasks, snapshot.hydrologyBaseHeight.size() >= expected);
 
 		m_globalMasks["ErodedHeight"] = m_globalMasks["FinalHeight"];
 
 		// Recompute normals / slope from the restored heightmap so shading matches.
 		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
-		UpdateHeightCache();
-		++m_generationRevision;
-		CancelWaterSettle();
-	}
-
-	void ChunkManager::StepSimulation()
-	{
-		m_particleBakeActive = false;
-		m_simulationRanThisTick = true;
-		m_terrainComputePipeline->StepSimulation(m_globalMasks);
-	}
-
-	void ChunkManager::StepErosionSimulation()
-	{
-		StepSimulation();
-		UpdateHeightCache();
-	}
-
-	void ChunkManager::BakeParticleErosion()
-	{
-		m_terrainComputePipeline->BakeParticleErosion(m_globalMasks);
+		m_terrainComputePipeline->InvalidateWaterRenderCache();
 		UpdateHeightCache();
 		++m_generationRevision;
 	}
 
-	void ChunkManager::StartParticleBake()
+	void ChunkManager::CancelParticleErosion()
 	{
-		m_terrainComputePipeline->ApplyUniversalGraphSimulationSettings();
-		auto& settings = m_terrainComputePipeline->GetHydraulicSettings();
-		m_particleBakeTotal = std::max(settings.bakeParticleSteps, 1);
-		m_particleBakeStep = 0;
-		m_particleBakeActive = true;
+		m_terrainComputePipeline->CancelParticleErosion();
 	}
 
-	void ChunkManager::CancelParticleBake()
+	void ChunkManager::StartParticleErosion()
 	{
-		m_particleBakeActive = false;
-		m_particleBakeStep = 0;
-		m_particleBakeTotal = 0;
+		if (m_terrainComputePipeline->ResetHydrology(m_globalMasks)) UpdateHeightCache();
+		m_terrainComputePipeline->StartParticleErosion();
+	}
+
+	bool ChunkManager::GenerateHydrology()
+	{
+		return m_terrainComputePipeline->GenerateHydrology(m_globalMasks);
+	}
+
+	void ChunkManager::CancelHydrology() { m_terrainComputePipeline->CancelHydrology(); }
+
+	bool ChunkManager::ResetHydrology()
+	{
+		if (!m_terrainComputePipeline->ResetHydrology(m_globalMasks)) return false;
 		UpdateHeightCache();
+		++m_generationRevision;
+		return true;
 	}
 
-	void ChunkManager::StepWaterSimulation()
-	{
-		m_terrainComputePipeline->StepWaterSimulation(m_globalMasks);
-	}
+	bool ChunkManager::IsHydrologyRunning() const { return m_terrainComputePipeline->IsHydrologyRunning(); }
+	float ChunkManager::GetHydrologyProgress() const { return m_terrainComputePipeline->GetHydrologyProgress(); }
+	std::string ChunkManager::GetHydrologyStatus() const { return m_terrainComputePipeline->GetHydrologyStatus(); }
 
-	void ChunkManager::ResetWaterSimulation()
+	void ChunkManager::PauseParticleErosion()
 	{
-		m_particleBakeActive = false;
-		CancelWaterSettle();
-		m_terrainComputePipeline->ResetWaterSimulation(m_globalMasks);
-	}
-
-	void ChunkManager::ResetErosionSimulation()
-	{
-		m_particleBakeActive = false;
-		m_globalMasks["FinalHeight"]->texture->ClearTexture();
-		m_globalMasks["NormalMask"]->texture->ClearTexture();
-		m_globalMasks["WaterMask"]->texture->ClearTexture();
-		m_globalMasks["SedimentMask"]->texture->ClearTexture();
-		m_globalMasks["DepositMask"]->texture->ClearTexture();
-		m_globalMasks["ErosionDelta"]->texture->ClearTexture();
-		m_terrainComputePipeline->ResetErosionSimulation(m_globalMasks);
+		m_terrainComputePipeline->PauseParticleErosion();
+		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
 		UpdateHeightCache();
-		m_needRegenerate = false;
+		++m_generationRevision;
+	}
+
+	bool ChunkManager::StepParticleErosion()
+	{
+		if (!m_terrainComputePipeline->StepParticleErosion(m_globalMasks)) return false;
+		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
+		UpdateHeightCache();
+		++m_generationRevision;
+		return true;
+	}
+
+	bool ChunkManager::ResetParticleErosion()
+	{
+		const bool reset = m_terrainComputePipeline->ResetParticleErosionState(m_globalMasks);
+		UpdateHeightCache();
+		++m_generationRevision;
+		return reset;
 	}
 
 	void ChunkManager::ConfigureTerrain(int chunkCount, int chunkSize)
 	{
-		m_particleBakeActive = false;
+		CancelHydrology();
+		m_terrainComputePipeline->CancelParticleErosion();
 		chunkCount = std::clamp(chunkCount, 3, 31);
 		chunkSize = std::clamp(chunkSize, 33, 257);
 		if (chunkCount == m_chunkCount && chunkSize == m_terrainSettings.chunkSize)
@@ -642,6 +572,7 @@ namespace pwg
 		m_lodManager = std::make_unique<LODManager>(m_terrainSettings.chunkSize);
 		m_lodManager->GenerateLODMeshes();
 		m_globalMasks = m_terrainComputePipeline->CreateMasks();
+		m_proceduralAssetsInitialized = false;
 
 		m_terrainDebug->Clear();
 		m_terrainDebug->RegisterTexture("NONE", DebugMode::DEBUG_NONE, nullptr, false);
@@ -651,8 +582,7 @@ namespace pwg
 		m_terrainDebug->RegisterTexture("Water", DebugMode::DEBUG_WATER, m_globalMasks["WaterMask"]->texture, true);
 		m_terrainDebug->RegisterTexture("Sediment", DebugMode::DEBUG_SEDIMENT, m_globalMasks["SedimentMask"]->texture, true);
 		m_terrainDebug->RegisterTexture("Deposited Sediment", DebugMode::DEBUG_DEPOSIT, m_globalMasks["DepositMask"]->texture, true);
-		m_terrainDebug->RegisterTexture("Flow - Cardinal", DebugMode::DEBUG_WATER_FLUX, m_globalMasks["WaterFlux"]->texture, true);
-		m_terrainDebug->RegisterTexture("Flow - Diagonal", DebugMode::DEBUG_DIAGONAL_FLUX, m_globalMasks["WaterFluxDiagonal"]->texture, true);
+		m_terrainDebug->RegisterTexture("Generated Flow", DebugMode::DEBUG_WATER_FLUX, m_globalMasks["FlowAccumulationMask"]->texture, true);
 		m_terrainDebug->RegisterTexture("Erosion / Deposit Delta", DebugMode::DEBUG_EROSION_DELTA, m_globalMasks["ErosionDelta"]->texture, true);
 		m_terrainDebug->RegisterTexture("Flow Accumulation", DebugMode::DEBUG_FLOW_ACCUMULATION, m_globalMasks["FlowAccumulationMask"]->texture, true);
 		m_terrainDebug->RegisterTexture("Accumulated River Channels", DebugMode::DEBUG_RIVER_CHANNELS, m_globalMasks["RiverChannelMask"]->texture, true);
@@ -736,21 +666,17 @@ namespace pwg
 		return m_generationRevision;
 	}
 
-	bool ChunkManager::IsParticleBakeActive() const
+	bool ChunkManager::IsParticleErosionActive() const
 	{
-		return m_particleBakeActive;
+		return m_terrainComputePipeline->IsParticleErosionActive();
 	}
 
-	int ChunkManager::GetParticleBakeStep() const
-	{
-		return m_particleBakeStep;
-	}
-
-	int ChunkManager::GetParticleBakeTotal() const
-	{
-		return m_particleBakeTotal;
-	}
-
+	bool ChunkManager::IsParticleErosionReady() const { return m_terrainComputePipeline->IsParticleErosionReady(); }
+	float ChunkManager::GetParticleErosionSpeed() const { return m_terrainComputePipeline->GetParticleErosionSpeed(); }
+	void ChunkManager::SetParticleErosionSpeed(float speed) { m_terrainComputePipeline->SetParticleErosionSpeed(speed); }
+	bool ChunkManager::GetShowErosionParticles() const { return m_terrainComputePipeline->GetShowErosionParticles(); }
+	void ChunkManager::SetShowErosionParticles(bool show) { m_terrainComputePipeline->SetShowErosionParticles(show); }
+	int ChunkManager::GetActiveParticleCount() const { return m_terrainComputePipeline->GetActiveParticleCount(); }
 	float ChunkManager::SampleHeightAtWorld(float worldX, float worldZ)
 	{
 		if (!m_heightCacheValid || m_heightCache.empty() || m_worldSize <= 1)
@@ -759,10 +685,10 @@ namespace pwg
 		}
 
 		float worldHalfSize = (m_worldSize - 1) * 0.5f;
-		// Terrain vertices sample normalized UVs. OpenGL maps those coordinates to
-		// texel centers with a -0.5 offset, so CPU height queries must do the same.
-		float textureX = std::clamp(worldX + worldHalfSize - 0.5f, 0.0f, static_cast<float>(m_worldSize - 1));
-		float textureZ = std::clamp(worldZ + worldHalfSize - 0.5f, 0.0f, static_cast<float>(m_worldSize - 1));
+		// Chunk UVs map global grid coordinate g to (g + 0.5) / worldSize, whose
+		// OpenGL texel coordinate is exactly g. Match that mapping on the CPU.
+		float textureX = std::clamp(worldX + worldHalfSize, 0.0f, static_cast<float>(m_worldSize - 1));
+		float textureZ = std::clamp(worldZ + worldHalfSize, 0.0f, static_cast<float>(m_worldSize - 1));
 
 		int x0 = static_cast<int>(std::floor(textureX));
 		int z0 = static_cast<int>(std::floor(textureZ));
@@ -826,16 +752,24 @@ namespace pwg
 	void ChunkManager::GenerateWorld()
 	{
 		m_terrainComputePipeline->GenerateWorld(m_globalMasks);
-		UpdateHeightCache();
-		++m_generationRevision;
+		if (!m_proceduralAssetsInitialized)
+		{
+			m_proceduralAssetsInitialized = m_terrainComputePipeline->RefreshProceduralAssets(m_globalMasks);
+		}
+		if (!m_terrainComputePipeline->IsParticleErosionActive())
+		{
+			UpdateHeightCache();
+			++m_generationRevision;
+		}
 		m_needRegenerate = false;
 	}
 
 	bool ChunkManager::RunUniversalGraph()
 	{
-		m_particleBakeActive = false;
+		if (m_terrainComputePipeline->IsParticleErosionActive()) return false;
+		CancelHydrology();
 		bool executed = m_terrainComputePipeline->ExecuteUniversalGraph(m_globalMasks);
-		if (executed)
+		if (executed && !m_terrainComputePipeline->IsParticleErosionActive())
 		{
 			m_globalMasks["BaseHeight"]->texture->CopyFrom(*m_globalMasks["FinalHeight"]->texture);
 			UpdateHeightCache();
@@ -845,15 +779,19 @@ namespace pwg
 		return executed;
 	}
 
-	void ChunkManager::BakeErosionAfterWorldGen()
+	bool ChunkManager::RefreshProceduralAssets()
 	{
-		for (int i = 0; i < 8; ++i)
-		{
-			StepSimulation();
-		}
-		UpdateHeightCache();
-		++m_generationRevision;
+		if (m_terrainComputePipeline->IsParticleErosionActive()) return false;
+		const bool refreshed = m_terrainComputePipeline->RefreshProceduralAssets(m_globalMasks);
+		m_proceduralAssetsInitialized = refreshed || m_proceduralAssetsInitialized;
+		return refreshed;
 	}
+
+	const std::string& ChunkManager::GetProceduralAssetStatus() const
+	{
+		return m_terrainComputePipeline->GetProceduralAssetStatus();
+	}
+
 }
 
 

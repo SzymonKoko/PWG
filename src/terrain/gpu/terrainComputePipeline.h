@@ -15,10 +15,9 @@
 #include "terrain/graph/passes/finalHeightPass.h"
 #include "terrain/graph/passes/normalMaskPass.h"
 #include "terrain/graph/passes/slopeMaskPass.h"
-#include "terrain/graph/passes/hydraulicFluxPass.h"
-#include "terrain/graph/passes/hydraulicWaterPass.h"
-#include "terrain/graph/passes/erosionPass.h"
-#include "terrain/graph/passes/particleErosionPass.h"
+#include "terrain/erosion/gpuParticleErosion.h"
+#include "terrain/water/waterClipmapRenderer.h"
+#include "terrain/hydrology/drainageNetworkGenerator.h"
 #include "terrain/chunk/terrainChunk.h"
 
 #include "terrain/debug/terrainDebug.h"
@@ -49,17 +48,36 @@ namespace pwg
 
 		void Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void RegenerateTerrain(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
-		void StepSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
-		void StepWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
-		void SettleWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, int iterations);
-		void StepErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
-		void StepParticleBake(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool uploadPreview);
-		void BakeParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void RefreshMaskPass(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void GenerateWorld(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
-		void ResetWaterSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
-		void ResetErosionSimulation(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		bool ExecuteUniversalGraph(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		bool RefreshProceduralAssets(const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		const std::string& GetProceduralAssetStatus() const;
+		void InvalidateWaterRenderCache();
+		void DrawWaterClipmap(const std::shared_ptr<Shader>& shader, const glm::vec3& cameraPosition,
+			const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		bool GenerateHydrology(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		bool UpdateHydrology(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void CancelHydrology();
+		bool ResetHydrology(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		bool IsHydrologyRunning() const;
+		float GetHydrologyProgress() const;
+		std::string GetHydrologyStatus() const;
+		void MarkHydrologyRestored(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool restored);
+		bool UpdateParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, float deltaTime);
+		bool StepParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		bool ResetParticleErosionState(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void StartParticleErosion();
+		void PauseParticleErosion();
+		void CancelParticleErosion();
+		bool IsParticleErosionActive() const;
+		bool IsParticleErosionReady() const;
+		float GetParticleErosionSpeed() const;
+		void SetParticleErosionSpeed(float speed);
+		bool GetShowErosionParticles() const;
+		void SetShowErosionParticles(bool show);
+		int GetActiveParticleCount() const;
+		void DrawErosionParticles(const glm::mat4& view, const glm::mat4& projection);
 		void ApplyUniversalGraphSimulationSettings();
 
 		TerrainPassContext& GetPassContext();
@@ -81,6 +99,8 @@ namespace pwg
 		std::shared_ptr<Texture> GetFinalMaskTexture();
 		std::unordered_map<std::string, std::shared_ptr<Texture>>& GetFinalTerrainMasks();
 	private:
+		void RefreshParticleErosionPreviews(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void RefreshHydrologyGraphOutputs(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		std::unordered_map<std::string, std::shared_ptr<ComputeShader>> m_computeShaders;
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> m_terrainMasks;
 		std::unordered_map<std::string, std::shared_ptr<Texture>> m_finalTerrainMasks;
@@ -88,10 +108,20 @@ namespace pwg
 		TerrainGraphAsset m_universalGraphAsset;
 		std::vector<VegetationLayerDescriptor> m_vegetationLayers;
 		std::uint64_t m_vegetationRevision{ 0 };
+		std::string m_proceduralAssetStatus{ "Assets have not been spawned" };
 		std::shared_ptr<ShaderManager> m_shaderManager;
 		std::shared_ptr<TerrainDebug> m_terrainDebug;
 
 		TerrainPassContext m_terrainPassContext;
+		std::unique_ptr<GpuParticleErosion> m_gpuParticleErosion;
+		std::unique_ptr<WaterClipmapRenderer> m_waterClipmapRenderer;
+		std::unique_ptr<DrainageNetworkGenerator> m_drainageNetworkGenerator;
+		bool m_hydrologyGenerated{ false };
+		std::string m_hydrologyStatus{ "Hydrology not generated" };
+		bool m_particleErosionReady{ false };
+		bool m_particleErosionRunning{ false };
+		float m_particleStepAccumulator{ 0.0f };
+		unsigned int m_particleStepCount{ 0 };
 		int m_size{ 0 };
 	};
 }

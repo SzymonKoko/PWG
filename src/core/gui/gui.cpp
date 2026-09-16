@@ -263,20 +263,15 @@ void pwg::Gui::DrawMainMenuBar()
 	if (editor && ImGui::BeginMenu("Simulation"))
 	{
 		auto chunkManager = editor->GetTerrain()->GetChunkManager();
-		if (ImGui::MenuItem("Step Simulation"))
+		if (ImGui::MenuItem("Generate Hydrology"))
 		{
-			chunkManager->StepSimulation();
+			chunkManager->GenerateHydrology();
 			MarkProjectDirty();
 		}
 		ImGui::Separator();
-		if (ImGui::MenuItem("Reset Water"))
+		if (ImGui::MenuItem("Reset Hydrology"))
 		{
-			chunkManager->ResetWaterSimulation();
-			MarkProjectDirty();
-		}
-		if (ImGui::MenuItem("Reset Terrain Erosion"))
-		{
-			chunkManager->ResetErosionSimulation();
+			chunkManager->ResetHydrology();
 			MarkProjectDirty();
 		}
 		ImGui::EndMenu();
@@ -332,15 +327,15 @@ void pwg::Gui::DrawTopToolbar()
 		MarkProjectDirty();
 	}
 	ImGui::SameLine();
-	if (ImGui::Button("Step Sim"))
+	if (ImGui::Button("Generate Hydrology"))
 	{
-		chunkManager->StepSimulation();
+		chunkManager->GenerateHydrology();
 		MarkProjectDirty();
 	}
 	ImGui::SameLine();
-	if (ImGui::Button("Reset Water"))
+	if (ImGui::Button("Reset Hydrology"))
 	{
-		chunkManager->ResetWaterSimulation();
+		chunkManager->ResetHydrology();
 		MarkProjectDirty();
 	}
 

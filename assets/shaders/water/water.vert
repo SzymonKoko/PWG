@@ -1,62 +1,47 @@
 #version 450 core
 
 layout (location = 0) in vec3 a_Pos;
-layout (location = 1) in vec3 a_Normals;
-layout (location = 2) in vec2 a_TextureCoordinates;
 
 out vec3 f_WorldPos;
 out vec3 f_MacroNormal;
 out vec2 f_WorldUV;
-out float f_WaterDepth;
-out float f_Flow;
-out float f_Channel;
+out float f_RenderLod;
 
-uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
-uniform sampler2D u_Heightmap;
-uniform sampler2D u_Watermap;
-uniform sampler2D u_FlowAccumulationmap;
-uniform sampler2D u_RiverChannelmap;
-uniform vec2 u_uvOffset;
-uniform vec2 u_uvScale;
-uniform float u_minVisibleWaterDepth;
+uniform sampler2D u_WaterSurfaceCache;
+uniform vec2 u_clipmapCenter;
+uniform float u_gridSpacing;
+uniform float u_worldSize;
+uniform int u_ringLevel;
 
-float SurfaceAt(vec2 uv)
+float SurfaceAt(vec2 uv, float lod)
 {
-    return texture(u_Heightmap, uv).r + max(texture(u_Watermap, uv).r, 0.0);
+    return textureLod(u_WaterSurfaceCache, clamp(uv, vec2(0.0), vec2(1.0)), lod).r;
 }
 
 void main()
 {
-    vec2 uv = u_uvOffset + a_TextureCoordinates * u_uvScale;
-    vec2 texel = 1.0 / vec2(textureSize(u_Heightmap, 0));
-    float terrainHeight = texture(u_Heightmap, uv).r;
-    float waterDepth = max(texture(u_Watermap, uv).r, 0.0);
-    float flow = texture(u_FlowAccumulationmap, uv).r;
-    float channel = texture(u_RiverChannelmap, uv).r;
+    vec2 local = a_Pos.xz;
+    float edgeDistance = max(abs(local.x), abs(local.y));
+    float morph = u_ringLevel < 5 ? smoothstep(56.0, 64.0, edgeDistance) : 0.0;
+    vec2 coarseLocal = round(local * 0.5) * 2.0;
+    local = mix(local, coarseLocal, morph);
 
-    float center = terrainHeight + waterDepth;
-    float left = SurfaceAt(uv - vec2(texel.x, 0.0));
-    float right = SurfaceAt(uv + vec2(texel.x, 0.0));
-    float down = SurfaceAt(uv - vec2(0.0, texel.y));
-    float up = SurfaceAt(uv + vec2(0.0, texel.y));
-    float localAverage = (center * 4.0 + left + right + down + up) * 0.125;
-    // Ignore the thin rain film produced on every simulation cell. Only pooled
-    // water should start leveling into a lake surface.
-    float standingWater = smoothstep(u_minVisibleWaterDepth + 0.015, u_minVisibleWaterDepth + 0.10, waterDepth)
-        * (1.0 - smoothstep(0.18, 0.65, max(flow, channel)));
-    float surfaceHeight = mix(center, localAverage, standingWater * 0.72) + 0.015;
+    vec2 worldXZ = u_clipmapCenter + local * u_gridSpacing;
+    float halfWorld = (u_worldSize - 1.0) * 0.5;
+    vec2 uv = (worldXZ + vec2(halfWorld)) / max(u_worldSize - 1.0, 1.0);
+    float lod = float(u_ringLevel);
+    vec2 texel = vec2(exp2(lod) / u_worldSize);
+    float center = SurfaceAt(uv, lod);
+    float left = SurfaceAt(uv - vec2(texel.x, 0.0), lod);
+    float right = SurfaceAt(uv + vec2(texel.x, 0.0), lod);
+    float down = SurfaceAt(uv - vec2(0.0, texel.y), lod);
+    float up = SurfaceAt(uv + vec2(0.0, texel.y), lod);
 
-    vec3 position = a_Pos;
-    position.y = surfaceHeight;
-    vec4 worldPosition = u_model * vec4(position, 1.0);
-
-    f_WorldPos = worldPosition.xyz;
-    f_MacroNormal = normalize(mat3(u_model) * normalize(vec3(left - right, 2.0, down - up)));
+    f_WorldPos = vec3(worldXZ.x, center + 0.015, worldXZ.y);
+    f_MacroNormal = normalize(vec3(left - right, 2.0 * u_gridSpacing, down - up));
     f_WorldUV = uv;
-    f_WaterDepth = waterDepth;
-    f_Flow = flow;
-    f_Channel = channel;
-    gl_Position = u_projection * u_view * worldPosition;
+    f_RenderLod = lod;
+    gl_Position = u_projection * u_view * vec4(f_WorldPos, 1.0);
 }

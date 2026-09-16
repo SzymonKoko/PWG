@@ -292,13 +292,16 @@ namespace pwg
 		{
 			return;
 		}
-		if (m_seenGraphRevision == pipeline.GetVegetationRevision() && m_seenTerrainRevision == terrainRevision)
+		const bool layoutChanged = m_seenGraphRevision != pipeline.GetVegetationRevision();
+		const bool terrainChanged = m_seenTerrainRevision != terrainRevision;
+		if (!layoutChanged && !terrainChanged)
 		{
 			return;
 		}
 		m_seenGraphRevision = pipeline.GetVegetationRevision();
 		m_seenTerrainRevision = terrainRevision;
-		Regenerate(terrain, pipeline.GetVegetationLayers());
+		if (layoutChanged || m_layers.empty()) Regenerate(terrain, pipeline.GetVegetationLayers());
+		else RefreshGrounding(terrain);
 	}
 
 	void VegetationSystem::Regenerate(std::shared_ptr<Terrain> terrain, const std::vector<VegetationLayerDescriptor>& layers)
@@ -423,7 +426,9 @@ namespace pwg
 						: BuildModelMatrix(*model, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees);
 					float collisionRadius = model->kind == VegetationKind::Rock ? std::max(footprintRadius, 0.35f) : 0.0f;
 					float collisionHeight = model->kind == VegetationKind::Rock ? std::max(height - groundSink, 0.5f) : 0.0f;
-					m_trees.push_back({ layer.modelIndex, position, modelMatrix, height * 0.6f, layer.descriptor.renderDistance, groundRadius, groundSink, collisionRadius, collisionHeight, variantIndex });
+					m_trees.push_back({ layer.modelIndex, position, modelMatrix, height * 0.6f, layer.descriptor.renderDistance,
+						groundRadius, groundSink, collisionRadius, collisionHeight, variantIndex, yaw, scale,
+						layer.descriptor.maxTiltDegrees, layer.descriptor.alignToSlope });
 				}
 			}
 		}
@@ -527,7 +532,9 @@ namespace pwg
 				glm::mat4 modelMatrix = variantIndex >= 0
 					? BuildModelMatrix(model->submeshes[static_cast<std::size_t>(variantIndex)], model->targetHeight, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees)
 					: BuildModelMatrix(*model, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees);
-				m_grass.push_back({ layer.modelIndex, position, modelMatrix, height * 0.75f, radius, groundRadius, groundSink, 0.0f, 0.0f, variantIndex });
+				m_grass.push_back({ layer.modelIndex, position, modelMatrix, height * 0.75f, radius, groundRadius,
+					groundSink, 0.0f, 0.0f, variantIndex, yaw, scale, layer.descriptor.maxTiltDegrees,
+					layer.descriptor.alignToSlope });
 			};
 
 			tryCell(centerX, centerZ);
@@ -559,12 +566,16 @@ namespace pwg
 			for (auto& instance : instances)
 			{
 				float groundedY = SampleGroundHeight(terrain, instance.position.x, instance.position.z, instance.groundRadius, instance.groundSink);
-				float delta = groundedY - instance.position.y;
-				if (std::abs(delta) > 0.001f)
-				{
-					instance.position.y = groundedY;
-					instance.model[3].y += delta;
-				}
+				instance.position.y = groundedY;
+				const VegetationModel* model = FindModel(instance.modelIndex);
+				if (!model) continue;
+				glm::vec3 normal = instance.alignToSlope
+					? SampleTerrainNormal(terrain, instance.position.x, instance.position.z)
+					: glm::vec3(0.0f, 1.0f, 0.0f);
+				instance.model = instance.variantIndex >= 0 && static_cast<std::size_t>(instance.variantIndex) < model->submeshes.size()
+					? BuildModelMatrix(model->submeshes[static_cast<std::size_t>(instance.variantIndex)], model->targetHeight,
+						instance.position, instance.yaw, instance.scale, normal, instance.maxTiltDegrees)
+					: BuildModelMatrix(*model, instance.position, instance.yaw, instance.scale, normal, instance.maxTiltDegrees);
 			}
 		};
 		refresh(m_trees);
@@ -782,8 +793,8 @@ namespace pwg
 		m_worldMin = 0.0f;
 		m_worldMax = 0.0f;
 		m_groundingAccumulator = 0.0f;
-		m_seenGraphRevision = 0;
-		m_seenTerrainRevision = 0;
+		m_seenGraphRevision = std::numeric_limits<std::uint64_t>::max();
+		m_seenTerrainRevision = std::numeric_limits<std::uint64_t>::max();
 	}
 
 	void VegetationSystem::ReloadAssetModels()

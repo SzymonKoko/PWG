@@ -1,0 +1,166 @@
+#version 450 core
+
+layout (local_size_x = 256) in;
+
+struct Particle
+{
+    vec4 motion;
+    uvec4 state;
+};
+
+layout (std430, binding = 0) buffer ParticleBuffer { Particle particles[]; };
+layout (r32i, binding = 0) uniform iimage2D u_heightDelta;
+layout (r32i, binding = 1) uniform iimage2D u_flowDelta;
+layout (r32i, binding = 2) uniform iimage2D u_waterDelta;
+
+uniform sampler2D u_height;
+uniform sampler2D u_water;
+uniform sampler2D u_flow;
+uniform sampler2D u_channels;
+uniform int u_size;
+uniform int u_particleCount;
+uniform int u_seed;
+uniform int u_step;
+uniform float u_amount;
+
+const float DELTA_SCALE = 100000.0;
+const float FLOW_SCALE = 4096.0;
+const float WATER_SCALE = 100000.0;
+
+uint Hash(uint value)
+{
+    value ^= value >> 16;
+    value *= 0x7feb352du;
+    value ^= value >> 15;
+    value *= 0x846ca68bu;
+    return value ^ (value >> 16);
+}
+
+float Random01(inout uint state)
+{
+    state = Hash(state);
+    return float(state & 0x00ffffffu) / 16777216.0;
+}
+
+float HeightAt(vec2 position)
+{
+    vec2 uv = (clamp(position, vec2(0.0), vec2(u_size - 1)) + 0.5) / float(u_size);
+    return texture(u_height, uv).r;
+}
+
+float WaterAt(vec2 position)
+{
+    ivec2 p = clamp(ivec2(position), ivec2(0), ivec2(u_size - 1));
+    return max(texelFetch(u_water, p, 0).r, 0.0);
+}
+
+float SurfaceAt(vec2 position)
+{
+    return HeightAt(position) + WaterAt(position);
+}
+
+void AddTerrainDelta(ivec2 center, float value)
+{
+    const ivec2 offsets[9] = ivec2[9](
+        ivec2(0, 0), ivec2(-1, 0), ivec2(1, 0), ivec2(0, -1), ivec2(0, 1),
+        ivec2(-1, -1), ivec2(1, -1), ivec2(-1, 1), ivec2(1, 1));
+    const float weights[9] = float[9](0.28, 0.12, 0.12, 0.12, 0.12, 0.06, 0.06, 0.06, 0.06);
+    for (int i = 0; i < 9; ++i)
+    {
+        ivec2 p = clamp(center + offsets[i], ivec2(0), ivec2(u_size - 1));
+        imageAtomicAdd(u_heightDelta, p, int(round(value * weights[i] * DELTA_SCALE)));
+    }
+}
+
+void Spawn(inout Particle particle, uint id)
+{
+    uint rng = Hash(id * 9781u + uint(u_seed) * 6271u + uint(u_step + 1) * 26699u + particle.state.x);
+    particle.motion = vec4(
+        1.0 + Random01(rng) * float(u_size - 3),
+        1.0 + Random01(rng) * float(u_size - 3),
+        0.0, 0.0);
+    particle.state = uvec4(rng, 0u, floatBitsToUint(1.0), floatBitsToUint(0.0));
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= uint(u_particleCount)) return;
+
+    Particle particle = particles[id];
+    float water = uintBitsToFloat(particle.state.z);
+    float sediment = uintBitsToFloat(particle.state.w);
+    uint age = particle.state.y;
+    if (age == 0u || age >= 160u || water < 0.025)
+    {
+        if (age > 0u && water > 0.0)
+        {
+            ivec2 restingCell = clamp(ivec2(particle.motion.xy), ivec2(0), ivec2(u_size - 1));
+            imageAtomicAdd(u_waterDelta, restingCell, int(round(water * 0.003 * WATER_SCALE)));
+            AddTerrainDelta(restingCell, sediment);
+        }
+        Spawn(particle, id);
+        water = 1.0;
+        sediment = 0.0;
+        age = 0u;
+    }
+
+    vec2 position = particle.motion.xy;
+    float center = SurfaceAt(position);
+    vec2 gradient = vec2(
+        SurfaceAt(position + vec2(1.0, 0.0)) - SurfaceAt(position - vec2(1.0, 0.0)),
+        SurfaceAt(position + vec2(0.0, 1.0)) - SurfaceAt(position - vec2(0.0, 1.0))) * 0.5;
+    vec2 downhill = -gradient;
+    float slope = length(gradient);
+    vec2 velocity = particle.motion.zw * 0.28 + downhill * (0.72 / max(slope, 0.00001));
+    float speed = length(velocity);
+
+    if (slope < 0.00001 || speed < 0.00001)
+    {
+        imageAtomicAdd(u_waterDelta, ivec2(position), int(round(water * 0.003 * WATER_SCALE)));
+        AddTerrainDelta(ivec2(position), sediment);
+        particle.state.y = 160u;
+		particle.state.z = floatBitsToUint(0.0);
+		particle.state.w = floatBitsToUint(0.0);
+        particles[id] = particle;
+        return;
+    }
+
+    velocity /= speed;
+    vec2 nextPosition = position + velocity;
+    if (any(lessThan(nextPosition, vec2(1.0))) || any(greaterThanEqual(nextPosition, vec2(u_size - 2))))
+    {
+		AddTerrainDelta(ivec2(position), sediment);
+        particle.state.y = 160u;
+		particle.state.z = floatBitsToUint(0.0);
+		particle.state.w = floatBitsToUint(0.0);
+        particles[id] = particle;
+        return;
+    }
+
+    float nextHeight = HeightAt(nextPosition) + WaterAt(nextPosition);
+    float drop = center - nextHeight;
+    float discharge = max(texelFetch(u_flow, ivec2(position), 0).r, texelFetch(u_channels, ivec2(position), 0).r);
+    float capacity = max(drop, slope * 0.08) * water * (5.0 + 16.0 * u_amount) * (1.0 + discharge);
+    float exchange = 0.0;
+    if (sediment > capacity || drop < 0.0)
+    {
+        exchange = min(sediment, max((sediment - capacity) * (0.18 + 0.22 * u_amount), -drop));
+        sediment -= exchange;
+        AddTerrainDelta(ivec2(position), exchange);
+    }
+    else
+    {
+        exchange = min((capacity - sediment) * (0.16 + 0.42 * u_amount), max(drop * 0.65, slope * 0.015));
+        sediment += exchange;
+        AddTerrainDelta(ivec2(position), -exchange);
+    }
+
+    imageAtomicAdd(u_flowDelta, ivec2(position), int(round(water * FLOW_SCALE)));
+    water *= 0.992;
+    particle.motion = vec4(nextPosition, velocity);
+    particle.state.y = age + 1u;
+    particle.state.z = floatBitsToUint(water);
+    particle.state.w = floatBitsToUint(sediment);
+    particles[id] = particle;
+}

@@ -79,6 +79,10 @@ namespace pwg
 			float collisionRadius{ 0.0f };
 			float collisionHeight{ 0.0f };
 			int variantIndex{ 0 };
+			float yaw{ 0.0f };
+			float scale{ 1.0f };
+			float maxTiltDegrees{ 0.0f };
+			bool alignToSlope{ false };
 		};
 
 		bool LoadModel(const VegetationAssetDefinition& definition);

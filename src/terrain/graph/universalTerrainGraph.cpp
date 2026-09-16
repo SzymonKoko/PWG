@@ -266,72 +266,22 @@ namespace pwg
 			{ "posterizeMask", "Posterize Mask", "Terrain", { Input("mask", "Mask") }, { Output("mask", "Mask") }, {
 				IntParam("steps", "Steps", 4, 2.0f, 64.0f)
 			} },
-			{ "hydraulicSimulation", "Hydraulic Simulation", "Simulation", {}, {}, {
-				BoolParam("autoWaterSimulation", "Auto Run", false),
-				IntParam("stepsPerUpdate", "Steps Per Update", 1, 1.0f, 16.0f),
-				IntParam("waterStepsPerSecond", "Steps Per Second", 8, 1.0f, 60.0f),
-				IntParam("waterSubsteps", "Substeps", 2, 1.0f, 8.0f),
-				FloatParam("rainRate", "Rain Rate", 0.004f, 0.0f, 0.08f),
-				FloatParam("rainElevationBias", "Rain Elevation Bias", 0.35f, 0.0f, 1.0f),
-				FloatParam("rainMinHeight", "Rain Min Height", 0.0f, -20000.0f, 20000.0f),
-				FloatParam("rainMaxHeight", "Rain Max Height", 1.2f, -20000.0f, 20000.0f),
-				FloatParam("evaporation", "Evaporation", 0.00004f, 0.0f, 0.01f),
-				FloatParam("infiltrationRate", "Infiltration", 0.00003f, 0.0f, 0.01f),
-				FloatParam("boundaryDrain", "Boundary Drain", 0.92f, 0.0f, 1.0f),
-				FloatParam("maxWaterDepth", "Max Water Depth", 2.5f, 0.05f, 20.0f),
-				FloatParam("pipeFlow", "Pipe Flow", 0.38f, 0.0f, 2.0f),
-				FloatParam("pipeDamping", "Pipe Damping", 0.28f, 0.0f, 1.0f),
-				FloatParam("flowConcentration", "Flow Concentration", 0.40f, 0.0f, 2.0f),
-				BoolParam("useDiagonalFlow", "Diagonal Flow", true)
+			{ "drainageNetwork", "Drainage Network", "Simulation", {}, {
+				Output("water", "Water"), Output("flow", "Flow"),
+				Output("rivers", "Rivers"), Output("lakes", "Lakes")
+			}, {
+				FloatParam("riverAmount", "River Amount", 0.5f, 0.0f, 1.0f),
+				FloatParam("lakeAmount", "Lake Amount", 0.5f, 0.0f, 1.0f),
+				IntParam("seed", "Seed", 1337, 1.0f, 100000.0f)
 			} },
-			{ "streamErosion", "Stream Erosion", "Simulation", {}, {}, {
-				BoolParam("erosionEnabled", "Enabled", true),
-				FloatParam("sedimentCapacity", "Sediment Capacity", 4.0f, 0.0f, 20.0f),
-				FloatParam("erosionStrength", "Channel Carving", 0.20f, 0.0f, 0.6f),
-				FloatParam("depositionStrength", "Deposition", 0.014f, 0.0f, 0.2f),
-				FloatParam("flatteningStrength", "Flattening", 0.25f, 0.0f, 1.0f),
-				FloatParam("minWaterToErode", "Min Water To Erode", 0.0008f, 0.0f, 0.05f),
-				FloatParam("minFlowToErode", "Min Flow To Erode", 0.0003f, 0.0f, 0.05f),
-				FloatParam("maxHeightChange", "Max Height Change", 0.018f, 0.0f, 0.2f),
-				FloatParam("maxErosionDepth", "Max Erosion Depth", 1.0f, 0.0f, 20.0f),
-				FloatParam("maxDepositHeight", "Max Deposit Height", 0.06f, 0.0f, 2.0f),
-				FloatParam("flowAccumulationGrowth", "Flow Accum Growth", 0.90f, 0.0f, 2.0f),
-				FloatParam("flowAccumulationDecay", "Flow Accum Decay", 0.008f, 0.0f, 0.1f),
-				FloatParam("riverChannelGrowth", "River Growth", 0.22f, 0.0f, 1.0f),
-				FloatParam("riverChannelDecay", "River Decay", 0.004f, 0.0f, 0.1f),
-				FloatParam("riverChannelInfluence", "River Influence", 0.55f, 0.0f, 2.0f),
-				FloatParam("riverChannelDepth", "River Depth", 0.14f, 0.0f, 2.0f)
-			} },
-			{ "particleErosion", "Particle Erosion", "Simulation", {}, {}, {
-				BoolParam("particleErosionEnabled", "Enabled", false),
-				IntParam("bakeParticleSteps", "Bake Steps", 24, 1.0f, 512.0f),
-				IntParam("bakeStepsPerFrame", "Bake Steps Per Frame", 1, 1.0f, 32.0f),
-				IntParam("bakeUploadInterval", "Upload Interval", 4, 1.0f, 64.0f),
-				IntParam("particlesPerStep", "Particles Per Step", 2500, 100.0f, 120000.0f),
-				IntParam("dropletLifetime", "Droplet Lifetime", 36, 1.0f, 256.0f),
-				IntParam("particleSeed", "Seed", 1337, 1.0f, 100000.0f),
-				FloatParam("particleInertia", "Inertia", 0.22f, 0.0f, 0.95f),
-				FloatParam("particleGravity", "Gravity", 5.5f, 0.1f, 20.0f),
-				FloatParam("particleInitialWater", "Initial Water", 1.0f, 0.0f, 10.0f),
-				FloatParam("particleEvaporation", "Evaporation", 0.018f, 0.0f, 0.2f),
-				FloatParam("particleMinSlope", "Min Slope", 0.0008f, 0.0f, 0.05f),
-				FloatParam("particleCapacity", "Capacity", 5.0f, 0.1f, 20.0f),
-				FloatParam("particleErosionStrength", "Erosion Strength", 0.045f, 0.0f, 0.3f),
-				FloatParam("particleDepositionStrength", "Deposition Strength", 0.18f, 0.0f, 0.5f),
-				FloatParam("particleBrushRadius", "Brush Radius", 2.0f, 0.5f, 5.0f),
-				FloatParam("particleDepositRadius", "Deposit Radius", 5.0f, 0.5f, 12.0f),
-				FloatParam("particleChannelStrength", "Channel Strength", 0.04f, 0.0f, 0.2f),
-				FloatParam("particleFlowStrength", "Flow Strength", 0.015f, 0.0f, 0.1f)
-			} },
-			{ "lakeCleanup", "Lake Cleanup", "Simulation", {}, {}, {
-				FloatParam("lakeMinDepth", "Lake Min Depth", 0.012f, 0.005f, 0.15f),
-				FloatParam("lakeLeveling", "Surface Leveling", 0.48f, 0.0f, 0.8f),
-				FloatParam("lakeFillEnabled", "Particle Lake Fill", 1.0f, 0.0f, 1.0f),
-				FloatParam("lakeMinFlow", "Lake Min Flow", 0.015f, 0.0f, 1.0f),
-				FloatParam("lakeMaxDepth", "Lake Max Depth", 2.5f, 0.05f, 10.0f),
-				FloatParam("lakeBedSmoothing", "Bed Smoothing", 0.06f, 0.0f, 0.5f),
-				FloatParam("lakeWaterSmoothing", "Water Smoothing", 0.30f, 0.0f, 1.0f),
-				FloatParam("lakeInfiltrationScale", "Infiltration Scale", 0.03f, 0.0f, 1.0f)
+			{ "particleErosion", "Particle Erosion", "Terrain", { Input("height", "Height") }, {
+				Output("height", "Height"),
+				Output("flow", "Flow"),
+				Output("deposition", "Deposition"),
+				Output("erosion", "Erosion")
+			}, {
+				FloatParam("amount", "Amount", 0.35f, 0.0f, 1.0f),
+				IntParam("seed", "Seed", 1337, 1.0f, 100000.0f)
 			} },
 			{ "treeAssetA", "Tree A", "Vegetation", { Input("density", "Density Mask", false, 1.0f) }, {}, {
 				IntParam("seed", "Seed", 1337, 1.0f, 100000.0f),
@@ -394,7 +344,7 @@ namespace pwg
 		return it != types.end() ? &(*it) : nullptr;
 	}
 
-	TerrainGraphValueRange EstimateTerrainGraphOutputRange(const TerrainGraphAsset& asset, int nodeId, const std::string&, int depth)
+	TerrainGraphValueRange EstimateTerrainGraphOutputRange(const TerrainGraphAsset& asset, int nodeId, const std::string& portId, int depth)
 	{
 		if (depth > 32) return { 0.0f, 1.0f, false };
 		const TerrainGraphNodeInstance* node = asset.FindNode(nodeId);
@@ -418,6 +368,14 @@ namespace pwg
 		if (node->typeId == "noiseHeight" || node->typeId == "noiseMask" || node->typeId == "normalize" ||
 			node->typeId == "smoothstep" || node->typeId == "thresholdMask" || node->typeId == "heightBandMask" ||
 			node->typeId == "slopeMask" || node->typeId == "curvatureMask" || node->typeId == "posterizeMask")
+		{
+			return { 0.0f, 1.0f, true };
+		}
+		if (node->typeId == "particleErosion")
+		{
+			return portId == "height" ? inputRange("height") : TerrainGraphValueRange{ 0.0f, 1.0f, true };
+		}
+		if (node->typeId == "drainageNetwork")
 		{
 			return { 0.0f, 1.0f, true };
 		}
@@ -503,6 +461,8 @@ namespace pwg
 		std::unordered_map<int, int> indegree;
 		std::unordered_map<int, std::vector<int>> outgoing;
 		std::unordered_set<int> nodeIds;
+		int particleErosionNodes = 0;
+		int drainageNetworkNodes = 0;
 
 		for (const auto& node : asset.nodes)
 		{
@@ -515,6 +475,11 @@ namespace pwg
 				result.messages.push_back(node.displayName + ": unknown node type '" + node.typeId + "'");
 				continue;
 			}
+			if (node.typeId == "particleErosion")
+			{
+				++particleErosionNodes;
+			}
+			if (node.typeId == "drainageNetwork") ++drainageNetworkNodes;
 			for (const auto& input : type->inputs)
 			{
 				if (input.required && !asset.FindInputLink(node.id, input.id))
@@ -523,6 +488,16 @@ namespace pwg
 					result.messages.push_back(node.displayName + ": missing required input '" + input.displayName + "'");
 				}
 			}
+		}
+		if (particleErosionNodes > 1)
+		{
+			result.valid = false;
+			result.messages.push_back("Only one Particle Erosion node is supported");
+		}
+		if (drainageNetworkNodes > 1)
+		{
+			result.valid = false;
+			result.messages.push_back("Only one Drainage Network node is supported");
 		}
 
 		for (const auto& link : asset.links)
@@ -605,21 +580,23 @@ namespace pwg
 			auto& outputNode = asset.AddNode(*output, ImVec2(360.0f, 30.0f));
 			asset.AddLink(noiseNode.id, "height", outputNode.id, "height");
 		}
-		if (const auto* hydro = FindTerrainGraphNodeType("hydraulicSimulation"))
+		if (const auto* hydro = FindTerrainGraphNodeType("drainageNetwork"))
 		{
 			asset.AddNode(*hydro, ImVec2(0.0f, 190.0f));
 		}
-		if (const auto* stream = FindTerrainGraphNodeType("streamErosion"))
+		if (noise && output)
 		{
-			asset.AddNode(*stream, ImVec2(360.0f, 190.0f));
-		}
-		if (const auto* particle = FindTerrainGraphNodeType("particleErosion"))
-		{
-			asset.AddNode(*particle, ImVec2(720.0f, 190.0f));
-		}
-		if (const auto* lake = FindTerrainGraphNodeType("lakeCleanup"))
-		{
-			asset.AddNode(*lake, ImVec2(1080.0f, 190.0f));
+			const auto* particle = FindTerrainGraphNodeType("particleErosion");
+			if (particle && asset.nodes.size() >= 2)
+			{
+				int noiseId = asset.nodes[0].id;
+				int outputId = asset.nodes[1].id;
+				asset.links.clear();
+				auto& particleNode = asset.AddNode(*particle, ImVec2(360.0f, 20.0f));
+				asset.AddLink(noiseId, "height", particleNode.id, "height");
+				asset.AddLink(particleNode.id, "height", outputId, "height");
+				asset.nodes[1].position = ImVec2(720.0f, 30.0f);
+			}
 		}
 		const auto* vegetationNoise = FindTerrainGraphNodeType("noiseMask");
 		const auto* treeA = FindTerrainGraphNodeType("treeAssetA");

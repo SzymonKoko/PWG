@@ -27,8 +27,14 @@ namespace pwg
 		std::vector<float> water;
 		std::vector<float> sediment;
 		std::vector<float> deposit;
+		std::vector<float> erosion;
+		std::vector<float> erosionDelta;
 		std::vector<float> flowAccumulation;
 		std::vector<float> riverChannels;
+		std::vector<float> lakes;
+		std::vector<float> waterVelocity;
+		std::vector<float> riverCarveDelta;
+		std::vector<float> hydrologyBaseHeight;
 
 		bool HasData() const { return worldSize > 0 && !finalHeight.empty(); }
 	};
@@ -44,21 +50,23 @@ namespace pwg
 		void DrawWater(Renderer& renderer);
 		void DrawShadowMap(std::shared_ptr<Shader> shader, const glm::mat4& lightSpaceMatrix);
 		void Regenerate();
-		void StepSimulation();
-		void StepWaterSimulation();
-		void StepErosionSimulation();
-		void BeginWaterSettle();
-		void CancelWaterSettle();
-		void BakeParticleErosion();
-		void StartParticleBake();
-		void CancelParticleBake();
-		void ResetWaterSimulation();
-		void ResetErosionSimulation();
+		void CancelParticleErosion();
+		void StartParticleErosion();
+		void PauseParticleErosion();
+		bool StepParticleErosion();
+		bool ResetParticleErosion();
 		void ConfigureTerrain(int chunkCount, int chunkSize);
 
 		void GenerateWorld();
 		bool RunUniversalGraph();
-		void BakeErosionAfterWorldGen();
+		bool RefreshProceduralAssets();
+		bool GenerateHydrology();
+		void CancelHydrology();
+		bool ResetHydrology();
+		bool IsHydrologyRunning() const;
+		float GetHydrologyProgress() const;
+		std::string GetHydrologyStatus() const;
+		const std::string& GetProceduralAssetStatus() const;
 
 		SimulationStateSnapshot CaptureSimulationState();
 		void RestoreSimulationState(const SimulationStateSnapshot& snapshot);
@@ -71,9 +79,13 @@ namespace pwg
 		int GetChunkSize();
 		int GetWorldSize();
 		std::uint64_t GetGenerationRevision() const;
-		bool IsParticleBakeActive() const;
-		int GetParticleBakeStep() const;
-		int GetParticleBakeTotal() const;
+		bool IsParticleErosionActive() const;
+		bool IsParticleErosionReady() const;
+		float GetParticleErosionSpeed() const;
+		void SetParticleErosionSpeed(float speed);
+		bool GetShowErosionParticles() const;
+		void SetShowErosionParticles(bool show);
+		int GetActiveParticleCount() const;
 		float SampleHeightAtWorld(float worldX, float worldZ);
 		void UpdateHeightCache();
 		void MaybeUpdateHeightCache(float dt);
@@ -92,21 +104,13 @@ namespace pwg
 		TerrainSettings m_terrainSettings;
 		int m_chunkCount{ 31 };
 		bool m_needRegenerate{ true };
+		bool m_proceduralAssetsInitialized{ false };
 		float m_amplitude{ 1.0f };
 		int m_worldSize{ 0 };
 		glm::vec3 m_cameraPosition{ 0 };
-		float m_waterSimulationAccumulator{ 0.0f };
 		float m_heightCacheAccumulator{ 0.0f };
-		static constexpr float m_heightCacheInterval{ 0.4f };
+		static constexpr float m_heightCacheInterval{ 0.25f };
 
-		bool m_simulationRanThisTick{ false };
-		bool m_prevSimulating{ false };
-		bool m_waterSettling{ false };
-		int m_settleStepsDone{ 0 };
-		int m_settleMaxSteps{ 0 };
-		bool m_particleBakeActive{ false };
-		int m_particleBakeStep{ 0 };
-		int m_particleBakeTotal{ 0 };
 		std::vector<float> m_heightCache;
 		bool m_heightCacheValid{ false };
 		std::uint64_t m_generationRevision{ 0 };
@@ -116,6 +120,8 @@ namespace pwg
 		int m_sceneColorCopyWidth{ 0 };
 		int m_sceneColorCopyHeight{ 0 };
 		float m_waterTime{ 0.0f };
+		glm::mat4 m_cameraView{ 1.0f };
+		glm::mat4 m_cameraProjection{ 1.0f };
 
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> m_globalMasks;
 

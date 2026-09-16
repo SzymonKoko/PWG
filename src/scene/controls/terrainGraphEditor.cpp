@@ -30,7 +30,6 @@ namespace pwg::controls
 			case TerrainPassTypes::ANALYSIS: return "Analysis";
 			case TerrainPassTypes::SIMULATION: return "Simulation";
 			case TerrainPassTypes::HYDROLOGY: return "Hydrology";
-			case TerrainPassTypes::EROSION: return "Erosion";
 			default: return "Unknown";
 			}
 		}
@@ -42,7 +41,6 @@ namespace pwg::controls
 			case TerrainPassTypes::GENERATION: return IM_COL32(70, 142, 205, 255);
 			case TerrainPassTypes::MASK: return IM_COL32(76, 168, 122, 255);
 			case TerrainPassTypes::HYDROLOGY: return IM_COL32(70, 122, 205, 255);
-			case TerrainPassTypes::EROSION: return IM_COL32(198, 132, 70, 255);
 			case TerrainPassTypes::COMPOSITION: return IM_COL32(170, 112, 190, 255);
 			case TerrainPassTypes::ANALYSIS: return IM_COL32(180, 170, 85, 255);
 			case TerrainPassTypes::SIMULATION: return IM_COL32(120, 160, 185, 255);
@@ -1057,15 +1055,6 @@ namespace pwg::controls
 				chunkManager->SetNeedRegenerate(true);
 				changed = true;
 			}
-			if (pass->GetPassType() == TerrainPassTypes::HYDROLOGY || pass->GetPassType() == TerrainPassTypes::EROSION)
-			{
-				ImGui::SameLine();
-				if (ImGui::Button("Step Simulation"))
-				{
-					chunkManager->StepSimulation();
-					changed = true;
-				}
-			}
 			ImGui::Spacing();
 			ImGui::TextDisabled("Parameters");
 			ImGui::Separator();
@@ -1094,7 +1083,7 @@ namespace pwg::controls
 			}
 			ImGui::PopItemWidth();
 
-			if (changed && pass->GetPassType() != TerrainPassTypes::HYDROLOGY && pass->GetPassType() != TerrainPassTypes::EROSION)
+			if (changed && pass->GetPassType() != TerrainPassTypes::HYDROLOGY)
 			{
 				chunkManager->SetNeedRegenerate(true);
 			}
@@ -1479,7 +1468,7 @@ namespace pwg::controls
 		}
 
 		bool DrawUniversalGraphCanvas(TerrainGraphAsset& asset, int& selectedNodeId,
-			const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool* viewChanged, bool* graphChanged)
+			const std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool* viewChanged, bool* graphChanged, bool readOnly = false)
 		{
 			auto& editorState = UniversalEditorState();
 			auto& selectedNodeIds = editorState.selectedNodeIds;
@@ -1507,8 +1496,8 @@ namespace pwg::controls
 			ImVec2 origin = ImGui::GetCursorScreenPos();
 			ImGui::InvisibleButton("universal_graph_canvas", viewportSize, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle | ImGuiButtonFlags_AllowOverlap);
 			ImVec2 viewportMax(origin.x + viewportSize.x, origin.y + viewportSize.y);
-			bool hovered = ImGui::IsItemHovered();
-			bool canvasActive = ImGui::IsItemActive();
+			bool hovered = ImGui::IsItemHovered() && !readOnly;
+			bool canvasActive = ImGui::IsItemActive() && !readOnly;
 			ImGuiIO& io = ImGui::GetIO();
 			ImDrawList* drawList = ImGui::GetWindowDrawList();
 			bool capturedInput = hovered || canvasActive;
@@ -1860,7 +1849,7 @@ namespace pwg::controls
 				dragPortId.clear();
 			}
 
-			const bool acceptsShortcuts = (hovered || canvasActive || ImGui::IsWindowFocused()) && !io.WantTextInput;
+			const bool acceptsShortcuts = !readOnly && (hovered || canvasActive || ImGui::IsWindowFocused()) && !io.WantTextInput;
 			bool shortcutChanged = false;
 			if (acceptsShortcuts)
 			{
@@ -1972,6 +1961,7 @@ namespace pwg::controls
 				changed = true;
 			}
 
+			ImGui::BeginDisabled(node->typeId == "particleErosion");
 			if (ImGui::Button("Duplicate"))
 			{
 				TerrainGraphNodeInstance duplicate = *node;
@@ -1984,6 +1974,7 @@ namespace pwg::controls
 				SelectSingleNode(UniversalEditorState().selectedNodeIds, selectedNodeId);
 				changed = true;
 			}
+			ImGui::EndDisabled();
 			ImGui::SameLine();
 			if (ImGui::Button("Delete"))
 			{
@@ -2124,6 +2115,9 @@ namespace pwg::controls
 		selectedPassIndex = std::clamp(selectedPassIndex, 0, static_cast<int>(passes.size()) - 1);
 		static int selectedUniversalNodeId = 0;
 		bool changed = false;
+		const bool erosionRunning = chunkManager->IsParticleErosionActive();
+		const bool hydrologyRunning = chunkManager->IsHydrologyRunning();
+		const bool graphLocked = erosionRunning || hydrologyRunning;
 
 		ImGui::Text("TerrainGraph");
 		ImGui::SameLine();
@@ -2163,7 +2157,10 @@ namespace pwg::controls
 		}
 		int selectedPreset = std::max(currentPreset, 0);
 		ImGui::SetNextItemWidth(190.0f);
-		if (ImGui::Combo("Terrain size", &selectedPreset, terrainPresetLabels, IM_ARRAYSIZE(terrainPresetLabels)))
+		ImGui::BeginDisabled(graphLocked);
+		const bool terrainSizeChanged = ImGui::Combo("Terrain size", &selectedPreset, terrainPresetLabels, IM_ARRAYSIZE(terrainPresetLabels));
+		ImGui::EndDisabled();
+		if (terrainSizeChanged)
 		{
 			const auto& preset = terrainPresets[selectedPreset];
 			chunkManager->ConfigureTerrain(preset.chunks, preset.chunkSize);
@@ -2182,39 +2179,80 @@ namespace pwg::controls
 		}
 		ImGui::SameLine();
 		ImGui::TextDisabled("World: %d | chunks: %d | chunk size: %d", chunkManager->GetWorldSize(), chunkManager->GetChunkCount(), chunkManager->GetChunkSize());
+		ImGui::TextDisabled("Hydrology");
+		ImGui::BeginDisabled(hydrologyRunning || erosionRunning);
+		if (ImGui::Button("Generate Hydrology"))
+		{
+			chunkManager->GenerateHydrology();
+			changed = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reset Hydrology"))
+		{
+			chunkManager->ResetHydrology();
+			changed = true;
+		}
+		ImGui::EndDisabled();
+		if (hydrologyRunning)
+		{
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel Hydrology")) chunkManager->CancelHydrology();
+			ImGui::SameLine();
+			ImGui::ProgressBar(chunkManager->GetHydrologyProgress(), ImVec2(150.0f, 0.0f));
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("%s", chunkManager->GetHydrologyStatus().c_str());
+		ImGui::Separator();
+		ImGui::TextDisabled("Particle Erosion");
+		const bool erosionReady = chunkManager->IsParticleErosionReady();
+		ImGui::BeginDisabled(!erosionReady);
+		if (ImGui::Button(erosionRunning ? "Pause Erosion" : "Start Erosion"))
+		{
+			if (erosionRunning) chunkManager->PauseParticleErosion();
+			else chunkManager->StartParticleErosion();
+			changed = true;
+		}
+		ImGui::SameLine();
+		ImGui::BeginDisabled(erosionRunning);
+		if (ImGui::Button("Step Erosion"))
+		{
+			changed = chunkManager->StepParticleErosion() || changed;
+		}
+		ImGui::SameLine();
 		if (ImGui::Button("Reset Erosion"))
 		{
-			chunkManager->ResetErosionSimulation();
-			changed = true;
+			changed = chunkManager->ResetParticleErosion() || changed;
+		}
+		ImGui::EndDisabled();
+		ImGui::NewLine();
+		float erosionSpeed = chunkManager->GetParticleErosionSpeed();
+		ImGui::SetNextItemWidth(130.0f);
+		if (ImGui::SliderFloat("Simulation Speed", &erosionSpeed, 0.25f, 4.0f, "%.2fx"))
+		{
+			chunkManager->SetParticleErosionSpeed(erosionSpeed);
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Reset Water"))
+		bool showParticles = chunkManager->GetShowErosionParticles();
+		if (ImGui::Checkbox("Show Particles", &showParticles))
 		{
-			chunkManager->ResetWaterSimulation();
-			changed = true;
+			chunkManager->SetShowErosionParticles(showParticles);
 		}
-		ImGui::SameLine();
-		if (ImGui::Button("Step Simulation"))
+		ImGui::EndDisabled();
+		if (erosionReady)
 		{
-			chunkManager->StepSimulation();
-			changed = true;
-		}
-		ImGui::SameLine();
-		if (chunkManager->IsParticleBakeActive())
-		{
-			if (ImGui::Button("Cancel Bake"))
-			{
-				chunkManager->CancelParticleBake();
-				changed = true;
-			}
 			ImGui::SameLine();
-			ImGui::TextDisabled("Bake %d / %d", chunkManager->GetParticleBakeStep(), chunkManager->GetParticleBakeTotal());
+			ImGui::TextDisabled("%d particles", chunkManager->GetActiveParticleCount());
 		}
-		else if (ImGui::Button("Bake Particle Erosion"))
+		ImGui::NewLine();
+		ImGui::BeginDisabled(erosionRunning);
+		if (ImGui::Button("Spawn/Refresh Assets"))
 		{
-			chunkManager->StartParticleBake();
-			changed = true;
+			changed = chunkManager->RefreshProceduralAssets() || changed;
 		}
+		ImGui::EndDisabled();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rebuild procedural objects without changing terrain, water, or erosion");
+		ImGui::SameLine();
+		ImGui::TextDisabled("%s", chunkManager->GetProceduralAssetStatus().c_str());
 		ImGui::Separator();
 
 		if (ImGui::BeginTabBar("TerrainGraphEditorTabs"))
@@ -2222,11 +2260,13 @@ namespace pwg::controls
 			if (ImGui::BeginTabItem("Universal Graph"))
 			{
 				auto& asset = terrainComputePipeline->GetUniversalGraphAsset();
+				const bool erosionActive = graphLocked;
+				ImGui::BeginDisabled(erosionActive);
 				EnsureGraphHistory(asset);
 				bool universalViewChanged = false;
 				bool universalCapturedInput = false;
 				ImGuiIO& graphIo = ImGui::GetIO();
-				const bool graphHasKeyboardFocus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !graphIo.WantTextInput;
+				const bool graphHasKeyboardFocus = !erosionActive && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !graphIo.WantTextInput;
 				const bool undoShortcut = graphHasKeyboardFocus && graphIo.KeyCtrl && !graphIo.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z);
 				const bool redoShortcut = graphHasKeyboardFocus && graphIo.KeyCtrl &&
 					(ImGui::IsKeyPressed(ImGuiKey_Y) || (graphIo.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z)));
@@ -2274,6 +2314,10 @@ namespace pwg::controls
 				if (ImGui::BeginPopup("AddUniversalTerrainNode"))
 				{
 					const auto& types = GetTerrainGraphNodeTypes();
+					bool hasParticleErosion = std::any_of(asset.nodes.begin(), asset.nodes.end(), [](const TerrainGraphNodeInstance& node)
+					{
+						return node.typeId == "particleErosion";
+					});
 					std::string currentCategory;
 					for (const auto& type : types)
 					{
@@ -2286,6 +2330,8 @@ namespace pwg::controls
 							currentCategory = type.category;
 							ImGui::TextDisabled("%s", currentCategory.c_str());
 						}
+						bool unavailable = type.typeId == "particleErosion" && hasParticleErosion;
+						ImGui::BeginDisabled(unavailable);
 						if (ImGui::Selectable(type.displayName.c_str()))
 						{
 							ImVec2 available = ImGui::GetContentRegionAvail();
@@ -2295,6 +2341,7 @@ namespace pwg::controls
 							SelectSingleNode(editorState.selectedNodeIds, node.id);
 							universalViewChanged = true;
 						}
+						ImGui::EndDisabled();
 					}
 					ImGui::EndPopup();
 				}
@@ -2344,7 +2391,7 @@ namespace pwg::controls
 				bool canvasViewChanged = false;
 				bool canvasGraphChanged = false;
 				const auto& graphMasks = chunkManager->GetMasks();
-				universalCapturedInput = DrawUniversalGraphCanvas(asset, selectedUniversalNodeId, graphMasks, &canvasViewChanged, &canvasGraphChanged);
+				universalCapturedInput = DrawUniversalGraphCanvas(asset, selectedUniversalNodeId, graphMasks, &canvasViewChanged, &canvasGraphChanged, erosionActive);
 				universalViewChanged = universalViewChanged || canvasViewChanged;
 				changed = changed || canvasGraphChanged;
 				ImGui::EndChild();
@@ -2371,11 +2418,13 @@ namespace pwg::controls
 				{
 					*viewChanged = universalViewChanged;
 				}
+				ImGui::EndDisabled();
 				ImGui::EndTabItem();
 			}
 
 			if (ImGui::BeginTabItem("Legacy Passes"))
 			{
+				ImGui::BeginDisabled(erosionRunning);
 				ImVec2 available = ImGui::GetContentRegionAvail();
 				float detailsWidth = std::clamp(available.x * 0.34f, 240.0f, 360.0f);
 				float graphWidth = std::max(available.x - detailsWidth - 8.0f, 320.0f);
@@ -2419,6 +2468,7 @@ namespace pwg::controls
 				{
 					*viewChanged = canvasViewChanged || inspectorViewChanged;
 				}
+				ImGui::EndDisabled();
 				ImGui::EndTabItem();
 			}
 			ImGui::EndTabBar();

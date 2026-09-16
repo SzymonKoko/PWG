@@ -690,6 +690,7 @@ namespace pwg
 		YAML::Node WriteUniversalTerrainGraph(const TerrainGraphAsset& asset)
 		{
 			YAML::Node node;
+			node["schemaVersion"] = 4;
 			node["useUniversalGraph"] = asset.useUniversalGraph;
 			node["pan"] = Vec2Node(asset.pan);
 			node["zoom"] = asset.zoom;
@@ -730,11 +731,15 @@ namespace pwg
 			}
 
 			asset.Clear();
+			const int schemaVersion = node["schemaVersion"] ? node["schemaVersion"].as<int>() : 0;
 			asset.useUniversalGraph = node["useUniversalGraph"] ? node["useUniversalGraph"].as<bool>() : false;
 			asset.pan = ReadVec2(node["pan"], asset.pan);
 			if (node["zoom"]) asset.zoom = std::clamp(node["zoom"].as<float>(), 0.30f, 2.75f);
 			if (node["nextNodeId"]) asset.nextNodeId = node["nextNodeId"].as<int>();
 			if (node["nextLinkId"]) asset.nextLinkId = node["nextLinkId"].as<int>();
+			bool migrateLegacyErosion = false;
+			bool migrateLegacyHydrology = schemaVersion < 4;
+			int legacyErosionSeed = 1337;
 
 			auto nodes = node["nodes"];
 			if (nodes && nodes.IsSequence())
@@ -745,7 +750,43 @@ namespace pwg
 					{
 						continue;
 					}
-					const auto* type = FindTerrainGraphNodeType(nodeData["typeId"].as<std::string>());
+					std::string storedTypeId = nodeData["typeId"].as<std::string>();
+					if (storedTypeId == "hydraulicSimulation" || storedTypeId == "lakeCleanup")
+					{
+						migrateLegacyHydrology = true;
+						continue;
+					}
+					bool legacyParticle = false;
+					bool legacyEnabled = nodeData["enabled"] ? nodeData["enabled"].as<bool>() : true;
+					auto storedParameters = nodeData["parameters"];
+					if (storedTypeId == "particleErosion")
+					{
+						legacyParticle = true;
+						if (storedParameters && storedParameters.IsSequence())
+						{
+							for (const auto& parameter : storedParameters)
+							{
+								std::string id = parameter["id"] ? parameter["id"].as<std::string>() : "";
+								if (id == "amount") legacyParticle = false;
+								if (id == "particleSeed" && parameter["int"]) legacyErosionSeed = parameter["int"].as<int>();
+								if (id == "particleErosionEnabled" && parameter["bool"]) legacyEnabled = legacyEnabled && parameter["bool"].as<bool>();
+							}
+						}
+					}
+					else if (storedTypeId == "streamErosion" && storedParameters && storedParameters.IsSequence())
+					{
+						for (const auto& parameter : storedParameters)
+						{
+							std::string id = parameter["id"] ? parameter["id"].as<std::string>() : "";
+							if (id == "erosionEnabled" && parameter["bool"]) legacyEnabled = legacyEnabled && parameter["bool"].as<bool>();
+						}
+					}
+					if (storedTypeId == "streamErosion" || legacyParticle)
+					{
+						migrateLegacyErosion = migrateLegacyErosion || legacyEnabled;
+						continue;
+					}
+					const auto* type = FindTerrainGraphNodeType(storedTypeId);
 					if (!type)
 					{
 						continue;
@@ -809,204 +850,82 @@ namespace pwg
 			{
 				asset.nextLinkId = std::max(asset.nextLinkId, link.id + 1);
 			}
+
+			asset.links.erase(std::remove_if(asset.links.begin(), asset.links.end(), [&](const TerrainGraphLink& link)
+			{
+				return !asset.FindNode(link.fromNodeId) || !asset.FindNode(link.toNodeId);
+			}), asset.links.end());
+
+			bool hasNewErosion = std::any_of(asset.nodes.begin(), asset.nodes.end(), [](const TerrainGraphNodeInstance& graphNode)
+			{
+				return graphNode.typeId == "particleErosion";
+			});
+			if (migrateLegacyErosion && !hasNewErosion)
+			{
+				const auto* erosionType = FindTerrainGraphNodeType("particleErosion");
+				auto outputIt = std::find_if(asset.nodes.begin(), asset.nodes.end(), [](const TerrainGraphNodeInstance& graphNode)
+				{
+					return graphNode.typeId == "outputHeight";
+				});
+				if (erosionType && outputIt != asset.nodes.end())
+				{
+					int outputId = outputIt->id;
+					auto inputLink = std::find_if(asset.links.begin(), asset.links.end(), [&](const TerrainGraphLink& link)
+					{
+						return link.toNodeId == outputId && link.toPortId == "height";
+					});
+					if (inputLink != asset.links.end())
+					{
+						int sourceId = inputLink->fromNodeId;
+						std::string sourcePort = inputLink->fromPortId;
+						asset.links.erase(inputLink);
+						ImVec2 erosionPosition(outputIt->position.x - 300.0f, outputIt->position.y);
+						auto& erosion = asset.AddNode(*erosionType, erosionPosition);
+						for (auto& parameter : erosion.parameters)
+						{
+							if (parameter.id == "amount") parameter.floatValue = 0.35f;
+							if (parameter.id == "seed") parameter.intValue = legacyErosionSeed;
+						}
+						asset.AddLink(sourceId, sourcePort, erosion.id, "height");
+						asset.AddLink(erosion.id, "height", outputId, "height");
+					}
+				}
+			}
+			bool hasDrainage = std::any_of(asset.nodes.begin(), asset.nodes.end(), [](const TerrainGraphNodeInstance& graphNode)
+			{
+				return graphNode.typeId == "drainageNetwork";
+			});
+			if (migrateLegacyHydrology && !hasDrainage)
+			{
+				if (const auto* drainage = FindTerrainGraphNodeType("drainageNetwork"))
+					asset.AddNode(*drainage, ImVec2(720.0f, 230.0f));
+			}
 		}
 
 		YAML::Node WriteHydraulicSettings(const HydraulicSimulationSettings& settings)
 		{
 			YAML::Node node;
-			node["stepsPerUpdate"] = settings.stepsPerUpdate;
-			node["waterStepsPerSecond"] = settings.waterStepsPerSecond;
-			node["waterSubsteps"] = settings.waterSubsteps;
-			node["bakeParticleSteps"] = settings.bakeParticleSteps;
-			node["bakeStepsPerFrame"] = settings.bakeStepsPerFrame;
-			node["bakeUploadInterval"] = settings.bakeUploadInterval;
-			node["erosionEnabled"] = settings.erosionEnabled;
-			node["autoWaterSimulation"] = settings.autoWaterSimulation;
-			node["particleErosionEnabled"] = settings.particleErosionEnabled;
 			node["showWaterSurface"] = settings.showWaterSurface;
+			node["showErosionParticles"] = settings.showErosionParticles;
+			node["particleSimulationSpeed"] = settings.particleSimulationSpeed;
 			node["waterRefractionEnabled"] = settings.waterRefractionEnabled;
-			node["useDiagonalFlow"] = settings.useDiagonalFlow;
-			node["rainRate"] = settings.rainRate;
-			node["rainElevationBias"] = settings.rainElevationBias;
-			node["rainMinHeight"] = settings.rainMinHeight;
-			node["rainMaxHeight"] = settings.rainMaxHeight;
-			node["pipeFlow"] = settings.pipeFlow;
-			node["pipeDamping"] = settings.pipeDamping;
-			node["flowRate"] = settings.pipeFlow;
-			node["flowInertia"] = settings.pipeDamping;
-			node["flowConcentration"] = settings.flowConcentration;
-			node["erosionStrength"] = settings.erosionStrength;
-			node["flatteningStrength"] = settings.flatteningStrength;
-			node["depositionStrength"] = settings.depositionStrength;
-			node["maxDepositHeight"] = settings.maxDepositHeight;
-			node["boundaryDrain"] = settings.boundaryDrain;
-			node["lakeLeveling"] = settings.lakeLeveling;
-			node["maxWaterDepth"] = settings.maxWaterDepth;
 			node["minVisibleWaterDepth"] = settings.minVisibleWaterDepth;
-			node["maxSurfaceDrop"] = settings.maxSurfaceDrop;
-			node["evaporation"] = settings.evaporation;
-			node["infiltrationRate"] = settings.infiltrationRate;
-			node["lakeInfiltrationScale"] = settings.lakeInfiltrationScale;
-			node["sedimentCapacity"] = settings.sedimentCapacity;
-			node["erosionRate"] = settings.erosionStrength;
-			node["slopeErosionRate"] = settings.slopeErosionRate;
-			node["slopeErosionMinSlope"] = settings.slopeErosionMinSlope;
-			node["slopeErosionWaterScale"] = settings.slopeErosionWaterScale;
-			node["depositionRate"] = settings.depositionStrength;
-			node["depositDiffusion"] = settings.depositDiffusion;
-			node["valleyDepositionRate"] = settings.valleyDepositionRate;
-			node["valleyDepositionSlope"] = settings.valleyDepositionSlope;
-			node["steepSlopeDepositionReduction"] = settings.steepSlopeDepositionReduction;
-			node["depositionSlopeStart"] = settings.depositionSlopeStart;
-			node["depositionSlopeEnd"] = settings.depositionSlopeEnd;
-			node["minWaterToErode"] = settings.minWaterToErode;
-			node["minFlowToErode"] = settings.minFlowToErode;
-			node["maxHeightChange"] = settings.maxHeightChange;
-			node["maxErosionDepth"] = settings.maxErosionDepth;
-			node["maxDepositionHeight"] = settings.maxDepositionHeight;
-			node["lakeDeposition"] = settings.lakeDeposition;
-			node["lakeMinDepth"] = settings.lakeMinDepth;
-			node["lakeBedSmoothing"] = settings.lakeBedSmoothing;
-			node["lakeWaterSmoothing"] = settings.lakeWaterSmoothing;
-			node["channelSmoothing"] = settings.channelSmoothing;
-			node["flowAccumulationGrowth"] = settings.flowAccumulationGrowth;
-			node["flowAccumulationDecay"] = settings.flowAccumulationDecay;
-			node["riverChannelGrowth"] = settings.riverChannelGrowth;
-			node["riverChannelDecay"] = settings.riverChannelDecay;
-			node["riverChannelInfluence"] = settings.riverChannelInfluence;
-			node["riverChannelDepth"] = settings.riverChannelDepth;
-			node["particlesPerStep"] = settings.particlesPerStep;
-			node["dropletLifetime"] = settings.dropletLifetime;
-			node["particleSeed"] = settings.particleSeed;
-			node["particleInertia"] = settings.particleInertia;
-			node["particleGravity"] = settings.particleGravity;
-			node["particleInitialWater"] = settings.particleInitialWater;
-			node["particleEvaporation"] = settings.particleEvaporation;
-			node["particleMinSlope"] = settings.particleMinSlope;
-			node["particleCapacity"] = settings.particleCapacity;
-			node["particleErosionStrength"] = settings.particleErosionStrength;
-			node["particleDepositionStrength"] = settings.particleDepositionStrength;
-			node["particleBrushRadius"] = settings.particleBrushRadius;
-			node["particleDepositRadius"] = settings.particleDepositRadius;
-			node["particleDepositSlopeStart"] = settings.particleDepositSlopeStart;
-			node["particleDepositSlopeEnd"] = settings.particleDepositSlopeEnd;
-			node["particleDepositValleyBoost"] = settings.particleDepositValleyBoost;
-			node["particleDepositShelfBoost"] = settings.particleDepositShelfBoost;
-			node["particleDepositMinSuitability"] = settings.particleDepositMinSuitability;
-			node["looseSedimentErosionStrength"] = settings.looseSedimentErosionStrength;
-			node["looseSedimentSmoothing"] = settings.looseSedimentSmoothing;
-			node["particleChannelStrength"] = settings.particleChannelStrength;
-			node["particleFlowStrength"] = settings.particleFlowStrength;
-			node["lakeFillEnabled"] = settings.lakeFillEnabled;
-			node["lakeMinFlow"] = settings.lakeMinFlow;
-			node["lakeMaxDepth"] = settings.lakeMaxDepth;
+			node["riverAmount"] = settings.riverAmount;
+			node["lakeAmount"] = settings.lakeAmount;
+			node["hydrologySeed"] = settings.hydrologySeed;
 			return node;
 		}
 
 		void ReadHydraulicSettings(const YAML::Node& node, HydraulicSimulationSettings& settings)
 		{
-			ReadValue(node, "stepsPerUpdate", settings.stepsPerUpdate);
-			ReadValue(node, "waterStepsPerSecond", settings.waterStepsPerSecond);
-			ReadValue(node, "waterSubsteps", settings.waterSubsteps);
-			ReadValue(node, "bakeParticleSteps", settings.bakeParticleSteps);
-			ReadValue(node, "bakeStepsPerFrame", settings.bakeStepsPerFrame);
-			ReadValue(node, "bakeUploadInterval", settings.bakeUploadInterval);
-			ReadValue(node, "erosionEnabled", settings.erosionEnabled);
-			ReadValue(node, "autoWaterSimulation", settings.autoWaterSimulation);
-			ReadValue(node, "particleErosionEnabled", settings.particleErosionEnabled);
 			ReadValue(node, "showWaterSurface", settings.showWaterSurface);
+			ReadValue(node, "showErosionParticles", settings.showErosionParticles);
+			ReadValue(node, "particleSimulationSpeed", settings.particleSimulationSpeed);
 			ReadValue(node, "waterRefractionEnabled", settings.waterRefractionEnabled);
-			ReadValue(node, "useDiagonalFlow", settings.useDiagonalFlow);
-			ReadValue(node, "rainRate", settings.rainRate);
-			ReadValue(node, "rainElevationBias", settings.rainElevationBias);
-			ReadValue(node, "rainMinHeight", settings.rainMinHeight);
-			ReadValue(node, "rainMaxHeight", settings.rainMaxHeight);
-			ReadValue(node, "pipeFlow", settings.pipeFlow);
-			ReadValue(node, "pipeDamping", settings.pipeDamping);
-			ReadValue(node, "flowRate", settings.flowRate);
-			ReadValue(node, "flowInertia", settings.flowInertia);
-			if (!node["pipeFlow"] && node["flowRate"])
-			{
-				settings.pipeFlow = settings.flowRate;
-			}
-			if (!node["pipeDamping"] && node["flowInertia"])
-			{
-				settings.pipeDamping = settings.flowInertia;
-			}
-			ReadValue(node, "flowConcentration", settings.flowConcentration);
-			ReadValue(node, "erosionStrength", settings.erosionStrength);
-			ReadValue(node, "flatteningStrength", settings.flatteningStrength);
-			ReadValue(node, "depositionStrength", settings.depositionStrength);
-			ReadValue(node, "maxDepositHeight", settings.maxDepositHeight);
-			ReadValue(node, "boundaryDrain", settings.boundaryDrain);
-			ReadValue(node, "lakeLeveling", settings.lakeLeveling);
-			ReadValue(node, "maxWaterDepth", settings.maxWaterDepth);
 			ReadValue(node, "minVisibleWaterDepth", settings.minVisibleWaterDepth);
-			ReadValue(node, "maxSurfaceDrop", settings.maxSurfaceDrop);
-			ReadValue(node, "evaporation", settings.evaporation);
-			ReadValue(node, "infiltrationRate", settings.infiltrationRate);
-			ReadValue(node, "lakeInfiltrationScale", settings.lakeInfiltrationScale);
-			ReadValue(node, "sedimentCapacity", settings.sedimentCapacity);
-			ReadValue(node, "erosionRate", settings.erosionRate);
-			if (!node["erosionStrength"] && node["erosionRate"])
-			{
-				settings.erosionStrength = settings.erosionRate;
-			}
-			ReadValue(node, "slopeErosionRate", settings.slopeErosionRate);
-			ReadValue(node, "slopeErosionMinSlope", settings.slopeErosionMinSlope);
-			ReadValue(node, "slopeErosionWaterScale", settings.slopeErosionWaterScale);
-			ReadValue(node, "depositionRate", settings.depositionRate);
-			if (!node["depositionStrength"] && node["depositionRate"])
-			{
-				settings.depositionStrength = settings.depositionRate;
-			}
-			ReadValue(node, "depositDiffusion", settings.depositDiffusion);
-			ReadValue(node, "valleyDepositionRate", settings.valleyDepositionRate);
-			ReadValue(node, "valleyDepositionSlope", settings.valleyDepositionSlope);
-			ReadValue(node, "steepSlopeDepositionReduction", settings.steepSlopeDepositionReduction);
-			ReadValue(node, "depositionSlopeStart", settings.depositionSlopeStart);
-			ReadValue(node, "depositionSlopeEnd", settings.depositionSlopeEnd);
-			ReadValue(node, "minWaterToErode", settings.minWaterToErode);
-			ReadValue(node, "minFlowToErode", settings.minFlowToErode);
-			ReadValue(node, "maxHeightChange", settings.maxHeightChange);
-			ReadValue(node, "maxErosionDepth", settings.maxErosionDepth);
-			ReadValue(node, "maxDepositionHeight", settings.maxDepositionHeight);
-			ReadValue(node, "lakeDeposition", settings.lakeDeposition);
-			ReadValue(node, "lakeMinDepth", settings.lakeMinDepth);
-			ReadValue(node, "lakeBedSmoothing", settings.lakeBedSmoothing);
-			ReadValue(node, "lakeWaterSmoothing", settings.lakeWaterSmoothing);
-			ReadValue(node, "channelSmoothing", settings.channelSmoothing);
-			ReadValue(node, "flowAccumulationGrowth", settings.flowAccumulationGrowth);
-			ReadValue(node, "flowAccumulationDecay", settings.flowAccumulationDecay);
-			ReadValue(node, "riverChannelGrowth", settings.riverChannelGrowth);
-			ReadValue(node, "riverChannelDecay", settings.riverChannelDecay);
-			ReadValue(node, "riverChannelInfluence", settings.riverChannelInfluence);
-			ReadValue(node, "riverChannelDepth", settings.riverChannelDepth);
-			ReadValue(node, "particlesPerStep", settings.particlesPerStep);
-			ReadValue(node, "dropletLifetime", settings.dropletLifetime);
-			ReadValue(node, "particleSeed", settings.particleSeed);
-			ReadValue(node, "particleInertia", settings.particleInertia);
-			ReadValue(node, "particleGravity", settings.particleGravity);
-			ReadValue(node, "particleInitialWater", settings.particleInitialWater);
-			ReadValue(node, "particleEvaporation", settings.particleEvaporation);
-			ReadValue(node, "particleMinSlope", settings.particleMinSlope);
-			ReadValue(node, "particleCapacity", settings.particleCapacity);
-			ReadValue(node, "particleErosionStrength", settings.particleErosionStrength);
-			ReadValue(node, "particleDepositionStrength", settings.particleDepositionStrength);
-			ReadValue(node, "particleBrushRadius", settings.particleBrushRadius);
-			ReadValue(node, "particleDepositRadius", settings.particleDepositRadius);
-			ReadValue(node, "particleDepositSlopeStart", settings.particleDepositSlopeStart);
-			ReadValue(node, "particleDepositSlopeEnd", settings.particleDepositSlopeEnd);
-			ReadValue(node, "particleDepositValleyBoost", settings.particleDepositValleyBoost);
-			ReadValue(node, "particleDepositShelfBoost", settings.particleDepositShelfBoost);
-			ReadValue(node, "particleDepositMinSuitability", settings.particleDepositMinSuitability);
-			ReadValue(node, "looseSedimentErosionStrength", settings.looseSedimentErosionStrength);
-			ReadValue(node, "looseSedimentSmoothing", settings.looseSedimentSmoothing);
-			ReadValue(node, "particleChannelStrength", settings.particleChannelStrength);
-			ReadValue(node, "particleFlowStrength", settings.particleFlowStrength);
-			ReadValue(node, "lakeFillEnabled", settings.lakeFillEnabled);
-			ReadValue(node, "lakeMinFlow", settings.lakeMinFlow);
-			ReadValue(node, "lakeMaxDepth", settings.lakeMaxDepth);
+			ReadValue(node, "riverAmount", settings.riverAmount);
+			ReadValue(node, "lakeAmount", settings.lakeAmount);
+			ReadValue(node, "hydrologySeed", settings.hydrologySeed);
 		}
 	}
 	namespace
@@ -1032,7 +951,7 @@ namespace pwg
 			}
 
 			const char magic[4] = { 'P', 'W', 'G', 'S' };
-			uint32_t version = 1;
+			uint32_t version = 5;
 			int32_t worldSize = snapshot.worldSize;
 			out.write(magic, 4);
 			out.write(reinterpret_cast<const char*>(&version), sizeof(version));
@@ -1052,8 +971,14 @@ namespace pwg
 			writeLayer(snapshot.water);
 			writeLayer(snapshot.sediment);
 			writeLayer(snapshot.deposit);
+			writeLayer(snapshot.erosion);
+			writeLayer(snapshot.erosionDelta);
 			writeLayer(snapshot.flowAccumulation);
 			writeLayer(snapshot.riverChannels);
+			writeLayer(snapshot.lakes);
+			writeLayer(snapshot.waterVelocity);
+			writeLayer(snapshot.riverCarveDelta);
+			writeLayer(snapshot.hydrologyBaseHeight);
 			return true;
 		}
 
@@ -1105,8 +1030,38 @@ namespace pwg
 			readLayer(snapshot.water);
 			readLayer(snapshot.sediment);
 			readLayer(snapshot.deposit);
+			if (version >= 2)
+			{
+				readLayer(snapshot.erosion);
+				readLayer(snapshot.erosionDelta);
+			}
 			readLayer(snapshot.flowAccumulation);
 			readLayer(snapshot.riverChannels);
+			if (version >= 3)
+			{
+				readLayer(snapshot.lakes);
+				readLayer(snapshot.waterVelocity);
+				readLayer(snapshot.riverCarveDelta);
+				readLayer(snapshot.hydrologyBaseHeight);
+				if (version < 5)
+				{
+					if (snapshot.hydrologyBaseHeight.size() == snapshot.finalHeight.size())
+						snapshot.finalHeight = snapshot.hydrologyBaseHeight;
+					snapshot.water.clear();
+					snapshot.flowAccumulation.clear();
+					snapshot.riverChannels.clear();
+					snapshot.lakes.clear();
+					snapshot.waterVelocity.clear();
+					snapshot.riverCarveDelta.clear();
+					snapshot.hydrologyBaseHeight.clear();
+				}
+			}
+			else
+			{
+				snapshot.water.clear();
+				snapshot.flowAccumulation.clear();
+				snapshot.riverChannels.clear();
+			}
 			return snapshot.HasData();
 		}
 	}
@@ -1118,6 +1073,8 @@ namespace pwg
 		root["project"]["version"] = 1;
 
 		auto chunkManager = scene.GetTerrain()->GetChunkManager();
+		chunkManager->CancelHydrology();
+		chunkManager->PauseParticleErosion();
 		root["terrain"]["chunkCount"] = chunkManager->GetChunkCount();
 		root["terrain"]["chunkSize"] = chunkManager->GetChunkSize();
 
@@ -1157,8 +1114,9 @@ namespace pwg
 
 		// Persist the live simulation textures (eroded height + water / rivers / lakes)
 		// next to the project so reopening it brings the water back exactly as saved.
+		const std::string simulationPath = SimulationSidecarPath(path);
 		SimulationStateSnapshot snapshot = chunkManager->CaptureSimulationState();
-		WriteSimulationSidecar(SimulationSidecarPath(path), snapshot);
+		WriteSimulationSidecar(simulationPath, snapshot);
 		return true;
 	}
 

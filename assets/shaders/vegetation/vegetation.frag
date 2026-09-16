@@ -27,14 +27,12 @@ uniform float u_minVisibleWaterDepth;
 
 void main()
 {
-	if (u_isGrass == 1 || u_isTree == 1)
+	if (u_isGrass == 1)
 	{
-		vec2 waterUV = f_WorldPos.xz / max(u_waterWorldSize - 1.0, 1.0) + vec2(0.5);
+		vec2 waterUV = f_WorldPos.xz / max(u_waterWorldSize, 1.0) + vec2(0.5);
 		float waterDepth = texture(u_Watermap, waterUV).r;
-		float flow = max(texture(u_FlowAccumulationmap, waterUV).r, texture(u_RiverChannelmap, waterUV).r);
 		float depthCoverage = smoothstep(u_minVisibleWaterDepth, u_minVisibleWaterDepth + max(0.012, u_minVisibleWaterDepth * 0.75), waterDepth);
-		float flowCoverage = smoothstep(0.10, 0.32, flow);
-		if (max(depthCoverage, flowCoverage) > 0.05)
+		if (depthCoverage > 0.05)
 		{
 			discard;
 		}
