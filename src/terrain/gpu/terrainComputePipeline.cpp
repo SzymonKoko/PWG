@@ -95,6 +95,7 @@ namespace pwg
 		m_shaderManager->LoadCompute("downsampleWaterRenderCacheShader", terrainShadersPath + "water/downsampleWaterRenderCache.comp");
 		m_shaderManager->LoadCompute("particleHydrologyShader", terrainShadersPath + "erosion/particleHydrology.comp");
 		m_shaderManager->LoadCompute("applyParticleHydrologyShader", terrainShadersPath + "erosion/applyParticleHydrology.comp");
+		m_shaderManager->LoadCompute("talusRelaxShader", terrainShadersPath + "erosion/talusRelax.comp");
 		m_shaderManager->LoadCompute("thermalWeatheringShader", terrainShadersPath + "erosion/thermalWeathering.comp");
 		m_shaderManager->LoadCompute("thermalTransportShader", terrainShadersPath + "erosion/thermalTransport.comp");
 		m_shaderManager->LoadCompute("applyThermalErosionShader", terrainShadersPath + "erosion/applyThermalErosion.comp");
@@ -116,6 +117,7 @@ namespace pwg
 		auto slopeMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("slopeMaskShader");
 		auto particleHydrologyShader = m_shaderManager->GetShader<pwg::ComputeShader>("particleHydrologyShader");
 		auto applyParticleHydrologyShader = m_shaderManager->GetShader<pwg::ComputeShader>("applyParticleHydrologyShader");
+		auto talusRelaxShader = m_shaderManager->GetShader<pwg::ComputeShader>("talusRelaxShader");
 		auto thermalWeatheringShader = m_shaderManager->GetShader<pwg::ComputeShader>("thermalWeatheringShader");
 		auto thermalTransportShader = m_shaderManager->GetShader<pwg::ComputeShader>("thermalTransportShader");
 		auto applyThermalErosionShader = m_shaderManager->GetShader<pwg::ComputeShader>("applyThermalErosionShader");
@@ -136,6 +138,7 @@ namespace pwg
 		AddComputeShader("SlopeMask", slopeMaskShader);
 		AddComputeShader("ParticleHydrology", particleHydrologyShader);
 		AddComputeShader("ApplyParticleHydrology", applyParticleHydrologyShader);
+		AddComputeShader("TalusRelax", talusRelaxShader);
 		AddComputeShader("ThermalWeathering", thermalWeatheringShader);
 		AddComputeShader("ThermalTransport", thermalTransportShader);
 		AddComputeShader("ApplyThermalErosion", applyThermalErosionShader);
@@ -152,6 +155,7 @@ namespace pwg
 			m_size,
 			particleHydrologyShader,
 			applyParticleHydrologyShader,
+			talusRelaxShader,
 			m_shaderManager->GetShader<pwg::Shader>("particleHydrologyDebugShader"));
 		m_gpuThermalErosion = std::make_unique<GpuThermalErosion>(
 			m_size, thermalWeatheringShader, thermalTransportShader, applyThermalErosionShader);

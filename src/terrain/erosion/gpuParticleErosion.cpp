@@ -16,10 +16,12 @@ namespace pwg
 		int terrainSize,
 		std::shared_ptr<ComputeShader> particleShader,
 		std::shared_ptr<ComputeShader> applyShader,
+		std::shared_ptr<ComputeShader> talusShader,
 		std::shared_ptr<Shader> debugShader)
 		: m_size(terrainSize),
 		  m_particleShader(std::move(particleShader)),
 		  m_applyShader(std::move(applyShader)),
+		  m_talusShader(std::move(talusShader)),
 		  m_debugShader(std::move(debugShader))
 	{
 		const long long pixels = static_cast<long long>(m_size) * m_size;
@@ -32,6 +34,8 @@ namespace pwg
 		m_heightDelta = CreateAtomicTexture();
 		m_flowDelta = CreateAtomicTexture();
 		m_waterDelta = CreateAtomicTexture();
+		m_talusTemp = std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT);
+		m_talusTemp->SetTextureWrapping(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
 		Reset(m_seed, m_amount);
 	}
 
@@ -142,6 +146,20 @@ namespace pwg
 		ClearAtomicTextures();
 		++m_step;
 
+		if (m_talusShader && (m_step & 7u) == 0u)
+		{
+			for (int iteration = 0; iteration < 2; ++iteration)
+			{
+				m_talusShader->ActivateShader();
+				m_talusShader->SetUniformInt("u_height", 0);
+				m_talusShader->SetUniformInt("u_size", m_size);
+				m_talusShader->SetUniformFloat("u_amount", m_amount);
+				m_talusShader->BindTextureSampler(0, height->GetTextureID());
+				m_talusShader->BindImage(0, m_talusTemp->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				m_talusShader->DispatchForTexture(m_size, m_size);
+				height->CopyFrom(*m_talusTemp);
+			}
+		}
 	}
 
 	void GpuParticleErosion::DrawDebug(const float* view, const float* projection, const std::shared_ptr<Texture>& height)

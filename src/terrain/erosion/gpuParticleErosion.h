@@ -16,6 +16,7 @@ namespace pwg
 			int terrainSize,
 			std::shared_ptr<ComputeShader> particleShader,
 			std::shared_ptr<ComputeShader> applyShader,
+			std::shared_ptr<ComputeShader> talusShader,
 			std::shared_ptr<Shader> debugShader);
 		~GpuParticleErosion();
 
@@ -51,7 +52,9 @@ namespace pwg
 		unsigned int m_waterDelta{ 0 };
 		std::shared_ptr<ComputeShader> m_particleShader;
 		std::shared_ptr<ComputeShader> m_applyShader;
+		std::shared_ptr<ComputeShader> m_talusShader;
 		std::shared_ptr<Shader> m_debugShader;
+		std::shared_ptr<Texture> m_talusTemp;
 	};
 }
 
