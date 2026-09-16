@@ -35,6 +35,11 @@ namespace pwg
 		std::vector<float> waterVelocity;
 		std::vector<float> riverCarveDelta;
 		std::vector<float> hydrologyBaseHeight;
+		std::vector<float> thermalBaseHeight;
+		std::vector<float> thermalDebris;
+		std::vector<float> thermalDebrisMask;
+		std::vector<float> thermalErosion;
+		std::vector<float> thermalDeposition;
 
 		bool HasData() const { return worldSize > 0 && !finalHeight.empty(); }
 	};
@@ -55,6 +60,10 @@ namespace pwg
 		void PauseParticleErosion();
 		bool StepParticleErosion();
 		bool ResetParticleErosion();
+		bool StartThermalErosion();
+		void PauseThermalErosion();
+		bool StepThermalErosion();
+		bool ResetThermalErosion();
 		void ConfigureTerrain(int chunkCount, int chunkSize);
 
 		void GenerateWorld();
@@ -86,9 +95,15 @@ namespace pwg
 		bool GetShowErosionParticles() const;
 		void SetShowErosionParticles(bool show);
 		int GetActiveParticleCount() const;
+		bool IsThermalErosionActive() const;
+		bool IsThermalErosionReady() const;
+		bool IsThermalErosionStable() const;
+		float GetThermalErosionSpeed() const;
+		void SetThermalErosionSpeed(float speed);
+		std::string GetThermalErosionStatus() const;
 		float SampleHeightAtWorld(float worldX, float worldZ);
 		void UpdateHeightCache();
-		void MaybeUpdateHeightCache(float dt);
+		bool MaybeUpdateHeightCache(float dt);
 
 		TerrainChunk& GetChunk(int x, int y);
 

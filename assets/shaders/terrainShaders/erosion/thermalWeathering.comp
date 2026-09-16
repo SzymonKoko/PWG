@@ -1,0 +1,51 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8) in;
+layout (r32f, binding = 0) writeonly uniform image2D u_debrisOut;
+
+uniform sampler2D u_height;
+uniform sampler2D u_debris;
+uniform sampler2D u_hardness;
+uniform int u_size;
+uniform int u_hasHardness;
+uniform float u_amount;
+uniform float u_weathering;
+uniform float u_talusSlope;
+
+float HeightAt(ivec2 p)
+{
+    return texelFetch(u_height, clamp(p, ivec2(0), ivec2(u_size - 1)), 0).r;
+}
+
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(id, ivec2(u_size)))) return;
+
+    float existing = max(texelFetch(u_debris, id, 0).r, 0.0);
+    if (id.x == 0 || id.y == 0 || id.x == u_size - 1 || id.y == u_size - 1)
+    {
+        imageStore(u_debrisOut, id, vec4(existing));
+        return;
+    }
+
+    float center = HeightAt(id);
+    float maximumExcess = 0.0;
+    for (int y = -1; y <= 1; ++y)
+    {
+        for (int x = -1; x <= 1; ++x)
+        {
+            if (x == 0 && y == 0) continue;
+            float distance = (x != 0 && y != 0) ? 1.41421356237 : 1.0;
+            float excess = center - HeightAt(id + ivec2(x, y)) - u_talusSlope * distance;
+            maximumExcess = max(maximumExcess, excess);
+        }
+    }
+
+    float hardness = u_hasHardness != 0
+        ? clamp(texelFetch(u_hardness, id, 0).r, 0.0, 1.0)
+        : 0.5;
+    float produced = maximumExcess * u_amount * u_weathering * (1.0 - hardness) * 0.08;
+    produced = min(produced, maximumExcess * 0.25);
+    imageStore(u_debrisOut, id, vec4(existing + max(produced, 0.0)));
+}

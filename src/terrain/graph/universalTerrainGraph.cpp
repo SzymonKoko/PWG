@@ -283,6 +283,16 @@ namespace pwg
 				FloatParam("amount", "Amount", 0.35f, 0.0f, 1.0f),
 				IntParam("seed", "Seed", 1337, 1.0f, 100000.0f)
 			} },
+			{ "thermalErosion", "Thermal Erosion", "Terrain", {
+				Input("height", "Height"), Input("hardness", "Hardness", false, 0.5f)
+			}, {
+				Output("height", "Height"), Output("debris", "Debris"),
+				Output("erosion", "Erosion"), Output("deposition", "Deposition")
+			}, {
+				FloatParam("amount", "Amount", 0.35f, 0.0f, 1.0f),
+				FloatParam("talusAngle", "Talus Angle", 32.0f, 15.0f, 60.0f),
+				FloatParam("weathering", "Weathering", 0.45f, 0.0f, 1.0f)
+			} },
 			{ "treeAssetA", "Tree A", "Vegetation", { Input("density", "Density Mask", false, 1.0f) }, {}, {
 				IntParam("seed", "Seed", 1337, 1.0f, 100000.0f),
 				FloatParam("density", "Density", 0.45f, 0.0f, 1.0f),
@@ -371,7 +381,7 @@ namespace pwg
 		{
 			return { 0.0f, 1.0f, true };
 		}
-		if (node->typeId == "particleErosion")
+		if (node->typeId == "particleErosion" || node->typeId == "thermalErosion")
 		{
 			return portId == "height" ? inputRange("height") : TerrainGraphValueRange{ 0.0f, 1.0f, true };
 		}
@@ -462,7 +472,11 @@ namespace pwg
 		std::unordered_map<int, std::vector<int>> outgoing;
 		std::unordered_set<int> nodeIds;
 		int particleErosionNodes = 0;
+		int thermalErosionNodes = 0;
 		int drainageNetworkNodes = 0;
+		int particleErosionId = 0;
+		int thermalErosionId = 0;
+		std::vector<int> outputHeightIds;
 
 		for (const auto& node : asset.nodes)
 		{
@@ -478,7 +492,14 @@ namespace pwg
 			if (node.typeId == "particleErosion")
 			{
 				++particleErosionNodes;
+				if (node.enabled) particleErosionId = node.id;
 			}
+			if (node.typeId == "thermalErosion")
+			{
+				++thermalErosionNodes;
+				if (node.enabled) thermalErosionId = node.id;
+			}
+			if (node.typeId == "outputHeight" && node.enabled) outputHeightIds.push_back(node.id);
 			if (node.typeId == "drainageNetwork") ++drainageNetworkNodes;
 			for (const auto& input : type->inputs)
 			{
@@ -493,6 +514,11 @@ namespace pwg
 		{
 			result.valid = false;
 			result.messages.push_back("Only one Particle Erosion node is supported");
+		}
+		if (thermalErosionNodes > 1)
+		{
+			result.valid = false;
+			result.messages.push_back("Only one Thermal Erosion node is supported");
 		}
 		if (drainageNetworkNodes > 1)
 		{
@@ -531,6 +557,31 @@ namespace pwg
 			}
 			outgoing[fromNode->id].push_back(toNode->id);
 			++indegree[toNode->id];
+		}
+
+		auto hasDirectHeightLink = [&](int start, int target)
+		{
+			if (start == 0 || target == 0) return false;
+			return std::any_of(asset.links.begin(), asset.links.end(), [&](const TerrainGraphLink& link)
+			{
+				return link.fromNodeId == start && link.fromPortId == "height" &&
+					link.toNodeId == target && link.toPortId == "height";
+			});
+		};
+		if (thermalErosionId != 0)
+		{
+			bool reachesOutput = false;
+			for (int outputId : outputHeightIds) reachesOutput = reachesOutput || hasDirectHeightLink(thermalErosionId, outputId);
+			if (!reachesOutput)
+			{
+				result.valid = false;
+				result.messages.push_back("Thermal Erosion must feed Output Height");
+			}
+			if (particleErosionId != 0 && !hasDirectHeightLink(particleErosionId, thermalErosionId))
+			{
+				result.valid = false;
+				result.messages.push_back("Thermal Erosion must be downstream of Particle Erosion");
+			}
 		}
 
 		std::queue<int> ready;
@@ -596,6 +647,35 @@ namespace pwg
 				asset.AddLink(noiseId, "height", particleNode.id, "height");
 				asset.AddLink(particleNode.id, "height", outputId, "height");
 				asset.nodes[1].position = ImVec2(720.0f, 30.0f);
+			}
+		}
+		if (noise && output)
+		{
+			const auto* thermal = FindTerrainGraphNodeType("thermalErosion");
+			const auto* particle = FindTerrainGraphNodeType("particleErosion");
+			if (thermal && particle)
+			{
+				auto particleIt = std::find_if(asset.nodes.begin(), asset.nodes.end(), [](const TerrainGraphNodeInstance& node)
+				{
+					return node.typeId == "particleErosion";
+				});
+				auto outputIt = std::find_if(asset.nodes.begin(), asset.nodes.end(), [](const TerrainGraphNodeInstance& node)
+				{
+					return node.typeId == "outputHeight";
+				});
+				if (particleIt != asset.nodes.end() && outputIt != asset.nodes.end())
+				{
+					const int particleId = particleIt->id;
+					const int outputId = outputIt->id;
+					asset.links.erase(std::remove_if(asset.links.begin(), asset.links.end(), [&](const TerrainGraphLink& link)
+					{
+						return link.fromNodeId == particleId && link.toNodeId == outputId;
+					}), asset.links.end());
+					auto& thermalNode = asset.AddNode(*thermal, ImVec2(720.0f, 20.0f));
+					asset.AddLink(particleId, "height", thermalNode.id, "height");
+					asset.AddLink(thermalNode.id, "height", outputId, "height");
+					if (auto* movedOutput = asset.FindNode(outputId)) movedOutput->position = ImVec2(1080.0f, 30.0f);
+				}
 			}
 		}
 		const auto* vegetationNoise = FindTerrainGraphNodeType("noiseMask");

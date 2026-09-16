@@ -97,7 +97,18 @@ namespace pwg
 		}
 		if (m_terrainComputePipeline->UpdateParticleErosion(m_globalMasks, dt))
 		{
-			MaybeUpdateHeightCache(dt);
+			if (MaybeUpdateHeightCache(dt)) ++m_generationRevision;
+		}
+		const bool thermalWasRunning = m_terrainComputePipeline->IsThermalErosionActive();
+		if (m_terrainComputePipeline->UpdateThermalErosion(m_globalMasks, dt))
+		{
+			if (MaybeUpdateHeightCache(dt)) ++m_generationRevision;
+		}
+		if (thermalWasRunning && !m_terrainComputePipeline->IsThermalErosionActive())
+		{
+			m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
+			UpdateHeightCache();
+			++m_generationRevision;
 		}
 		if (m_terrainComputePipeline->UpdateHydrology(m_globalMasks))
 		{
@@ -389,8 +400,9 @@ namespace pwg
 	{
 		CancelHydrology();
 		m_terrainComputePipeline->CancelParticleErosion();
+		m_terrainComputePipeline->PauseThermalErosion();
 		m_terrainComputePipeline->RegenerateTerrain(m_globalMasks);
-		if (!m_terrainComputePipeline->IsParticleErosionActive()) UpdateHeightCache();
+		if (!m_terrainComputePipeline->IsParticleErosionActive() && !m_terrainComputePipeline->IsThermalErosionActive()) UpdateHeightCache();
 
 		m_needRegenerate = false;
 	}
@@ -422,6 +434,11 @@ namespace pwg
 		snapshot.waterVelocity = read("WaterVelocityMap");
 		snapshot.riverCarveDelta = read("RiverCarveDelta");
 		snapshot.hydrologyBaseHeight = read("HydrologyBaseHeight");
+		snapshot.thermalBaseHeight = read("ThermalBaseHeight");
+		snapshot.thermalDebris = read("ThermalDebris");
+		snapshot.thermalDebrisMask = read("ThermalDebrisMask");
+		snapshot.thermalErosion = read("ThermalErosionMask");
+		snapshot.thermalDeposition = read("ThermalDepositionMask");
 		return snapshot;
 	}
 
@@ -432,6 +449,7 @@ namespace pwg
 			return;
 		}
 		m_terrainComputePipeline->CancelParticleErosion();
+		m_terrainComputePipeline->PauseThermalErosion();
 
 		size_t expected = static_cast<size_t>(m_worldSize) * static_cast<size_t>(m_worldSize);
 		auto write = [&](const char* name, const std::vector<float>& data)
@@ -461,7 +479,13 @@ namespace pwg
 			m_globalMasks["WaterVelocityMap"]->texture->UpdateFloatData(snapshot.waterVelocity, m_worldSize, m_worldSize);
 		write("RiverCarveDelta", snapshot.riverCarveDelta);
 		write("HydrologyBaseHeight", snapshot.hydrologyBaseHeight);
+		write("ThermalBaseHeight", snapshot.thermalBaseHeight);
+		write("ThermalDebris", snapshot.thermalDebris);
+		write("ThermalDebrisMask", snapshot.thermalDebrisMask);
+		write("ThermalErosionMask", snapshot.thermalErosion);
+		write("ThermalDepositionMask", snapshot.thermalDeposition);
 		m_terrainComputePipeline->MarkHydrologyRestored(m_globalMasks, snapshot.hydrologyBaseHeight.size() >= expected);
+		m_terrainComputePipeline->MarkThermalErosionRestored(m_globalMasks, snapshot.thermalBaseHeight.size() >= expected);
 
 		m_globalMasks["ErodedHeight"] = m_globalMasks["FinalHeight"];
 
@@ -479,6 +503,7 @@ namespace pwg
 
 	void ChunkManager::StartParticleErosion()
 	{
+		m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
 		if (m_terrainComputePipeline->ResetHydrology(m_globalMasks)) UpdateHeightCache();
 		m_terrainComputePipeline->StartParticleErosion();
 	}
@@ -512,6 +537,7 @@ namespace pwg
 
 	bool ChunkManager::StepParticleErosion()
 	{
+		m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
 		if (!m_terrainComputePipeline->StepParticleErosion(m_globalMasks)) return false;
 		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
 		UpdateHeightCache();
@@ -521,16 +547,51 @@ namespace pwg
 
 	bool ChunkManager::ResetParticleErosion()
 	{
+		m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks);
 		const bool reset = m_terrainComputePipeline->ResetParticleErosionState(m_globalMasks);
 		UpdateHeightCache();
 		++m_generationRevision;
 		return reset;
 	}
 
+	bool ChunkManager::StartThermalErosion()
+	{
+		if (m_terrainComputePipeline->ResetHydrology(m_globalMasks)) UpdateHeightCache();
+		return m_terrainComputePipeline->StartThermalErosion(m_globalMasks);
+	}
+
+	void ChunkManager::PauseThermalErosion()
+	{
+		m_terrainComputePipeline->PauseThermalErosion();
+		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
+		UpdateHeightCache();
+		++m_generationRevision;
+	}
+
+	bool ChunkManager::StepThermalErosion()
+	{
+		if (m_terrainComputePipeline->IsHydrologyRunning()) return false;
+		if (m_terrainComputePipeline->ResetHydrology(m_globalMasks)) UpdateHeightCache();
+		if (!m_terrainComputePipeline->StepThermalErosion(m_globalMasks)) return false;
+		m_terrainComputePipeline->RefreshMaskPass(m_globalMasks);
+		UpdateHeightCache();
+		++m_generationRevision;
+		return true;
+	}
+
+	bool ChunkManager::ResetThermalErosion()
+	{
+		if (!m_terrainComputePipeline->ResetThermalErosionState(m_globalMasks)) return false;
+		UpdateHeightCache();
+		++m_generationRevision;
+		return true;
+	}
+
 	void ChunkManager::ConfigureTerrain(int chunkCount, int chunkSize)
 	{
 		CancelHydrology();
 		m_terrainComputePipeline->CancelParticleErosion();
+		m_terrainComputePipeline->PauseThermalErosion();
 		chunkCount = std::clamp(chunkCount, 3, 31);
 		chunkSize = std::clamp(chunkSize, 33, 257);
 		if (chunkCount == m_chunkCount && chunkSize == m_terrainSettings.chunkSize)
@@ -677,6 +738,12 @@ namespace pwg
 	bool ChunkManager::GetShowErosionParticles() const { return m_terrainComputePipeline->GetShowErosionParticles(); }
 	void ChunkManager::SetShowErosionParticles(bool show) { m_terrainComputePipeline->SetShowErosionParticles(show); }
 	int ChunkManager::GetActiveParticleCount() const { return m_terrainComputePipeline->GetActiveParticleCount(); }
+	bool ChunkManager::IsThermalErosionActive() const { return m_terrainComputePipeline->IsThermalErosionActive(); }
+	bool ChunkManager::IsThermalErosionReady() const { return m_terrainComputePipeline->IsThermalErosionReady(); }
+	bool ChunkManager::IsThermalErosionStable() const { return m_terrainComputePipeline->IsThermalErosionStable(); }
+	float ChunkManager::GetThermalErosionSpeed() const { return m_terrainComputePipeline->GetThermalErosionSpeed(); }
+	void ChunkManager::SetThermalErosionSpeed(float speed) { m_terrainComputePipeline->SetThermalErosionSpeed(speed); }
+	std::string ChunkManager::GetThermalErosionStatus() const { return m_terrainComputePipeline->GetThermalErosionStatus(); }
 	float ChunkManager::SampleHeightAtWorld(float worldX, float worldZ)
 	{
 		if (!m_heightCacheValid || m_heightCache.empty() || m_worldSize <= 1)
@@ -726,13 +793,15 @@ namespace pwg
 		m_heightCacheAccumulator = 0.0f;
 	}
 
-	void ChunkManager::MaybeUpdateHeightCache(float dt)
+	bool ChunkManager::MaybeUpdateHeightCache(float dt)
 	{
 		m_heightCacheAccumulator += std::clamp(dt, 0.0f, 0.25f);
 		if (m_heightCacheAccumulator >= m_heightCacheInterval)
 		{
 			UpdateHeightCache();
+			return true;
 		}
+		return false;
 	}
 
 	TerrainChunk& ChunkManager::GetChunk(int x, int y)
@@ -756,7 +825,7 @@ namespace pwg
 		{
 			m_proceduralAssetsInitialized = m_terrainComputePipeline->RefreshProceduralAssets(m_globalMasks);
 		}
-		if (!m_terrainComputePipeline->IsParticleErosionActive())
+		if (!m_terrainComputePipeline->IsParticleErosionActive() && !m_terrainComputePipeline->IsThermalErosionActive())
 		{
 			UpdateHeightCache();
 			++m_generationRevision;
@@ -766,10 +835,10 @@ namespace pwg
 
 	bool ChunkManager::RunUniversalGraph()
 	{
-		if (m_terrainComputePipeline->IsParticleErosionActive()) return false;
+		if (m_terrainComputePipeline->IsParticleErosionActive() || m_terrainComputePipeline->IsThermalErosionActive()) return false;
 		CancelHydrology();
 		bool executed = m_terrainComputePipeline->ExecuteUniversalGraph(m_globalMasks);
-		if (executed && !m_terrainComputePipeline->IsParticleErosionActive())
+		if (executed && !m_terrainComputePipeline->IsParticleErosionActive() && !m_terrainComputePipeline->IsThermalErosionActive())
 		{
 			m_globalMasks["BaseHeight"]->texture->CopyFrom(*m_globalMasks["FinalHeight"]->texture);
 			UpdateHeightCache();
@@ -781,7 +850,7 @@ namespace pwg
 
 	bool ChunkManager::RefreshProceduralAssets()
 	{
-		if (m_terrainComputePipeline->IsParticleErosionActive()) return false;
+		if (m_terrainComputePipeline->IsParticleErosionActive() || m_terrainComputePipeline->IsThermalErosionActive()) return false;
 		const bool refreshed = m_terrainComputePipeline->RefreshProceduralAssets(m_globalMasks);
 		m_proceduralAssetsInitialized = refreshed || m_proceduralAssetsInitialized;
 		return refreshed;

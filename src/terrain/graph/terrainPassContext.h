@@ -21,6 +21,11 @@ namespace pwg
 
 	};
 
+	struct ThermalSimulationSettings
+	{
+		float simulationSpeed = 1.0f;
+	};
+
 	struct TerrainPassContext
 	{
 		int chunkSize;
@@ -30,6 +35,7 @@ namespace pwg
 		bool chunkLocalGeneration{ false };
 		int simulationIterations = 40;
 		HydraulicSimulationSettings hydraulicSettings;
+		ThermalSimulationSettings thermalSettings;
 		bool cpuTerrainCacheValid = false;
 		std::vector<float> cpuHeight;
 		std::vector<float> cpuBaseHeight;

@@ -1,0 +1,31 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8) in;
+layout (r32f, binding = 0) uniform image2D u_heightOut;
+layout (r32f, binding = 1) writeonly uniform image2D u_debrisOut;
+layout (r32f, binding = 2) uniform image2D u_erosionOut;
+layout (r32f, binding = 3) uniform image2D u_depositionOut;
+layout (r32f, binding = 4) writeonly uniform image2D u_debrisMaskOut;
+
+uniform isampler2D u_delta;
+uniform sampler2D u_debrisSource;
+uniform int u_size;
+uniform float u_fixedScale;
+uniform float u_invHeightRange;
+
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(id, ivec2(u_size)))) return;
+
+    float delta = float(texelFetch(u_delta, id, 0).r) / u_fixedScale;
+    float height = imageLoad(u_heightOut, id).r + delta;
+    float debris = max(texelFetch(u_debrisSource, id, 0).r + delta, 0.0);
+    float erosion = clamp(imageLoad(u_erosionOut, id).r + max(-delta, 0.0) * u_invHeightRange, 0.0, 1.0);
+    float deposition = clamp(imageLoad(u_depositionOut, id).r + max(delta, 0.0) * u_invHeightRange, 0.0, 1.0);
+    imageStore(u_heightOut, id, vec4(height));
+    imageStore(u_debrisOut, id, vec4(debris));
+    imageStore(u_erosionOut, id, vec4(erosion));
+    imageStore(u_depositionOut, id, vec4(deposition));
+    imageStore(u_debrisMaskOut, id, vec4(clamp(debris * u_invHeightRange, 0.0, 1.0)));
+}

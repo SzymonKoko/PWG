@@ -690,7 +690,7 @@ namespace pwg
 		YAML::Node WriteUniversalTerrainGraph(const TerrainGraphAsset& asset)
 		{
 			YAML::Node node;
-			node["schemaVersion"] = 4;
+			node["schemaVersion"] = 5;
 			node["useUniversalGraph"] = asset.useUniversalGraph;
 			node["pan"] = Vec2Node(asset.pan);
 			node["zoom"] = asset.zoom;
@@ -927,6 +927,19 @@ namespace pwg
 			ReadValue(node, "lakeAmount", settings.lakeAmount);
 			ReadValue(node, "hydrologySeed", settings.hydrologySeed);
 		}
+
+		YAML::Node WriteThermalSettings(const ThermalSimulationSettings& settings)
+		{
+			YAML::Node node;
+			node["simulationSpeed"] = settings.simulationSpeed;
+			return node;
+		}
+
+		void ReadThermalSettings(const YAML::Node& node, ThermalSimulationSettings& settings)
+		{
+			ReadValue(node, "simulationSpeed", settings.simulationSpeed);
+			settings.simulationSpeed = std::clamp(settings.simulationSpeed, 0.25f, 4.0f);
+		}
 	}
 	namespace
 	{
@@ -951,7 +964,7 @@ namespace pwg
 			}
 
 			const char magic[4] = { 'P', 'W', 'G', 'S' };
-			uint32_t version = 5;
+			uint32_t version = 6;
 			int32_t worldSize = snapshot.worldSize;
 			out.write(magic, 4);
 			out.write(reinterpret_cast<const char*>(&version), sizeof(version));
@@ -979,6 +992,11 @@ namespace pwg
 			writeLayer(snapshot.waterVelocity);
 			writeLayer(snapshot.riverCarveDelta);
 			writeLayer(snapshot.hydrologyBaseHeight);
+			writeLayer(snapshot.thermalBaseHeight);
+			writeLayer(snapshot.thermalDebris);
+			writeLayer(snapshot.thermalDebrisMask);
+			writeLayer(snapshot.thermalErosion);
+			writeLayer(snapshot.thermalDeposition);
 			return true;
 		}
 
@@ -1062,6 +1080,22 @@ namespace pwg
 				snapshot.flowAccumulation.clear();
 				snapshot.riverChannels.clear();
 			}
+			if (version >= 6)
+			{
+				readLayer(snapshot.thermalBaseHeight);
+				readLayer(snapshot.thermalDebris);
+				readLayer(snapshot.thermalDebrisMask);
+				readLayer(snapshot.thermalErosion);
+				readLayer(snapshot.thermalDeposition);
+			}
+			else
+			{
+				snapshot.thermalBaseHeight.clear();
+				snapshot.thermalDebris.clear();
+				snapshot.thermalDebrisMask.clear();
+				snapshot.thermalErosion.clear();
+				snapshot.thermalDeposition.clear();
+			}
 			return snapshot.HasData();
 		}
 	}
@@ -1075,11 +1109,13 @@ namespace pwg
 		auto chunkManager = scene.GetTerrain()->GetChunkManager();
 		chunkManager->CancelHydrology();
 		chunkManager->PauseParticleErosion();
+		chunkManager->PauseThermalErosion();
 		root["terrain"]["chunkCount"] = chunkManager->GetChunkCount();
 		root["terrain"]["chunkSize"] = chunkManager->GetChunkSize();
 
 		auto pipeline = chunkManager->GetTerrainComputePipeline();
 		root["hydraulic"] = WriteHydraulicSettings(pipeline->GetHydraulicSettings());
+		root["thermal"] = WriteThermalSettings(pipeline->GetThermalSettings());
 		if (scene.GetTerrainMaterialLibrary())
 		{
 			root["terrainMaterials"] = WriteTerrainMaterials(*scene.GetTerrainMaterialLibrary());
@@ -1135,6 +1171,7 @@ namespace pwg
 
 		auto pipeline = chunkManager->GetTerrainComputePipeline();
 		ReadHydraulicSettings(root["hydraulic"], pipeline->GetHydraulicSettings());
+		ReadThermalSettings(root["thermal"], pipeline->GetThermalSettings());
 		if (scene.GetTerrainMaterialLibrary())
 		{
 			ReadTerrainMaterials(root["terrainMaterials"], *scene.GetTerrainMaterialLibrary());

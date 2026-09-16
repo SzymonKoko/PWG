@@ -95,7 +95,9 @@ namespace pwg
 		m_shaderManager->LoadCompute("downsampleWaterRenderCacheShader", terrainShadersPath + "water/downsampleWaterRenderCache.comp");
 		m_shaderManager->LoadCompute("particleHydrologyShader", terrainShadersPath + "erosion/particleHydrology.comp");
 		m_shaderManager->LoadCompute("applyParticleHydrologyShader", terrainShadersPath + "erosion/applyParticleHydrology.comp");
-		m_shaderManager->LoadCompute("talusRelaxShader", terrainShadersPath + "erosion/talusRelax.comp");
+		m_shaderManager->LoadCompute("thermalWeatheringShader", terrainShadersPath + "erosion/thermalWeathering.comp");
+		m_shaderManager->LoadCompute("thermalTransportShader", terrainShadersPath + "erosion/thermalTransport.comp");
+		m_shaderManager->LoadCompute("applyThermalErosionShader", terrainShadersPath + "erosion/applyThermalErosion.comp");
 		m_shaderManager->Load("particleHydrologyDebugShader", terrainShadersPath + "erosion/particleDebug.vert", terrainShadersPath + "erosion/particleDebug.frag");
 		m_shaderManager->LoadCompute("universalConstantShader", terrainShadersPath + "masks/universalConstant.comp");
 		m_shaderManager->LoadCompute("universalNoiseHeightShader", terrainShadersPath + "masks/universalNoiseHeight.comp");
@@ -114,7 +116,9 @@ namespace pwg
 		auto slopeMaskShader = m_shaderManager->GetShader<pwg::ComputeShader>("slopeMaskShader");
 		auto particleHydrologyShader = m_shaderManager->GetShader<pwg::ComputeShader>("particleHydrologyShader");
 		auto applyParticleHydrologyShader = m_shaderManager->GetShader<pwg::ComputeShader>("applyParticleHydrologyShader");
-		auto talusRelaxShader = m_shaderManager->GetShader<pwg::ComputeShader>("talusRelaxShader");
+		auto thermalWeatheringShader = m_shaderManager->GetShader<pwg::ComputeShader>("thermalWeatheringShader");
+		auto thermalTransportShader = m_shaderManager->GetShader<pwg::ComputeShader>("thermalTransportShader");
+		auto applyThermalErosionShader = m_shaderManager->GetShader<pwg::ComputeShader>("applyThermalErosionShader");
 		auto universalConstantShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalConstantShader");
 		auto universalNoiseHeightShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalNoiseHeightShader");
 		auto universalBinaryOpShader = m_shaderManager->GetShader<pwg::ComputeShader>("universalBinaryOpShader");
@@ -132,7 +136,9 @@ namespace pwg
 		AddComputeShader("SlopeMask", slopeMaskShader);
 		AddComputeShader("ParticleHydrology", particleHydrologyShader);
 		AddComputeShader("ApplyParticleHydrology", applyParticleHydrologyShader);
-		AddComputeShader("TalusRelax", talusRelaxShader);
+		AddComputeShader("ThermalWeathering", thermalWeatheringShader);
+		AddComputeShader("ThermalTransport", thermalTransportShader);
+		AddComputeShader("ApplyThermalErosion", applyThermalErosionShader);
 		AddComputeShader("UniversalConstant", universalConstantShader);
 		AddComputeShader("UniversalNoiseHeight", universalNoiseHeightShader);
 		AddComputeShader("UniversalBinaryOp", universalBinaryOpShader);
@@ -146,8 +152,9 @@ namespace pwg
 			m_size,
 			particleHydrologyShader,
 			applyParticleHydrologyShader,
-			talusRelaxShader,
 			m_shaderManager->GetShader<pwg::Shader>("particleHydrologyDebugShader"));
+		m_gpuThermalErosion = std::make_unique<GpuThermalErosion>(
+			m_size, thermalWeatheringShader, thermalTransportShader, applyThermalErosionShader);
 		m_waterClipmapRenderer = std::make_unique<WaterClipmapRenderer>(
 			m_size,
 			m_shaderManager->GetShader<pwg::ComputeShader>("buildWaterRenderCacheShader"),
@@ -159,6 +166,7 @@ namespace pwg
 	{
 		CancelHydrology();
 		PauseParticleErosion();
+		PauseThermalErosion();
 	}
 
 	void TerrainComputePipeline::Execute(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
@@ -197,7 +205,10 @@ namespace pwg
 	bool TerrainComputePipeline::ExecuteUniversalGraph(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
 		PauseParticleErosion();
+		PauseThermalErosion();
 		m_particleErosionReady = false;
+		m_thermalErosionReady = false;
+		m_thermalErosionInitialized = false;
 		ApplyUniversalGraphSimulationSettings();
 		auto validation = ValidateTerrainGraphAsset(m_universalGraphAsset);
 		if (!validation.valid)
@@ -238,21 +249,34 @@ namespace pwg
 			}
 			if (!node->enabled)
 			{
-				if (node->typeId == "particleErosion")
+				if (node->typeId == "particleErosion" || node->typeId == "thermalErosion")
 				{
 					auto source = inputFor(*node, "height");
 					if (!source) return false;
 					setOutput(*node, "height", source);
-					for (const char* port : { "flow", "deposition", "erosion" })
+					const std::vector<const char*> ports = node->typeId == "particleErosion"
+						? std::vector<const char*>{ "flow", "deposition", "erosion" }
+						: std::vector<const char*>{ "debris", "deposition", "erosion" };
+					for (const char* port : ports)
 					{
 						auto output = makeOutput(*node, port);
 						output->texture->ClearTexture();
 						setOutput(*node, port, output);
 					}
-					masks.at("DepositMask")->texture->ClearTexture();
-					masks.at("FlowAccumulationMask")->texture->ClearTexture();
-					masks.at("RiverChannelMask")->texture->ClearTexture();
-					masks.at("ErosionDelta")->texture->ClearTexture();
+					if (node->typeId == "particleErosion")
+					{
+						masks.at("DepositMask")->texture->ClearTexture();
+						masks.at("FlowAccumulationMask")->texture->ClearTexture();
+						masks.at("RiverChannelMask")->texture->ClearTexture();
+						masks.at("ErosionDelta")->texture->ClearTexture();
+					}
+					else
+					{
+						masks.at("ThermalDebris")->texture->ClearTexture();
+						masks.at("ThermalDebrisMask")->texture->ClearTexture();
+						masks.at("ThermalErosionMask")->texture->ClearTexture();
+						masks.at("ThermalDepositionMask")->texture->ClearTexture();
+					}
 				}
 				continue;
 			}
@@ -447,6 +471,27 @@ namespace pwg
 				m_particleStepCount = 0;
 				m_particleStepAccumulator = 0.0f;
 			}
+			else if (node->typeId == "thermalErosion")
+			{
+				auto source = inputFor(*node, "height");
+				if (!source) return false;
+				m_thermalAmount = std::clamp(GetFloatParameter(*node, "amount", 0.35f), 0.0f, 1.0f);
+				m_thermalTalusAngle = std::clamp(GetFloatParameter(*node, "talusAngle", 32.0f), 15.0f, 60.0f);
+				m_thermalWeathering = std::clamp(GetFloatParameter(*node, "weathering", 0.45f), 0.0f, 1.0f);
+				auto hardness = inputFor(*node, "hardness");
+				m_thermalHardness = hardness ? hardness->texture : nullptr;
+				setOutput(*node, "height", source);
+				setOutput(*node, "debris", masks.at("ThermalDebrisMask"));
+				setOutput(*node, "erosion", masks.at("ThermalErosionMask"));
+				setOutput(*node, "deposition", masks.at("ThermalDepositionMask"));
+				masks[TempMaskName(node->id, "debris")] = masks.at("ThermalDebrisMask");
+				masks[TempMaskName(node->id, "erosion")] = masks.at("ThermalErosionMask");
+				masks[TempMaskName(node->id, "deposition")] = masks.at("ThermalDepositionMask");
+				m_gpuThermalErosion->Reset(m_thermalAmount, m_thermalTalusAngle, m_thermalWeathering);
+				m_thermalErosionReady = m_thermalAmount > 0.0001f;
+				m_thermalStepCount = 0;
+				m_thermalStepAccumulator = 0.0f;
+			}
 			else if (node->typeId == "drainageNetwork")
 			{
 				setOutput(*node, "water", masks.at("WaterMask"));
@@ -490,6 +535,11 @@ namespace pwg
 		masks.at("LakeMask")->texture->ClearTexture();
 		masks.at("WaterVelocityMap")->texture->ClearTexture();
 		masks.at("RiverCarveDelta")->texture->ClearTexture();
+		masks.at("ThermalBaseHeight")->texture->ClearTexture();
+		masks.at("ThermalDebris")->texture->ClearTexture();
+		masks.at("ThermalDebrisMask")->texture->ClearTexture();
+		masks.at("ThermalErosionMask")->texture->ClearTexture();
+		masks.at("ThermalDepositionMask")->texture->ClearTexture();
 		m_hydrologyGenerated = false;
 		m_hydrologyStatus = "Hydrology ready to generate";
 		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
@@ -500,6 +550,14 @@ namespace pwg
 			masks[TempMaskName(node.id, "flow")] = masks.at("ErosionFlowMask");
 			masks[TempMaskName(node.id, "deposition")] = masks.at("DepositMask");
 			masks[TempMaskName(node.id, "erosion")] = masks.at("ErosionMask");
+		}
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "thermalErosion") continue;
+			masks[TempMaskName(node.id, "height")] = masks.at("FinalHeight");
+			masks[TempMaskName(node.id, "debris")] = masks.at("ThermalDebrisMask");
+			masks[TempMaskName(node.id, "erosion")] = masks.at("ThermalErosionMask");
+			masks[TempMaskName(node.id, "deposition")] = masks.at("ThermalDepositionMask");
 		}
 		for (const auto& node : m_universalGraphAsset.nodes)
 		{
@@ -729,6 +787,186 @@ namespace pwg
 		m_gpuParticleErosion->DrawDebug(&view[0][0], &projection[0][0], height->second->texture);
 	}
 
+	bool TerrainComputePipeline::StartThermalErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		if (!m_thermalErosionReady || !m_gpuThermalErosion || IsHydrologyRunning()) return false;
+		PauseParticleErosion();
+		if (!m_thermalErosionInitialized)
+		{
+			masks.at("ThermalBaseHeight")->texture->CopyFrom(*masks.at("FinalHeight")->texture);
+			masks.at("ThermalDebris")->texture->ClearTexture();
+			masks.at("ThermalDebrisMask")->texture->ClearTexture();
+			masks.at("ThermalErosionMask")->texture->ClearTexture();
+			masks.at("ThermalDepositionMask")->texture->ClearTexture();
+			m_thermalErosionInitialized = true;
+			m_thermalStepCount = 0;
+		}
+		m_gpuThermalErosion->Reset(m_thermalAmount, m_thermalTalusAngle, m_thermalWeathering);
+		m_gpuThermalErosion->Begin(masks.at("FinalHeight")->texture);
+		m_thermalErosionRunning = true;
+		m_thermalStepAccumulator = 0.0f;
+		return true;
+	}
+
+	void TerrainComputePipeline::PauseThermalErosion()
+	{
+		m_thermalErosionRunning = false;
+		m_thermalStepAccumulator = 0.0f;
+	}
+
+	bool TerrainComputePipeline::StepThermalErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		if (!m_thermalErosionReady || !m_gpuThermalErosion) return false;
+		if (!m_thermalErosionInitialized)
+		{
+			masks.at("ThermalBaseHeight")->texture->CopyFrom(*masks.at("FinalHeight")->texture);
+			masks.at("ThermalDebris")->texture->ClearTexture();
+			masks.at("ThermalDebrisMask")->texture->ClearTexture();
+			masks.at("ThermalErosionMask")->texture->ClearTexture();
+			masks.at("ThermalDepositionMask")->texture->ClearTexture();
+			m_gpuThermalErosion->Reset(m_thermalAmount, m_thermalTalusAngle, m_thermalWeathering);
+			m_gpuThermalErosion->Begin(masks.at("FinalHeight")->texture);
+			m_thermalErosionInitialized = true;
+		}
+
+		const bool stepped = m_gpuThermalErosion->Step(
+			masks.at("FinalHeight")->texture,
+			m_thermalHardness,
+			masks.at("ThermalDebris")->texture,
+			masks.at("ThermalDebrisMask")->texture,
+			masks.at("ThermalErosionMask")->texture,
+			masks.at("ThermalDepositionMask")->texture);
+		if (!stepped)
+		{
+			if (m_gpuThermalErosion->IsStable()) PauseThermalErosion();
+			return false;
+		}
+
+		++m_thermalStepCount;
+		if ((m_thermalStepCount & 3u) == 0u)
+		{
+			RefreshMaskPass(masks);
+			RefreshThermalErosionPreviews(masks);
+		}
+		if (m_gpuThermalErosion->IsStable()) PauseThermalErosion();
+		m_terrainMasks = masks;
+		InvalidateWaterRenderCache();
+		return true;
+	}
+
+	bool TerrainComputePipeline::UpdateThermalErosion(
+		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, float deltaTime)
+	{
+		if (!m_thermalErosionRunning || !m_thermalErosionReady) return false;
+		m_thermalStepAccumulator += std::clamp(deltaTime, 0.0f, 0.1f) * 60.0f *
+			m_terrainPassContext.thermalSettings.simulationSpeed;
+		const int steps = std::min(static_cast<int>(m_thermalStepAccumulator), 4);
+		if (steps <= 0) return false;
+		m_thermalStepAccumulator -= static_cast<float>(steps);
+		bool changed = false;
+		for (int i = 0; i < steps && m_thermalErosionRunning; ++i)
+		{
+			changed = StepThermalErosion(masks) || changed;
+		}
+		return changed;
+	}
+
+	bool TerrainComputePipeline::ResetThermalErosionState(
+		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		PauseThermalErosion();
+		if (m_thermalErosionInitialized)
+		{
+			masks.at("FinalHeight")->texture->CopyFrom(*masks.at("ThermalBaseHeight")->texture);
+		}
+		for (const char* name : { "ThermalBaseHeight", "ThermalDebris", "ThermalDebrisMask",
+			"ThermalErosionMask", "ThermalDepositionMask" })
+		{
+			masks.at(name)->texture->ClearTexture();
+		}
+		m_gpuThermalErosion->Reset(m_thermalAmount, m_thermalTalusAngle, m_thermalWeathering);
+		m_thermalErosionInitialized = false;
+		m_thermalStepCount = 0;
+		RefreshMaskPass(masks);
+		RefreshThermalErosionPreviews(masks);
+		InvalidateWaterRenderCache();
+		return true;
+	}
+
+	void TerrainComputePipeline::RefreshThermalErosionPreviews(
+		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
+	{
+		auto shader = m_computeShaders.at("UniversalGraphPreview");
+		constexpr int previewSize = 256;
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "thermalErosion") continue;
+			for (const char* port : { "height", "debris", "erosion", "deposition" })
+			{
+				auto source = masks.find(TempMaskName(node.id, port));
+				if (source == masks.end() || !source->second || !source->second->texture) continue;
+				auto range = EstimateTerrainGraphOutputRange(m_universalGraphAsset, node.id, port);
+				if (!range.valid || std::abs(range.maximum - range.minimum) < 0.0001f)
+					range = { 0.0f, 1.0f, true };
+				auto preview = EnsureFloatMask(masks, "preview_" + TempMaskName(node.id, port), previewSize);
+				shader->ActivateShader();
+				shader->SetUniformInt("u_value", 0);
+				shader->SetUniformInt("u_size", previewSize);
+				shader->SetUniformFloat("u_minValue", range.minimum);
+				shader->SetUniformFloat("u_maxValue", range.maximum);
+				shader->BindTextureSampler(0, source->second->texture->GetTextureID());
+				shader->BindImage(0, preview->texture->GetTextureID(), GL_WRITE_ONLY, GL_R32F);
+				shader->DispatchForTexture(previewSize, previewSize);
+			}
+		}
+		shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+	}
+
+	bool TerrainComputePipeline::IsThermalErosionActive() const { return m_thermalErosionRunning; }
+	bool TerrainComputePipeline::IsThermalErosionReady() const { return m_thermalErosionReady; }
+	bool TerrainComputePipeline::IsThermalErosionStable() const
+	{
+		return m_thermalErosionInitialized && m_gpuThermalErosion && m_gpuThermalErosion->IsStable();
+	}
+	float TerrainComputePipeline::GetThermalErosionSpeed() const
+	{
+		return m_terrainPassContext.thermalSettings.simulationSpeed;
+	}
+	void TerrainComputePipeline::SetThermalErosionSpeed(float speed)
+	{
+		m_terrainPassContext.thermalSettings.simulationSpeed = std::clamp(speed, 0.25f, 4.0f);
+	}
+	std::string TerrainComputePipeline::GetThermalErosionStatus() const
+	{
+		if (!m_thermalErosionReady) return "Add an enabled Thermal Erosion node";
+		if (m_thermalErosionRunning) return "Running";
+		if (IsThermalErosionStable()) return "Stable";
+		return m_thermalErosionInitialized ? "Paused" : "Ready";
+	}
+
+	void TerrainComputePipeline::MarkThermalErosionRestored(
+		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool restored)
+	{
+		PauseThermalErosion();
+		m_thermalErosionInitialized = restored;
+		m_thermalStepCount = 0;
+		for (const auto& node : m_universalGraphAsset.nodes)
+		{
+			if (!node.enabled || node.typeId != "thermalErosion") continue;
+			m_thermalAmount = std::clamp(GetFloatParameter(node, "amount", 0.35f), 0.0f, 1.0f);
+			m_thermalTalusAngle = std::clamp(GetFloatParameter(node, "talusAngle", 32.0f), 15.0f, 60.0f);
+			m_thermalWeathering = std::clamp(GetFloatParameter(node, "weathering", 0.45f), 0.0f, 1.0f);
+			m_thermalErosionReady = m_thermalAmount > 0.0001f;
+			masks[TempMaskName(node.id, "height")] = masks.at("FinalHeight");
+			masks[TempMaskName(node.id, "debris")] = masks.at("ThermalDebrisMask");
+			masks[TempMaskName(node.id, "erosion")] = masks.at("ThermalErosionMask");
+			masks[TempMaskName(node.id, "deposition")] = masks.at("ThermalDepositionMask");
+			break;
+		}
+		m_gpuThermalErosion->Reset(m_thermalAmount, m_thermalTalusAngle, m_thermalWeathering);
+		if (restored) m_gpuThermalErosion->Begin(masks.at("FinalHeight")->texture);
+	}
+
 	void TerrainComputePipeline::InvalidateWaterRenderCache()
 	{
 		if (m_waterClipmapRenderer) m_waterClipmapRenderer->Invalidate();
@@ -752,7 +990,8 @@ namespace pwg
 
 	bool TerrainComputePipeline::GenerateHydrology(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
-		if (!m_drainageNetworkGenerator || m_drainageNetworkGenerator->IsRunning() || IsParticleErosionActive()) return false;
+		if (!m_drainageNetworkGenerator || m_drainageNetworkGenerator->IsRunning() ||
+			IsParticleErosionActive() || IsThermalErosionActive()) return false;
 		if (m_hydrologyGenerated) ResetHydrology(masks);
 
 		DrainageNetworkSettings settings;
@@ -1154,6 +1393,11 @@ namespace pwg
 		terrainMasks["ErosionWaterMask"] = std::make_shared<TerrainMask>("ErosionWaterMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["ErosionFlowMask"] = std::make_shared<TerrainMask>("ErosionFlowMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 		terrainMasks["ErosionChannelMask"] = std::make_shared<TerrainMask>("ErosionChannelMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["ThermalBaseHeight"] = std::make_shared<TerrainMask>("ThermalBaseHeight", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["ThermalDebris"] = std::make_shared<TerrainMask>("ThermalDebris", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::HEIGHT, 1.0f);
+		terrainMasks["ThermalDebrisMask"] = std::make_shared<TerrainMask>("ThermalDebrisMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["ThermalErosionMask"] = std::make_shared<TerrainMask>("ThermalErosionMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
+		terrainMasks["ThermalDepositionMask"] = std::make_shared<TerrainMask>("ThermalDepositionMask", std::make_shared<Texture>(m_size, m_size, TextureType::HEIGHT), MaskUsage::WEIGHTS, 1.0f);
 
 		for (const auto& mask : terrainMasks)
 		{
@@ -1202,6 +1446,10 @@ namespace pwg
 	HydraulicSimulationSettings& TerrainComputePipeline::GetHydraulicSettings()
 	{
 		return m_terrainPassContext.hydraulicSettings;
+	}
+	ThermalSimulationSettings& TerrainComputePipeline::GetThermalSettings()
+	{
+		return m_terrainPassContext.thermalSettings;
 	}
 	int TerrainComputePipeline::GetSize()
 	{

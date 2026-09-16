@@ -1,0 +1,62 @@
+#version 450 core
+
+layout (local_size_x = 8, local_size_y = 8) in;
+layout (r32i, binding = 0) coherent uniform iimage2D u_delta;
+layout (r32ui, binding = 1) coherent uniform uimage2D u_maxTransfer;
+
+uniform sampler2D u_height;
+uniform sampler2D u_debris;
+uniform int u_size;
+uniform float u_amount;
+uniform float u_talusSlope;
+uniform float u_fixedScale;
+
+const ivec2 OFFSETS[8] = ivec2[8](
+    ivec2(-1, -1), ivec2(0, -1), ivec2(1, -1), ivec2(-1, 0),
+    ivec2(1, 0), ivec2(-1, 1), ivec2(0, 1), ivec2(1, 1));
+
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(id, ivec2(u_size)))) return;
+    if (id.x == 0 || id.y == 0 || id.x == u_size - 1 || id.y == u_size - 1) return;
+
+    float available = max(texelFetch(u_debris, id, 0).r, 0.0);
+    if (available <= 0.0) return;
+
+    float center = texelFetch(u_height, id, 0).r;
+    float excess[8];
+    float totalExcess = 0.0;
+    float maximumExcess = 0.0;
+    for (int i = 0; i < 8; ++i)
+    {
+        ivec2 offset = OFFSETS[i];
+        float distance = (offset.x != 0 && offset.y != 0) ? 1.41421356237 : 1.0;
+        float neighbor = texelFetch(u_height, id + offset, 0).r;
+        excess[i] = max(center - neighbor - u_talusSlope * distance, 0.0);
+        totalExcess += excess[i];
+        maximumExcess = max(maximumExcess, excess[i]);
+    }
+    if (totalExcess <= 0.0) return;
+
+    float rate = mix(0.08, 0.35, u_amount);
+    float move = min(available, min(maximumExcess * 0.5, totalExcess * rate));
+    int budgetFixed = int(floor(move * u_fixedScale));
+    int movedFixed = 0;
+    for (int i = 0; i < 8; ++i)
+    {
+        if (excess[i] <= 0.0) continue;
+        int transfer = min(
+            int(round(move * (excess[i] / totalExcess) * u_fixedScale)),
+            budgetFixed - movedFixed);
+        if (transfer <= 0) continue;
+        imageAtomicAdd(u_delta, id + OFFSETS[i], transfer);
+        movedFixed += transfer;
+        if (movedFixed >= budgetFixed) break;
+    }
+    if (movedFixed > 0)
+    {
+        imageAtomicAdd(u_delta, id, -movedFixed);
+        imageAtomicMax(u_maxTransfer, ivec2(0), uint(movedFixed));
+    }
+}

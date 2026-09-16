@@ -16,6 +16,7 @@
 #include "terrain/graph/passes/normalMaskPass.h"
 #include "terrain/graph/passes/slopeMaskPass.h"
 #include "terrain/erosion/gpuParticleErosion.h"
+#include "terrain/erosion/gpuThermalErosion.h"
 #include "terrain/water/waterClipmapRenderer.h"
 #include "terrain/hydrology/drainageNetworkGenerator.h"
 #include "terrain/chunk/terrainChunk.h"
@@ -78,6 +79,18 @@ namespace pwg
 		void SetShowErosionParticles(bool show);
 		int GetActiveParticleCount() const;
 		void DrawErosionParticles(const glm::mat4& view, const glm::mat4& projection);
+		bool UpdateThermalErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, float deltaTime);
+		bool StepThermalErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		bool ResetThermalErosionState(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		bool StartThermalErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void PauseThermalErosion();
+		bool IsThermalErosionActive() const;
+		bool IsThermalErosionReady() const;
+		bool IsThermalErosionStable() const;
+		float GetThermalErosionSpeed() const;
+		void SetThermalErosionSpeed(float speed);
+		std::string GetThermalErosionStatus() const;
+		void MarkThermalErosionRestored(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool restored);
 		void ApplyUniversalGraphSimulationSettings();
 
 		TerrainPassContext& GetPassContext();
@@ -94,12 +107,14 @@ namespace pwg
 		void ResetUniversalGraphToDefault();
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& GetMasks();
 		HydraulicSimulationSettings& GetHydraulicSettings();
+		ThermalSimulationSettings& GetThermalSettings();
 		int GetSize();
 
 		std::shared_ptr<Texture> GetFinalMaskTexture();
 		std::unordered_map<std::string, std::shared_ptr<Texture>>& GetFinalTerrainMasks();
 	private:
 		void RefreshParticleErosionPreviews(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
+		void RefreshThermalErosionPreviews(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		void RefreshHydrologyGraphOutputs(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks);
 		std::unordered_map<std::string, std::shared_ptr<ComputeShader>> m_computeShaders;
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>> m_terrainMasks;
@@ -114,6 +129,7 @@ namespace pwg
 
 		TerrainPassContext m_terrainPassContext;
 		std::unique_ptr<GpuParticleErosion> m_gpuParticleErosion;
+		std::unique_ptr<GpuThermalErosion> m_gpuThermalErosion;
 		std::unique_ptr<WaterClipmapRenderer> m_waterClipmapRenderer;
 		std::unique_ptr<DrainageNetworkGenerator> m_drainageNetworkGenerator;
 		bool m_hydrologyGenerated{ false };
@@ -122,6 +138,15 @@ namespace pwg
 		bool m_particleErosionRunning{ false };
 		float m_particleStepAccumulator{ 0.0f };
 		unsigned int m_particleStepCount{ 0 };
+		std::shared_ptr<Texture> m_thermalHardness;
+		bool m_thermalErosionReady{ false };
+		bool m_thermalErosionRunning{ false };
+		bool m_thermalErosionInitialized{ false };
+		float m_thermalStepAccumulator{ 0.0f };
+		unsigned int m_thermalStepCount{ 0 };
+		float m_thermalAmount{ 0.35f };
+		float m_thermalTalusAngle{ 32.0f };
+		float m_thermalWeathering{ 0.45f };
 		int m_size{ 0 };
 	};
 }

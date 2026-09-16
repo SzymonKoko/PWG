@@ -2116,8 +2116,9 @@ namespace pwg::controls
 		static int selectedUniversalNodeId = 0;
 		bool changed = false;
 		const bool erosionRunning = chunkManager->IsParticleErosionActive();
+		const bool thermalRunning = chunkManager->IsThermalErosionActive();
 		const bool hydrologyRunning = chunkManager->IsHydrologyRunning();
-		const bool graphLocked = erosionRunning || hydrologyRunning;
+		const bool graphLocked = erosionRunning || thermalRunning || hydrologyRunning;
 
 		ImGui::Text("TerrainGraph");
 		ImGui::SameLine();
@@ -2180,7 +2181,7 @@ namespace pwg::controls
 		ImGui::SameLine();
 		ImGui::TextDisabled("World: %d | chunks: %d | chunk size: %d", chunkManager->GetWorldSize(), chunkManager->GetChunkCount(), chunkManager->GetChunkSize());
 		ImGui::TextDisabled("Hydrology");
-		ImGui::BeginDisabled(hydrologyRunning || erosionRunning);
+		ImGui::BeginDisabled(hydrologyRunning || erosionRunning || thermalRunning);
 		if (ImGui::Button("Generate Hydrology"))
 		{
 			chunkManager->GenerateHydrology();
@@ -2205,7 +2206,7 @@ namespace pwg::controls
 		ImGui::Separator();
 		ImGui::TextDisabled("Particle Erosion");
 		const bool erosionReady = chunkManager->IsParticleErosionReady();
-		ImGui::BeginDisabled(!erosionReady);
+		ImGui::BeginDisabled(!erosionReady || thermalRunning || hydrologyRunning);
 		if (ImGui::Button(erosionRunning ? "Pause Erosion" : "Start Erosion"))
 		{
 			if (erosionRunning) chunkManager->PauseParticleErosion();
@@ -2244,7 +2245,39 @@ namespace pwg::controls
 			ImGui::TextDisabled("%d particles", chunkManager->GetActiveParticleCount());
 		}
 		ImGui::NewLine();
-		ImGui::BeginDisabled(erosionRunning);
+		ImGui::Separator();
+		ImGui::TextDisabled("Thermal Erosion");
+		const bool thermalReady = chunkManager->IsThermalErosionReady();
+		ImGui::BeginDisabled(!thermalReady || erosionRunning || hydrologyRunning);
+		if (ImGui::Button(thermalRunning ? "Pause Thermal" : "Start Thermal"))
+		{
+			if (thermalRunning) chunkManager->PauseThermalErosion();
+			else chunkManager->StartThermalErosion();
+			changed = true;
+		}
+		ImGui::SameLine();
+		ImGui::BeginDisabled(thermalRunning);
+		if (ImGui::Button("Step Thermal"))
+		{
+			changed = chunkManager->StepThermalErosion() || changed;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reset Thermal"))
+		{
+			changed = chunkManager->ResetThermalErosion() || changed;
+		}
+		ImGui::EndDisabled();
+		float thermalSpeed = chunkManager->GetThermalErosionSpeed();
+		ImGui::SetNextItemWidth(130.0f);
+		if (ImGui::SliderFloat("Thermal Speed", &thermalSpeed, 0.25f, 4.0f, "%.2fx"))
+		{
+			chunkManager->SetThermalErosionSpeed(thermalSpeed);
+		}
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::TextDisabled("%s", chunkManager->GetThermalErosionStatus().c_str());
+		ImGui::NewLine();
+		ImGui::BeginDisabled(erosionRunning || thermalRunning);
 		if (ImGui::Button("Spawn/Refresh Assets"))
 		{
 			changed = chunkManager->RefreshProceduralAssets() || changed;
@@ -2424,7 +2457,7 @@ namespace pwg::controls
 
 			if (ImGui::BeginTabItem("Legacy Passes"))
 			{
-				ImGui::BeginDisabled(erosionRunning);
+				ImGui::BeginDisabled(graphLocked);
 				ImVec2 available = ImGui::GetContentRegionAvail();
 				float detailsWidth = std::clamp(available.x * 0.34f, 240.0f, 360.0f);
 				float graphWidth = std::max(available.x - detailsWidth - 8.0f, 320.0f);
