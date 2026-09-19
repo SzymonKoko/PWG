@@ -85,26 +85,12 @@ bool pwg::Renderer::IsSphereVisible(const glm::vec3& center, float radius, float
 	}
 
 	float cullingRadius = radius + std::max(frustumMargin, 0.0f);
-	glm::mat4 clip = m_projectionMatrix * m_viewMatrix;
-	auto row = [&](int index)
+	if (!m_cameraFrustumValid)
 	{
-		return glm::vec4(clip[0][index], clip[1][index], clip[2][index], clip[3][index]);
-	};
-	glm::vec4 rows[4] = { row(0), row(1), row(2), row(3) };
-	glm::vec4 planes[6] =
+		return true;
+	}
+	for (const glm::vec4& plane : m_cameraFrustumPlanes)
 	{
-		rows[3] + rows[0], rows[3] - rows[0],
-		rows[3] + rows[1], rows[3] - rows[1],
-		rows[3] + rows[2], rows[3] - rows[2]
-	};
-	for (glm::vec4 plane : planes)
-	{
-		float normalLength = glm::length(glm::vec3(plane));
-		if (normalLength <= 0.00001f)
-		{
-			continue;
-		}
-		plane /= normalLength;
 		if (glm::dot(glm::vec3(plane), center) + plane.w < -cullingRadius)
 		{
 			return false;
@@ -227,6 +213,25 @@ void pwg::Renderer::SetCamera(std::shared_ptr<ICamera> camera)
 	m_viewMatrix = camera->GetViewMatrix();
 	m_projectionMatrix = camera->GetProjectionMatrix();
 	m_cameraPosition = camera->GetCameraPosition();
+
+	const glm::mat4 clip = m_projectionMatrix * m_viewMatrix;
+	auto row = [&](int index)
+	{
+		return glm::vec4(clip[0][index], clip[1][index], clip[2][index], clip[3][index]);
+	};
+	const glm::vec4 rows[4] = { row(0), row(1), row(2), row(3) };
+	m_cameraFrustumPlanes =
+	{
+		rows[3] + rows[0], rows[3] - rows[0],
+		rows[3] + rows[1], rows[3] - rows[1],
+		rows[3] + rows[2], rows[3] - rows[2]
+	};
+	m_cameraFrustumValid = true;
+	for (glm::vec4& plane : m_cameraFrustumPlanes)
+	{
+		const float normalLength = glm::length(glm::vec3(plane));
+		if (normalLength > 0.00001f) plane /= normalLength;
+	}
 }
 
 void pwg::Renderer::SetDebugSettings(DebugSettings& settings)

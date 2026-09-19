@@ -6,6 +6,8 @@
 #include "core/logger/logger.h"
 #include "mesh.h"
 
+#include <algorithm>
+
 namespace pwg
 {
 	Mesh::Mesh(const std::vector<pwg::Vertex>& vertices)
@@ -65,7 +67,13 @@ namespace pwg
 
 		glBindVertexArray(m_vaoID);
 		glBindBuffer(GL_ARRAY_BUFFER, m_instanceVboID);
-		glBufferData(GL_ARRAY_BUFFER, transforms.size() * sizeof(glm::mat4), transforms.data(), GL_DYNAMIC_DRAW);
+		const std::size_t requiredBytes = transforms.size() * sizeof(glm::mat4);
+		if (requiredBytes > m_instanceBufferCapacity)
+		{
+			m_instanceBufferCapacity = std::max(requiredBytes, m_instanceBufferCapacity + m_instanceBufferCapacity / 2u);
+			glBufferData(GL_ARRAY_BUFFER, m_instanceBufferCapacity, nullptr, GL_STREAM_DRAW);
+		}
+		glBufferSubData(GL_ARRAY_BUFFER, 0, requiredBytes, transforms.data());
 		for (unsigned int location = 4; location < 8; ++location)
 		{
 			glEnableVertexAttribArray(location);

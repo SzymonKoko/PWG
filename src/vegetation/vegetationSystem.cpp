@@ -13,8 +13,14 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <iterator>
 #include <limits>
+#include <optional>
 #include <unordered_map>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace pwg
 {
@@ -34,6 +40,36 @@ namespace pwg
 		float Unit(std::uint32_t value)
 		{
 			return static_cast<float>(value & 0x00ffffffu) / static_cast<float>(0x01000000u);
+		}
+
+		std::array<glm::vec4, 6> ExtractFrustumPlanes(const glm::mat4& clip)
+		{
+			auto row = [&](int index)
+			{
+				return glm::vec4(clip[0][index], clip[1][index], clip[2][index], clip[3][index]);
+			};
+			const glm::vec4 rows[4] = { row(0), row(1), row(2), row(3) };
+			std::array<glm::vec4, 6> planes =
+			{
+				rows[3] + rows[0], rows[3] - rows[0],
+				rows[3] + rows[1], rows[3] - rows[1],
+				rows[3] + rows[2], rows[3] - rows[2]
+			};
+			for (glm::vec4& plane : planes)
+			{
+				const float length = glm::length(glm::vec3(plane));
+				if (length > 0.00001f) plane /= length;
+			}
+			return planes;
+		}
+
+		bool SphereInsideFrustum(const std::array<glm::vec4, 6>& planes, const glm::vec3& center, float radius)
+		{
+			for (const glm::vec4& plane : planes)
+			{
+				if (glm::dot(glm::vec3(plane), center) + plane.w < -radius) return false;
+			}
+			return true;
 		}
 
 		glm::mat4 SlopeAlignment(const glm::vec3& terrainNormal, float maxTiltDegrees)
@@ -442,7 +478,6 @@ namespace pwg
 	void VegetationSystem::Update(std::shared_ptr<Terrain> terrain, std::shared_ptr<ICamera> camera, float dt)
 	{
 		m_time += std::clamp(dt, 0.0f, 0.1f);
-		m_groundingAccumulator += std::clamp(dt, 0.0f, 0.1f);
 		if (!terrain || !camera)
 		{
 			return;
@@ -462,11 +497,6 @@ namespace pwg
 			(!m_grassBuilt || glm::distance(glm::vec2(cameraPosition.x, cameraPosition.z), glm::vec2(m_lastGrassCamera.x, m_lastGrassCamera.z)) > grassRebuildDistance))
 		{
 			RebuildGrass(terrain, cameraPosition);
-		}
-		if (m_groundingAccumulator >= 0.25f)
-		{
-			RefreshGrounding(terrain);
-			m_groundingAccumulator = 0.0f;
 		}
 	}
 
@@ -496,65 +526,90 @@ namespace pwg
 			int centerX = static_cast<int>(std::floor((cameraPosition.x - m_worldMin) / spacing));
 			int centerZ = static_cast<int>(std::floor((cameraPosition.z - m_worldMin) / spacing));
 			int maxRing = static_cast<int>(std::ceil(radius / spacing)) + 1;
-
-			auto tryCell = [&](int x, int z)
+			std::vector<glm::ivec2> cells;
+			constexpr std::size_t cellBatchSize = 32768;
+			cells.reserve(cellBatchSize);
+			auto processCells = [&]()
 			{
-				if (m_grass.size() >= layerLimit) return;
-				std::uint32_t hash = Hash(x, z, static_cast<std::uint32_t>(layer.descriptor.seed ^ (layer.descriptor.nodeId * 7919)));
-				float worldX = m_worldMin + (static_cast<float>(x) + 0.1f + Unit(hash) * 0.8f) * spacing;
-				float worldZ = m_worldMin + (static_cast<float>(z) + 0.1f + Unit(Hash(x, z, hash ^ 0x517cc1b7u)) * 0.8f) * spacing;
-				int variantIndex = model->submeshesAsVariants ? static_cast<int>(hash % model->submeshes.size()) : -1;
-				float scale = glm::mix(layer.descriptor.minScale, layer.descriptor.maxScale, Unit(Hash(x, z, hash ^ 0xb5297a4du)));
-				float height = model->targetHeight * scale;
-				float groundRadiusRatio = variantIndex >= 0 ? model->submeshes[static_cast<std::size_t>(variantIndex)].groundRadiusRatio : model->groundRadiusRatio;
-				float footprintRadiusRatio = variantIndex >= 0 ? model->submeshes[static_cast<std::size_t>(variantIndex)].footprintRadiusRatio : model->footprintRadiusRatio;
-				float groundRadius = std::clamp(groundRadiusRatio * height, 0.25f, 1.6f);
-				float footprintRadius = footprintRadiusRatio * height;
-				if (worldX - footprintRadius < m_worldMin || worldX + footprintRadius > m_worldMax ||
-					worldZ - footprintRadius < m_worldMin || worldZ + footprintRadius > m_worldMax ||
-					glm::distance(glm::vec2(worldX, worldZ), glm::vec2(cameraPosition.x, cameraPosition.z)) > radius)
+				std::vector<std::optional<Instance>> candidates(cells.size());
+				const std::int64_t candidateCount = static_cast<std::int64_t>(cells.size());
+#pragma omp parallel for schedule(static) if(candidateCount >= 2048)
+				for (std::int64_t candidateIndex = 0; candidateIndex < candidateCount; ++candidateIndex)
 				{
-					return;
+					const int x = cells[static_cast<std::size_t>(candidateIndex)].x;
+					const int z = cells[static_cast<std::size_t>(candidateIndex)].y;
+					std::uint32_t hash = Hash(x, z, static_cast<std::uint32_t>(layer.descriptor.seed ^ (layer.descriptor.nodeId * 7919)));
+					float worldX = m_worldMin + (static_cast<float>(x) + 0.1f + Unit(hash) * 0.8f) * spacing;
+					float worldZ = m_worldMin + (static_cast<float>(z) + 0.1f + Unit(Hash(x, z, hash ^ 0x517cc1b7u)) * 0.8f) * spacing;
+					int variantIndex = model->submeshesAsVariants ? static_cast<int>(hash % model->submeshes.size()) : -1;
+					float scale = glm::mix(layer.descriptor.minScale, layer.descriptor.maxScale, Unit(Hash(x, z, hash ^ 0xb5297a4du)));
+					float height = model->targetHeight * scale;
+					float groundRadiusRatio = variantIndex >= 0 ? model->submeshes[static_cast<std::size_t>(variantIndex)].groundRadiusRatio : model->groundRadiusRatio;
+					float footprintRadiusRatio = variantIndex >= 0 ? model->submeshes[static_cast<std::size_t>(variantIndex)].footprintRadiusRatio : model->footprintRadiusRatio;
+					float groundRadius = std::clamp(groundRadiusRatio * height, 0.25f, 1.6f);
+					float footprintRadius = footprintRadiusRatio * height;
+					if (worldX - footprintRadius < m_worldMin || worldX + footprintRadius > m_worldMax ||
+						worldZ - footprintRadius < m_worldMin || worldZ + footprintRadius > m_worldMax ||
+						glm::distance(glm::vec2(worldX, worldZ), glm::vec2(cameraPosition.x, cameraPosition.z)) > radius)
+					{
+						continue;
+					}
+					float mask = layer.densityData ? SampleMask(*layer.densityData, worldX, worldZ) : 1.0f;
+					float distribution = layer.densityData
+						? glm::mix(0.55f, 1.0f, glm::smoothstep(0.05f, 0.68f, std::clamp(mask, 0.0f, 1.0f)))
+						: 1.0f;
+					if (Unit(Hash(x, z, hash ^ 0x68e31da4u)) > layer.descriptor.density * distribution ||
+						!AcceptTerrainPoint(terrain, worldX, worldZ, layer.descriptor.maxSlopeDegrees, true))
+					{
+						continue;
+					}
+					float yaw = Unit(Hash(x, z, hash ^ 0x1b56c4e9u)) * glm::two_pi<float>();
+					float groundSink = std::max(model->groundSink * scale, 0.0f);
+					glm::vec3 position(worldX, SampleGroundHeight(terrain, worldX, worldZ, groundRadius, groundSink), worldZ);
+					glm::vec3 normal = layer.descriptor.alignToSlope ? SampleTerrainNormal(terrain, worldX, worldZ) : glm::vec3(0.0f, 1.0f, 0.0f);
+					glm::mat4 modelMatrix = variantIndex >= 0
+						? BuildModelMatrix(model->submeshes[static_cast<std::size_t>(variantIndex)], model->targetHeight, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees)
+						: BuildModelMatrix(*model, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees);
+					candidates[static_cast<std::size_t>(candidateIndex)] = Instance{ layer.modelIndex, position, modelMatrix, height * 0.75f, radius, groundRadius,
+						groundSink, 0.0f, 0.0f, variantIndex, yaw, scale, layer.descriptor.maxTiltDegrees,
+						layer.descriptor.alignToSlope };
 				}
-				float mask = layer.densityData ? SampleMask(*layer.densityData, worldX, worldZ) : 1.0f;
-				float distribution = layer.densityData
-					? glm::mix(0.55f, 1.0f, glm::smoothstep(0.05f, 0.68f, std::clamp(mask, 0.0f, 1.0f)))
-					: 1.0f;
-				if (Unit(Hash(x, z, hash ^ 0x68e31da4u)) > layer.descriptor.density * distribution ||
-					!AcceptTerrainPoint(terrain, worldX, worldZ, layer.descriptor.maxSlopeDegrees, true))
+
+				m_grass.reserve(std::min(maxGrassInstances, m_grass.size() + candidates.size()));
+				for (auto& candidate : candidates)
 				{
-					return;
+					if (m_grass.size() >= layerLimit) break;
+					if (candidate) m_grass.push_back(std::move(*candidate));
 				}
-				float yaw = Unit(Hash(x, z, hash ^ 0x1b56c4e9u)) * glm::two_pi<float>();
-				float groundSink = std::max(model->groundSink * scale, 0.0f);
-				glm::vec3 position(worldX, SampleGroundHeight(terrain, worldX, worldZ, groundRadius, groundSink), worldZ);
-				glm::vec3 normal = layer.descriptor.alignToSlope ? SampleTerrainNormal(terrain, worldX, worldZ) : glm::vec3(0.0f, 1.0f, 0.0f);
-				glm::mat4 modelMatrix = variantIndex >= 0
-					? BuildModelMatrix(model->submeshes[static_cast<std::size_t>(variantIndex)], model->targetHeight, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees)
-					: BuildModelMatrix(*model, position, yaw, scale, normal, layer.descriptor.maxTiltDegrees);
-				m_grass.push_back({ layer.modelIndex, position, modelMatrix, height * 0.75f, radius, groundRadius,
-					groundSink, 0.0f, 0.0f, variantIndex, yaw, scale, layer.descriptor.maxTiltDegrees,
-					layer.descriptor.alignToSlope });
+				cells.clear();
+				return m_grass.size() >= layerLimit;
 			};
 
-			tryCell(centerX, centerZ);
-			for (int ring = 1; ring <= maxRing && m_grass.size() < layerLimit; ++ring)
+			bool layerFull = false;
+			auto queueCell = [&](int x, int z)
 			{
-				int minX = centerX - ring;
-				int maxX = centerX + ring;
-				int minZ = centerZ - ring;
-				int maxZ = centerZ + ring;
-				for (int x = minX; x <= maxX && m_grass.size() < layerLimit; ++x)
+				cells.emplace_back(x, z);
+				if (cells.size() >= cellBatchSize) layerFull = processCells();
+			};
+			queueCell(centerX, centerZ);
+			for (int ring = 1; ring <= maxRing && !layerFull; ++ring)
+			{
+				const int minX = centerX - ring;
+				const int maxX = centerX + ring;
+				const int minZ = centerZ - ring;
+				const int maxZ = centerZ + ring;
+				for (int x = minX; x <= maxX && !layerFull; ++x)
 				{
-					tryCell(x, minZ);
-					if (maxZ != minZ) tryCell(x, maxZ);
+					queueCell(x, minZ);
+					if (maxZ != minZ && !layerFull) queueCell(x, maxZ);
 				}
-				for (int z = minZ + 1; z < maxZ && m_grass.size() < layerLimit; ++z)
+				for (int z = minZ + 1; z < maxZ && !layerFull; ++z)
 				{
-					tryCell(minX, z);
-					if (maxX != minX) tryCell(maxX, z);
+					queueCell(minX, z);
+					if (maxX != minX && !layerFull) queueCell(maxX, z);
 				}
 			}
+			if (!layerFull && !cells.empty()) processCells();
 		}
 	}
 
@@ -563,8 +618,11 @@ namespace pwg
 		if (!terrain) return;
 		auto refresh = [&](std::vector<Instance>& instances)
 		{
-			for (auto& instance : instances)
+			const std::int64_t count = static_cast<std::int64_t>(instances.size());
+#pragma omp parallel for schedule(static) if(count >= 512)
+			for (std::int64_t index = 0; index < count; ++index)
 			{
+				auto& instance = instances[static_cast<std::size_t>(index)];
 				float groundedY = SampleGroundHeight(terrain, instance.position.x, instance.position.z, instance.groundRadius, instance.groundSink);
 				instance.position.y = groundedY;
 				const VegetationModel* model = FindModel(instance.modelIndex);
@@ -710,17 +768,44 @@ namespace pwg
 			const auto& source = grass ? m_grass : m_trees;
 			std::size_t batchCount = variants ? model->submeshes.size() : 1;
 			std::vector<std::vector<glm::mat4>> batches(std::max<std::size_t>(batchCount, 1));
-			float renderDistance = 1.0f;
-			for (const auto& instance : source)
+			int workerCount = 1;
+#ifdef _OPENMP
+			if (source.size() >= 2048) workerCount = std::max(1, omp_get_max_threads());
+#endif
+			std::vector<std::vector<std::vector<glm::mat4>>> workerBatches(
+				static_cast<std::size_t>(workerCount), std::vector<std::vector<glm::mat4>>(batches.size()));
+			const std::int64_t instanceCount = static_cast<std::int64_t>(source.size());
+#pragma omp parallel for schedule(static) if(instanceCount >= 2048)
+			for (std::int64_t instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex)
 			{
+				const auto& instance = source[static_cast<std::size_t>(instanceIndex)];
 				if (instance.modelIndex == modelIndex && renderer.IsSphereVisible(instance.position, instance.radius, instance.renderDistance, frustumMargin))
 				{
 					std::size_t batch = variants
 						? static_cast<std::size_t>(std::max(instance.variantIndex, 0)) % batches.size()
 						: 0;
-					batches[batch].push_back(instance.model);
-					renderDistance = std::max(renderDistance, instance.renderDistance);
+					int workerIndex = 0;
+#ifdef _OPENMP
+					workerIndex = omp_get_thread_num();
+#endif
+					workerBatches[static_cast<std::size_t>(workerIndex)][batch].push_back(instance.model);
 				}
+			}
+			for (std::size_t batch = 0; batch < batches.size(); ++batch)
+			{
+				std::size_t total = 0;
+				for (const auto& local : workerBatches) total += local[batch].size();
+				batches[batch].reserve(total);
+				for (auto& local : workerBatches)
+				{
+					batches[batch].insert(batches[batch].end(),
+						std::make_move_iterator(local[batch].begin()), std::make_move_iterator(local[batch].end()));
+				}
+			}
+			float renderDistance = 1.0f;
+			for (const auto& instance : source)
+			{
+				if (instance.modelIndex == modelIndex) renderDistance = std::max(renderDistance, instance.renderDistance);
 			}
 			for (std::size_t submeshIndex = 0; submeshIndex < model->submeshes.size(); ++submeshIndex)
 			{
@@ -745,6 +830,7 @@ namespace pwg
 	void VegetationSystem::DrawShadow(const glm::mat4& lightSpaceMatrix)
 	{
 		if (!m_shadowShader || m_trees.empty()) return;
+		const auto lightFrustum = ExtractFrustumPlanes(lightSpaceMatrix);
 		for (int modelIndex = 0; modelIndex < static_cast<int>(m_models.size()); ++modelIndex)
 		{
 			const VegetationModel* model = FindModel(modelIndex);
@@ -752,13 +838,38 @@ namespace pwg
 			bool variants = model->submeshesAsVariants;
 			std::size_t batchCount = variants ? model->submeshes.size() : 1;
 			std::vector<std::vector<glm::mat4>> batches(std::max<std::size_t>(batchCount, 1));
-			for (const auto& instance : m_trees)
+			int workerCount = 1;
+#ifdef _OPENMP
+			if (m_trees.size() >= 512) workerCount = std::max(1, omp_get_max_threads());
+#endif
+			std::vector<std::vector<std::vector<glm::mat4>>> workerBatches(
+				static_cast<std::size_t>(workerCount), std::vector<std::vector<glm::mat4>>(batches.size()));
+			const std::int64_t treeCount = static_cast<std::int64_t>(m_trees.size());
+#pragma omp parallel for schedule(static) if(treeCount >= 512)
+			for (std::int64_t treeIndex = 0; treeIndex < treeCount; ++treeIndex)
 			{
+				const auto& instance = m_trees[static_cast<std::size_t>(treeIndex)];
 				if (instance.modelIndex != modelIndex) continue;
+				if (!SphereInsideFrustum(lightFrustum, instance.position, instance.radius + 8.0f)) continue;
 				std::size_t batch = variants
 					? static_cast<std::size_t>(std::max(instance.variantIndex, 0)) % batches.size()
 					: 0;
-				batches[batch].push_back(instance.model);
+				int workerIndex = 0;
+#ifdef _OPENMP
+				workerIndex = omp_get_thread_num();
+#endif
+				workerBatches[static_cast<std::size_t>(workerIndex)][batch].push_back(instance.model);
+			}
+			for (std::size_t batch = 0; batch < batches.size(); ++batch)
+			{
+				std::size_t total = 0;
+				for (const auto& local : workerBatches) total += local[batch].size();
+				batches[batch].reserve(total);
+				for (auto& local : workerBatches)
+				{
+					batches[batch].insert(batches[batch].end(),
+						std::make_move_iterator(local[batch].begin()), std::make_move_iterator(local[batch].end()));
+				}
 			}
 			for (std::size_t submeshIndex = 0; submeshIndex < model->submeshes.size(); ++submeshIndex)
 			{
@@ -792,7 +903,6 @@ namespace pwg
 		m_lastGrassCamera = glm::vec3(1000000.0f);
 		m_worldMin = 0.0f;
 		m_worldMax = 0.0f;
-		m_groundingAccumulator = 0.0f;
 		m_seenGraphRevision = std::numeric_limits<std::uint64_t>::max();
 		m_seenTerrainRevision = std::numeric_limits<std::uint64_t>::max();
 	}

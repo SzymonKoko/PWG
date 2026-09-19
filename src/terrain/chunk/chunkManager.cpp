@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace pwg
 {
@@ -57,6 +58,11 @@ namespace pwg
 
 	ChunkManager::~ChunkManager()
 	{
+		ResetHeightCacheReadbacks();
+		for (auto& slot : m_heightReadbacks)
+		{
+			if (slot.buffer != 0) glDeleteBuffers(1, &slot.buffer);
+		}
 		if (m_sceneDepthCopy != 0) glDeleteTextures(1, &m_sceneDepthCopy);
 	}
 
@@ -603,6 +609,7 @@ namespace pwg
 		CancelHydrology();
 		m_terrainComputePipeline->CancelParticleErosion();
 		m_terrainComputePipeline->PauseThermalErosion();
+		ResetHeightCacheReadbacks();
 		chunkCount = std::clamp(chunkCount, 3, 31);
 		chunkSize = std::clamp(chunkSize, 33, 257);
 		if (chunkCount == m_chunkCount && chunkSize == m_terrainSettings.chunkSize)
@@ -799,7 +806,13 @@ namespace pwg
 			return;
 		}
 
-		m_heightCache = heightMask->second->texture->ReadFloatData();
+		ResetHeightCacheReadbacks();
+		PublishHeightCache(heightMask->second->texture->ReadFloatData());
+	}
+
+	void ChunkManager::PublishHeightCache(std::vector<float>&& values)
+	{
+		m_heightCache = std::move(values);
 		m_heightCacheValid = m_heightCache.size() >= static_cast<size_t>(m_worldSize) * static_cast<size_t>(m_worldSize);
 		if (m_heightCacheValid && !m_heightCache.empty())
 		{
@@ -812,18 +825,82 @@ namespace pwg
 		m_heightCacheAccumulator = 0.0f;
 	}
 
+	void ChunkManager::QueueHeightCacheReadback()
+	{
+		auto heightMask = m_globalMasks.find("FinalHeight");
+		if (heightMask == m_globalMasks.end() || !heightMask->second || !heightMask->second->texture || m_worldSize <= 1) return;
+
+		HeightReadbackSlot& slot = m_heightReadbacks[m_nextHeightReadback];
+		if (slot.pending) return;
+		const std::size_t byteSize = static_cast<std::size_t>(m_worldSize) * static_cast<std::size_t>(m_worldSize) * sizeof(float);
+		if (slot.buffer == 0) glGenBuffers(1, &slot.buffer);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.buffer);
+		if (slot.byteSize != byteSize)
+		{
+			glBufferData(GL_PIXEL_PACK_BUFFER, byteSize, nullptr, GL_STREAM_READ);
+			slot.byteSize = byteSize;
+		}
+		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		glBindTexture(GL_TEXTURE_2D, heightMask->second->texture->GetTextureID());
+		glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, nullptr);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+		slot.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+		slot.pending = true;
+		m_nextHeightReadback = (m_nextHeightReadback + 1u) % m_heightReadbacks.size();
+	}
+
+	bool ChunkManager::PollHeightCacheReadback()
+	{
+		for (auto& slot : m_heightReadbacks)
+		{
+			if (!slot.pending || !slot.fence) continue;
+			const GLenum result = glClientWaitSync(static_cast<GLsync>(slot.fence), 0, 0);
+			if (result != GL_ALREADY_SIGNALED && result != GL_CONDITION_SATISFIED) continue;
+
+			std::vector<float> values(slot.byteSize / sizeof(float));
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.buffer);
+			const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, slot.byteSize, GL_MAP_READ_BIT);
+			if (mapped) std::memcpy(values.data(), mapped, slot.byteSize);
+			if (mapped) glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+			glDeleteSync(static_cast<GLsync>(slot.fence));
+			slot.fence = nullptr;
+			slot.pending = false;
+			if (!mapped) return false;
+			PublishHeightCache(std::move(values));
+			return true;
+		}
+		return false;
+	}
+
+	void ChunkManager::ResetHeightCacheReadbacks()
+	{
+		for (auto& slot : m_heightReadbacks)
+		{
+			if (slot.fence)
+			{
+				glClientWaitSync(static_cast<GLsync>(slot.fence), GL_SYNC_FLUSH_COMMANDS_BIT, GL_TIMEOUT_IGNORED);
+				glDeleteSync(static_cast<GLsync>(slot.fence));
+			}
+			slot.fence = nullptr;
+			slot.pending = false;
+		}
+	}
+
 	float ChunkManager::GetTerrainHeightMin() const { return m_terrainHeightMin; }
 	float ChunkManager::GetTerrainHeightMax() const { return m_terrainHeightMax; }
 
 	bool ChunkManager::MaybeUpdateHeightCache(float dt)
 	{
+		const bool published = PollHeightCacheReadback();
 		m_heightCacheAccumulator += std::clamp(dt, 0.0f, 0.25f);
 		if (m_heightCacheAccumulator >= m_heightCacheInterval)
 		{
-			UpdateHeightCache();
-			return true;
+			QueueHeightCacheReadback();
+			m_heightCacheAccumulator = 0.0f;
 		}
-		return false;
+		return published;
 	}
 
 	TerrainChunk& ChunkManager::GetChunk(int x, int y)

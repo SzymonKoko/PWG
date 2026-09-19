@@ -112,6 +112,7 @@ namespace pwg
 		unsigned int m_vboID{ 0 };           /**< OpenGL Vertex Buffer Object ID */
 		unsigned int m_eboID{ 0 };           /**< OpenGL Element Buffer Object ID */
 		unsigned int m_instanceVboID{ 0 };      /**< Per-instance model matrices */
+		std::size_t m_instanceBufferCapacity{ 0 };
 
 		int m_modelUniformLocation{ -1 };    /**< Cached model matrix uniform location */
 

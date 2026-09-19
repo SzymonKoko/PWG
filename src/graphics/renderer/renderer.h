@@ -103,6 +103,8 @@ namespace pwg
 		glm::mat4 m_viewMatrix{ 1.0f };							/**< Cached view matrix from the active camera */
 		glm::mat4 m_projectionMatrix{ 1.0f };					/**< Cached projection matrix from the active camera */
 		glm::vec3 m_cameraPosition{ 0.0f };						/**< World-space position of the camera */
+		std::array<glm::vec4, 6> m_cameraFrustumPlanes{};
+		bool m_cameraFrustumValid{ false };
 
 		EnvironmentLighting m_environmentLighting;				/**< Environment lighting used by scene shaders. */
 		std::array<glm::mat4, 3> m_lightSpaceMatrices{ glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f) };

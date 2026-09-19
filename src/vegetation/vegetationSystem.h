@@ -115,7 +115,6 @@ namespace pwg
 		glm::vec3 m_lastGrassCamera{ 1000000.0f };
 		bool m_grassBuilt{ false };
 		float m_time{ 0.0f };
-		float m_groundingAccumulator{ 0.0f };
 		float m_minVisibleWaterDepth{ 0.025f };
 		std::string m_status{ "Vegetation assets are not loaded" };
 	};

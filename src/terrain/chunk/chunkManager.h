@@ -11,6 +11,7 @@
 #include "graphics/texture/texture.h"
 #include "graphics/shader/shader.h"
 #include <glm/glm.hpp>
+#include <array>
 #include <vector>
 #include <cstdint>
 
@@ -134,6 +135,15 @@ namespace pwg
 		float m_terrainHeightMin{ 0.0f };
 		float m_terrainHeightMax{ 1.0f };
 		std::uint64_t m_generationRevision{ 0 };
+		struct HeightReadbackSlot
+		{
+			unsigned int buffer{ 0 };
+			void* fence{ nullptr };
+			std::size_t byteSize{ 0 };
+			bool pending{ false };
+		};
+		std::array<HeightReadbackSlot, 2> m_heightReadbacks{};
+		std::size_t m_nextHeightReadback{ 0 };
 		std::shared_ptr<TerrainDebug> m_terrainDebug;
 		std::shared_ptr<Texture> m_sceneColorCopy;
 		unsigned int m_sceneDepthCopy{ 0 };
@@ -152,6 +162,10 @@ namespace pwg
 		void UpdateFrustum(std::shared_ptr<ICamera> camera);
 		void SetupSharedTerrainUniforms(bool waterOverlay);
 		void DrawTerrainChunks(const std::shared_ptr<Material>& material);
+		void QueueHeightCacheReadback();
+		bool PollHeightCacheReadback();
+		void ResetHeightCacheReadbacks();
+		void PublishHeightCache(std::vector<float>&& values);
 	};
 }
 #endif // !SRC_TERRAIN_CHUNK_CHUNK_MANAGER_H_
