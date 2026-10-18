@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jak stworzyć świat, który nie istnieje? — PWG</title>
+<meta name="description" content="Seminarium dyplomowe: Proceduralne generowanie świata na potrzeby gier i symulacji. Analiza algorytmów. Projekt PWG — Procedural World Generator.">
+
+<style>
+/* ===========================================================
+   FONTS (stored locally in assets/fonts so the deck works offline)
+   Bricolage Grotesque = display/body, JetBrains Mono = technical labels.
+   Both subsets (latin + latin-ext) are needed for Polish diacritics.
+   =========================================================== */
+@font-face{font-family:'Bricolage Grotesque';font-style:normal;font-weight:300 800;font-stretch:75% 100%;font-display:swap;
+  src:url(assets/fonts/BricolageGrotesque-300-800-latin-ext.woff2) format('woff2');
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Bricolage Grotesque';font-style:normal;font-weight:300 800;font-stretch:75% 100%;font-display:swap;
+  src:url(assets/fonts/BricolageGrotesque-300-800-latin.woff2) format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;
+  src:url(assets/fonts/JetBrainsMono-400-latin-ext.woff2) format('woff2');
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;
+  src:url(assets/fonts/JetBrainsMono-400-latin.woff2) format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+/* ===========================================================
+   THEME — change colours / fonts for the whole deck here
+   =========================================================== */
+:root{
+  --bg:#10141C;          /* primary background */
+  --bg2:#18212B;         /* secondary background */
+  --text:#F3F5F7;        /* main text */
+  --muted:#98A5B3;       /* muted text */
+  --teal:#49D6C1;        /* primary accent */
+  --gold:#E9B872;        /* secondary accent */
+  --line:rgba(243,245,247,.14);
+  --stage-bg:#05070a;
+  --slide-bg:var(--bg);
+  --font-display:'Bricolage Grotesque',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --pad:150px;           /* left/right safe margin on the 1920×1080 stage */
+}
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ===========================================================
+   FIXED 16:9 STAGE — full contents of frontend-slides viewport-base.css
+   =========================================================== */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--slide-bg,#fff)}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--slide-bg,#fff)}
+.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+img,video,canvas,svg{max-width:100%;max-height:100%}
+.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000}
+@media print{
+  html,body{width:1920px;height:auto;overflow:visible;background:#fff}
+  .deck-viewport{position:static;overflow:visible;background:#fff}
+  .deck-stage{position:static;width:auto;height:auto;transform:none!important;background:none}
+  .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:1920px;height:1080px;break-after:page;page-break-after:always}
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .deck-controls{display:none!important}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}}
+
+/* ===========================================================
+   BASE SLIDE LOOK
+   =========================================================== */
+body{font-family:var(--font-display);color:var(--text);-webkit-font-smoothing:antialiased}
+.slide{background:var(--bg);transition:opacity .7s ease,visibility 0s linear .7s}
+.slide.visible{transition:opacity .7s ease,visibility 0s}
+/* crossfade: the leaving slide stays visible while fading out */
+.slide.leaving{visibility:visible;opacity:0;z-index:0}
+
+/* full-bleed image layer (an <img>, so a missing file can show a placeholder) */
+.bgimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-width:none;max-height:none}
+.kb{transform:scale(1.08);transition:transform 16s linear}
+.slide.visible .kb{transform:scale(1)}
+.shade{position:absolute;inset:0;pointer-events:none}
+.shade-left{background:linear-gradient(90deg,rgba(16,20,28,.96) 0%,rgba(16,20,28,.82) 30%,rgba(16,20,28,.2) 64%,rgba(16,20,28,0) 100%)}
+.shade-bottom{background:linear-gradient(0deg,rgba(16,20,28,.95) 0%,rgba(16,20,28,.55) 30%,rgba(16,20,28,0) 60%)}
+.shade-top{background:linear-gradient(180deg,rgba(16,20,28,.9) 0%,rgba(16,20,28,0) 40%)}
+.vignette{background:radial-gradient(ellipse at 50% 45%,rgba(16,20,28,0) 35%,rgba(5,7,10,.85) 100%)}
+.grain{position:absolute;inset:0;opacity:.07;mix-blend-mode:overlay;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ===========================================================
+   TYPOGRAPHY
+   =========================================================== */
+.kicker{font:500 22px/1 var(--font-mono);letter-spacing:.3em;color:var(--teal);text-transform:uppercase;display:flex;align-items:center;gap:22px}
+.kicker::before{content:"";width:64px;height:2px;background:currentColor}
+.h-xl,.h-l,.h-m{font-family:var(--font-display);font-weight:700;font-stretch:78%;letter-spacing:-.025em;line-height:.94;color:var(--text)}
+.h-xl{font-size:150px}
+.h-l{font-size:120px}
+.h-m{font-size:92px}
+.h-xl span,.h-l span,.h-m span{display:block}
+.accent{color:var(--teal)}
+.gold{color:var(--gold)}
+.lead{font-weight:300;font-size:40px;line-height:1.3;color:var(--muted)}
+.mono{font-family:var(--font-mono);font-weight:400;font-size:22px;letter-spacing:.04em;color:var(--muted)}
+/* image attribution, required for third-party stills */
+.credit{position:absolute;right:40px;bottom:28px;font:400 15px/1.4 var(--font-mono);color:rgba(243,245,247,.55);letter-spacing:.04em;text-align:right;z-index:5}
+.credit.left{left:40px;right:auto;text-align:left}
+/* label marking authentic PWG material */
+.tag{display:inline-flex;align-items:center;gap:12px;font:500 17px/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--teal);border:1px solid rgba(73,214,193,.45);padding:11px 16px;border-radius:3px;background:rgba(16,20,28,.55)}
+.tag::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--teal)}
+.tag.gold{color:var(--gold);border-color:rgba(233,184,114,.5)}
+.tag.gold::before{background:var(--gold)}
+.abs{position:absolute}
+
+/* ===========================================================
+   ANIMATION SYSTEM
+   .rv   = plays automatically when the slide becomes visible (delay via --d)
+   .step = revealed one by one with → / Space (progressive disclosure)
+   =========================================================== */
+.rv{opacity:0;transform:translateY(32px);transition:opacity 1.1s var(--ease),transform 1.1s var(--ease);transition-delay:0s}
+.slide.visible .rv{opacity:1;transform:none;transition-delay:var(--d,0s)}
+.rv-fade{opacity:0;transition:opacity 1.6s ease}
+.slide.visible .rv-fade{opacity:1;transition-delay:var(--d,0s)}
+.step{opacity:0;transform:translateY(24px);transition:opacity .9s var(--ease),transform .9s var(--ease)}
+.step.on{opacity:1;transform:none}
+.step-fade{opacity:0;transition:opacity .9s ease}
+.step-fade.on{opacity:1}
+
+/* placeholder shown when an asset file is missing (see ASSETS_NEEDED.md) */
+.ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:repeating-linear-gradient(135deg,#141a23 0 22px,#17202a 22px 44px);border:2px dashed rgba(233,184,114,.6);color:var(--gold);font:500 22px/1.4 var(--font-mono);text-align:center;padding:30px}
+.ph small{color:var(--muted);font-size:17px}
+
+/* ===========================================================
+   SLIDE 00 — TITLE
+   =========================================================== */
+.s-title .copy{left:var(--pad);top:270px;width:1000px}
+.s-title .h-xl{margin-top:44px;font-size:138px}
+.s-title .lead{margin-top:46px}
+.s-title .foot{left:var(--pad);bottom:86px;font:400 20px/1.6 var(--font-mono);color:var(--muted);letter-spacing:.05em}
+.s-title .foot b{color:var(--gold);font-weight:500}
+
+/* ===========================================================
+   SLIDE 01 — TRIPTYCH
+   =========================================================== */
+.triptych{position:absolute;left:0;top:0;width:1920px;height:790px;display:flex;gap:8px}
+.triptych .panel{position:relative;flex:1;overflow:hidden;clip-path:inset(100% 0 0 0);transition:clip-path 1.6s var(--ease)}
+.slide.visible .triptych .panel{clip-path:inset(0 0 0 0)}
+.triptych .panel:nth-child(2){transition-delay:.25s}
+.triptych .panel:nth-child(3){transition-delay:.5s}
+.triptych .panel img{transform:scale(1.12);transition:transform 9s var(--ease)}
+.slide.visible .triptych .panel img{transform:scale(1)}
+.triptych .panel::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(16,20,28,.85),rgba(16,20,28,0) 40%)}
+.triptych .cap{position:absolute;left:34px;bottom:30px;z-index:2;font:500 19px/1.5 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text)}
+.triptych .cap small{display:block;color:rgba(243,245,247,.6);font-size:15px;letter-spacing:.06em;text-transform:none}
+.s01 .title{left:0;right:0;top:850px;text-align:center}
+.s01 .h-l{font-size:128px}
+
+/* ===========================================================
+   SLIDE 02 — ONE ALGORITHM
+   =========================================================== */
+.s02 .iris{position:absolute;inset:0;clip-path:circle(0% at 62% 45%);transition:clip-path 2.4s var(--ease)}
+.slide.visible.s02 .iris{clip-path:circle(80% at 62% 45%)}
+.s02 .copy{left:var(--pad);bottom:150px}
+
+/* ===========================================================
+   SLIDE 03 — CINEMA
+   =========================================================== */
+.s03 .film{position:absolute;overflow:hidden;background:var(--bg2)}
+.s03 .film img{width:100%;height:100%;object-fit:cover}
+.s03 .f1{left:0;top:0;width:1180px;height:1080px}
+.s03 .f2{left:1188px;top:0;width:732px;height:600px}
+.s03 .f1::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(16,20,28,0) 60%,rgba(16,20,28,.6)),linear-gradient(0deg,rgba(16,20,28,.75),rgba(16,20,28,0) 35%)}
+.s03 .fcap{position:absolute;left:30px;bottom:26px;font:500 18px/1.5 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;z-index:2}
+.s03 .fcap small{display:block;font-size:15px;letter-spacing:.05em;text-transform:none;color:rgba(243,245,247,.6)}
+.s03 .copy{left:1250px;top:690px}
+.s03 .offline{left:60px;top:60px}
+
+/* ===========================================================
+   SLIDE 04 — REAL TIME
+   =========================================================== */
+.s04 .copy{left:var(--pad);top:300px}
+.s04 .budget{right:var(--pad);bottom:170px;text-align:right}
+.s04 .budget .num{font-family:var(--font-display);font-weight:800;font-stretch:75%;font-size:260px;line-height:.85;letter-spacing:-.04em;color:var(--gold)}
+.s04 .budget .num em{font-style:normal;font-size:120px;color:var(--text);margin-left:10px}
+.s04 .budget .mono{margin-top:22px;font-size:26px;color:var(--text)}
+
+/* ===========================================================
+   SLIDE 05 — PWG REVEAL
+   =========================================================== */
+.s05 .bgimg{opacity:0;transform:scale(1.15);transition:opacity 2.8s ease .3s,transform 12s var(--ease) .3s}
+.slide.visible.s05 .bgimg{opacity:1;transform:scale(1)}
+.s05 .center{left:0;right:0;top:330px;text-align:center}
+.s05 .pwg{font-family:var(--font-display);font-weight:800;font-stretch:75%;font-size:330px;line-height:.8;letter-spacing:.06em;color:var(--text);text-shadow:0 10px 80px rgba(0,0,0,.5);opacity:0;letter-spacing:.5em;transition:opacity 2s ease 1.4s,letter-spacing 2.6s var(--ease) 1.4s}
+.slide.visible.s05 .pwg{opacity:1;letter-spacing:.04em}
+.s05 .full{margin-top:40px;font:500 30px/1 var(--font-mono);letter-spacing:.42em;text-transform:uppercase;color:var(--teal)}
+.s05 .tag{position:absolute;left:var(--pad);bottom:80px}
+.s05 .stack{right:var(--pad);bottom:84px;font:400 20px/1 var(--font-mono);letter-spacing:.16em;color:var(--text);text-transform:uppercase}
+
+/* ===========================================================
+   SLIDE 06 — NUMBERS TO LANDSCAPE
+   =========================================================== */
+.s06 .head{left:var(--pad);top:110px}
+.s06 .hm{left:var(--pad);top:330px;width:500px;height:500px;border:1px solid var(--line)}
+.s06 .hm canvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 1.4s ease}
+.s06 .hm.on-map canvas{opacity:1}
+.s06 .nums{position:absolute;inset:0;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;justify-items:center;font:500 30px var(--font-mono);color:var(--text);transition:opacity 1.2s ease,filter 1.2s ease}
+.s06 .hm.on-map .nums{opacity:0;filter:blur(8px)}
+.s06 .hmlabel{left:var(--pad);top:860px}
+.s06 .mesh{left:740px;top:250px;width:1100px;height:700px}
+
+/* ===========================================================
+   SLIDE 07 — PARAMETERS
+   =========================================================== */
+.s07 .head{left:var(--pad);top:110px}
+.s07 .variants{left:var(--pad);top:340px;display:flex;gap:30px}
+.s07 .v{position:relative;width:520px;height:390px;overflow:hidden;background:var(--bg2);border:1px solid var(--line)}
+.s07 .v img{width:100%;height:100%;object-fit:cover}
+.s07 .v .lbl{position:absolute;left:22px;top:18px;font:700 44px var(--font-display);color:var(--text)}
+.s07 .seed{left:var(--pad);top:800px;font-weight:600;font-size:56px;font-stretch:80%}
+.s07 .seed b{color:var(--teal);font-weight:600}
+.s07 .tag{position:absolute;right:var(--pad);top:130px}
+
+/* ===========================================================
+   SLIDE 08 — LAYERED MASKS
+   =========================================================== */
+.s08 .head{left:var(--pad);top:110px}
+.s08 .m{position:absolute;top:400px;width:300px}
+.s08 .m .img{position:relative;width:300px;height:300px;border:1px solid var(--line);overflow:hidden}
+.s08 .m img{width:100%;height:100%;object-fit:cover;filter:sepia(.25) hue-rotate(130deg) saturate(.6) brightness(1.05)}
+.s08 .m .lbl{margin-top:20px;font:500 20px/1.4 var(--font-mono);color:var(--text);letter-spacing:.05em}
+.s08 .m .lbl small{display:block;color:var(--muted);font-size:17px;letter-spacing:.02em}
+.s08 .m1{left:150px}.s08 .m2{left:500px}.s08 .m3{left:850px}
+.s08 .op{position:absolute;top:500px;font:300 84px/1 var(--font-display);color:var(--teal)}
+.s08 .final{left:1330px;top:340px;width:440px}
+.s08 .final .img{width:440px;height:440px;border:2px solid var(--teal);box-shadow:0 0 80px rgba(73,214,193,.15)}
+.s08 .final img{filter:none}
+.s08 .tag{position:absolute;right:var(--pad);top:130px}
+
+/* ===========================================================
+   SLIDE 09 — NODE GRAPH
+   =========================================================== */
+.s09 .head{left:var(--pad);top:110px}
+.s09 svg.graph{position:absolute;left:0;top:280px;width:1920px;height:640px}
+.s09 .node{opacity:0;transform:translateY(16px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.slide.visible.s09 .node{opacity:1;transform:none}
+.s09 .wire{fill:none;stroke:rgba(152,165,179,.45);stroke-width:3;stroke-dasharray:600;stroke-dashoffset:600;transition:stroke-dashoffset 1.2s var(--ease)}
+.slide.visible.s09 .wire{stroke-dashoffset:0}
+.s09 .pulse{opacity:0;transition:opacity .6s}
+.slide.visible.s09 .pulse{opacity:1;transition-delay:2.8s}
+.s09 .foot{left:var(--pad);top:960px}
+
+/* ===========================================================
+   SLIDE 10 — EROSION
+   =========================================================== */
+.s10 .photo{position:absolute;left:880px;top:0;width:1040px;height:1080px}
+.s10 .photo img{width:100%;height:100%;object-fit:cover}
+.s10 .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--bg) 0%,rgba(16,20,28,.35) 35%,rgba(16,20,28,0) 70%)}
+.s10 .head{left:var(--pad);top:110px}
+.s10 svg.profile{position:absolute;left:110px;top:380px;width:980px;height:420px;overflow:visible}
+.s10 .legend{left:var(--pad);top:830px;display:flex;gap:40px}
+.s10 .legend span{display:flex;align-items:center;gap:12px}
+.s10 .legend i{display:inline-block;width:34px;height:4px;background:var(--muted)}
+.s10 .legend .after i{background:var(--teal)}
+.s10 .legend .sed i{height:14px;background:rgba(233,184,114,.75)}
+.s10 .status{left:var(--pad);bottom:80px}
+.s10 .credit{color:rgba(243,245,247,.75)}
+
+/* ===========================================================
+   SLIDE 11 — GPU
+   =========================================================== */
+.s11 .head{left:var(--pad);top:110px}
+.s11 .unit{position:absolute;top:290px;width:460px}
+.s11 .cpu{left:300px}.s11 .gpu{left:1160px}
+.s11 .unit .name{font:700 72px/1 var(--font-display);font-stretch:78%;margin-bottom:24px}
+.s11 .gpu .name{color:var(--teal)}
+.s11 .grid{position:relative;width:460px;height:460px;display:grid;grid-template-columns:repeat(8,1fr);background:url(assets/pwg/mask-final.png) center/cover;border:1px solid var(--line)}
+.s11 .grid::before{content:"";position:absolute;inset:0;background:rgba(16,20,28,.45)}
+.s11 .tile{position:relative;border:1px solid rgba(16,20,28,.6)}
+.slide.visible.s11 .cpu .tile{animation:cpuTile 8s steps(1,end) infinite;animation-delay:var(--t)}
+.slide.visible.s11 .gpu.on .tile{animation:gpuTile 2.6s ease-out infinite;animation-delay:var(--t)}
+@keyframes cpuTile{0%{background:rgba(233,184,114,.75)}3%{background:rgba(233,184,114,.22)}96%{background:rgba(233,184,114,.22)}100%{background:transparent}}
+@keyframes gpuTile{0%{background:rgba(73,214,193,.0)}10%{background:rgba(73,214,193,.7)}60%{background:rgba(73,214,193,.2)}100%{background:rgba(73,214,193,0)}}
+.s11 .sub{margin-top:24px}
+.s11 .arrow{left:860px;top:560px;width:200px;text-align:center;font:300 90px/1 var(--font-display);color:var(--muted)}
+.s11 .foot{left:0;right:0;top:985px;text-align:center;color:var(--text)}
+
+/* ===========================================================
+   SLIDE 12 — CHUNKS
+   =========================================================== */
+.s12 .map{left:160px;top:160px;width:760px;height:760px}
+.s12 .map canvas{width:760px;height:760px;filter:brightness(.62) contrast(1.15) saturate(.8)}
+.s12 .cells{position:absolute;inset:0;display:grid;grid-template-columns:repeat(9,1fr)}
+.s12 .cell{border:1px solid rgba(73,214,193,.0);transition:border-color .5s,background .8s,opacity .8s;}
+.slide.visible.s12 .cell{border-color:rgba(73,214,193,.55);transition-delay:var(--t)}
+.s12 .map.cull .cell.out{background:rgba(5,7,10,.72);border-color:rgba(73,214,193,.15);transition-delay:0s}
+.s12 .map.cull .cell.in{background:rgba(73,214,193,.04)}
+.s12 svg.frustum{position:absolute;inset:0;width:760px;height:760px;overflow:visible}
+.s12 .copy{left:1060px;top:300px;width:720px}
+.s12 .h-xl{font-size:200px}
+.s12 .copy .mono{font-size:26px;line-height:1.6;color:var(--text)}
+.s12 .copy .mono b{color:var(--teal);font-weight:500}
+
+/* ===========================================================
+   SLIDE 13 — LOD
+   =========================================================== */
+.s13 .head{left:var(--pad);top:110px}
+.s13 canvas.lod{position:absolute;left:110px;top:300px;width:1700px;height:470px}
+.s13 .labels{left:110px;top:790px;width:1700px;display:grid;grid-template-columns:repeat(5,1fr);text-align:center}
+.s13 .labels div{font:500 22px/1.55 var(--font-mono);color:var(--muted)}
+.s13 .labels b{display:block;font:700 46px/1.1 var(--font-display);font-stretch:80%;color:var(--text)}
+.s13 .labels div:first-child b{color:var(--teal)}
+.s13 .dist{left:300px;top:985px;width:1320px;display:flex;align-items:center;gap:20px;font:400 20px var(--font-mono);color:var(--muted);letter-spacing:.08em}
+.s13 .dist::after{content:"";flex:1;height:2px;background:linear-gradient(90deg,var(--teal),rgba(152,165,179,.2))}
+
+/* ===========================================================
+   SLIDE 14 — VIDEO
+   =========================================================== */
+.s14{background:#000}
+.s14 video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-width:none;max-height:none}
+.s14 .overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,7,10,.75),rgba(5,7,10,0) 35%);transition:opacity 1.2s}
+.s14 .head{left:var(--pad);top:90px;transition:opacity 1.2s,transform 1.2s}
+.s14.playing .head,.s14.playing .overlay{opacity:0}
+.s14 .tag{position:absolute;right:var(--pad);top:100px}
+.s14 .hint{left:var(--pad);bottom:60px;font:400 18px var(--font-mono);color:rgba(243,245,247,.6);transition:opacity 1s}
+.s14.playing .hint{opacity:0}
+
+/* ===========================================================
+   SLIDE 15 — VALIDATION
+   =========================================================== */
+.s15 .bgimg{opacity:.22}
+.s15 .head{left:var(--pad);top:110px}
+.s15 .rows{left:var(--pad);top:300px;width:1620px}
+.s15 .row{display:grid;grid-template-columns:700px 1fr;align-items:center;padding:34px 0;border-top:1px solid var(--line)}
+.s15 .row:last-child{border-bottom:1px solid var(--line)}
+.s15 .word{font:700 104px/1 var(--font-display);font-stretch:78%;letter-spacing:-.02em}
+.s15 .row .desc{font-weight:300;font-size:34px;color:var(--text);line-height:1.35}
+.s15 .row .desc .tag{margin-top:16px}
+
+/* ===========================================================
+   SLIDE 16 — FUTURE
+   =========================================================== */
+.s16 .head{left:var(--pad);top:120px}
+.s16 .list{left:var(--pad);top:420px}
+.s16 .item{margin-bottom:46px}
+.s16 .item .w{font:700 84px/1 var(--font-display);font-stretch:78%}
+.s16 .item .w::before{content:"";display:inline-block;width:14px;height:14px;background:var(--teal);transform:rotate(45deg) translateY(-14px);margin-right:28px}
+.s16 .item .mono{margin:12px 0 0 46px;font-size:24px;color:var(--text);opacity:.85}
+
+/* ===========================================================
+   SLIDE 17 — ENDING
+   =========================================================== */
+.s17 .copy{right:var(--pad);top:330px;text-align:right}
+.s17 .shade-right{background:linear-gradient(270deg,rgba(16,20,28,.95) 0%,rgba(16,20,28,.78) 34%,rgba(16,20,28,.1) 70%,rgba(16,20,28,0) 100%)}
+.s17 .credit{right:auto;left:40px;text-align:left}
+.s17 .l1{font:700 112px/1 var(--font-display);font-stretch:78%;letter-spacing:-.025em}
+.s17 .l2{margin-top:36px;font:700 112px/1 var(--font-display);font-stretch:78%;letter-spacing:-.025em;color:var(--teal)}
+
+/* speaker notes are stored in each slide but never shown on stage */
+.notes{display:none}
+
+/* ===========================================================
+   PRESENTER CHROME (outside the stage, never part of a slide)
+   =========================================================== */
+.counter{position:fixed;right:22px;bottom:16px;z-index:1000;font:400 13px var(--font-mono);letter-spacing:.12em;color:rgba(243,245,247,.28);pointer-events:none;transition:opacity .4s}
+.progress{position:fixed;left:0;bottom:0;height:2px;background:rgba(73,214,193,.55);z-index:1000;transition:width .6s var(--ease)}
+.blackout{position:fixed;inset:0;background:#000;z-index:2000;opacity:0;pointer-events:none;transition:opacity .5s}
+.blackout.on{opacity:1;pointer-events:auto}
+.notes-panel{position:fixed;left:0;right:0;bottom:0;max-height:42vh;overflow:auto;z-index:1500;background:rgba(10,13,18,.96);border-top:1px solid rgba(73,214,193,.4);color:var(--text);font:400 18px/1.55 var(--font-display);padding:20px 28px 26px;transform:translateY(100%);transition:transform .35s var(--ease)}
+.notes-panel.open{transform:none}
+.notes-panel h4{font:500 13px var(--font-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--teal);margin-bottom:10px}
+.notes-panel p{margin-bottom:8px;max-width:1100px}
+.notes-panel .tr{color:var(--gold)}
+.help{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1600;background:rgba(10,13,18,.97);border:1px solid var(--line);padding:26px 34px;font:400 15px/1.9 var(--font-mono);color:var(--text);display:none}
+.help.open{display:block}
+.help b{color:var(--teal);display:inline-block;min-width:150px}
+
+/* inline edit mode (E) */
+.edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:10000;cursor:pointer}
+.edit-toggle{position:fixed;top:16px;left:16px;z-index:10001;opacity:0;pointer-events:none;transition:opacity .3s;background:var(--bg2);color:var(--text);border:1px solid var(--line);font:500 13px var(--font-mono);padding:8px 12px;border-radius:4px;cursor:pointer}
+.edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto}
+.edit-toggle.active{border-color:var(--teal);color:var(--teal)}
+body.editing [data-editable]{outline:1px dashed rgba(73,214,193,.6);outline-offset:6px}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- =========================================================
+     00 — TITLE (shown while the audience settles)
+     ========================================================= -->
+<section class="slide s-title" data-title="Tytuł">
+  <img class="bgimg kb" src="assets/pwg/lake-glint.jpg" alt="Jezioro wśród gór — zrzut ekranu z silnika PWG">
+  <div class="shade shade-left"></div><div class="shade shade-bottom" style="opacity:.6"></div><div class="grain"></div>
+  <div class="abs copy">
+    <div class="kicker rv" style="--d:.5s">Procedural World Generator</div>
+    <h1 class="h-xl" data-editable><span class="rv" style="--d:.75s">Jak stworzyć świat,</span><span class="rv" style="--d:1s">który <span class="accent" style="display:inline">nie istnieje?</span></span></h1>
+    <p class="lead rv" style="--d:1.5s" data-editable>Od matematyki do wirtualnego krajobrazu.</p>
+  </div>
+  <div class="abs foot rv" style="--d:2s" data-editable>Seminarium dyplomowe &nbsp;·&nbsp; <b>Proceduralne generowanie świata</b><br>na potrzeby gier i symulacji. Analiza algorytmów.</div>
+  <aside class="notes" data-time="15">
+    <p>Dzień dobry. Nazywam się [imię i nazwisko], a tematem mojej pracy inżynierskiej jest proceduralne generowanie świata na potrzeby gier i symulacji.</p>
+    <p>Za mną widzicie krajobraz, którego nikt nie wymodelował ręcznie — ale o tym za chwilę.</p>
+    <p class="tr">Przejście: Zanim pokażę, co zbudowałem, zacznę od pytania.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     01 — KTO STWORZYŁ TE ŚWIATY?
+     ========================================================= -->
+<section class="slide s01" data-title="Kto stworzył te światy?">
+  <div class="triptych">
+    <div class="panel"><img class="bgimg" src="assets/ref/minecraft.jpg" alt="Minecraft — krajobraz" style="object-position:62% 50%">
+      <div class="cap">Minecraft<small>© Mojang Studios · minecraft.net</small></div></div>
+    <div class="panel"><img class="bgimg" src="assets/ref/nms-meadow.jpg" alt="No Man's Sky — powierzchnia planety" style="object-position:40% 50%">
+      <div class="cap">No Man's Sky<small>© Hello Games · Steam</small></div></div>
+    <div class="panel"><img class="bgimg" src="assets/ref/good-dinosaur.jpg" alt="Dobry dinozaur — kadr z filmu" style="object-position:72% 50%">
+      <div class="cap">Dobry dinozaur (2015)<small>© Disney / Pixar · disney.com</small></div></div>
+  </div>
+  <div class="abs title rv" style="--d:1.2s"><h2 class="h-l" data-editable>Kto stworzył te światy?</h2></div>
+  <aside class="notes" data-time="45">
+    <p>Spójrzcie na te trzy światy: Minecraft, No Man's Sky i film Pixara „Dobry dinozaur”. Każdy z nich jest ogromny — i w każdym dużą część pracy wykonał nie grafik z myszką, tylko algorytm albo dane.</p>
+    <p>W Minecrafcie teren powstaje z ziarna losowości, czyli seeda, i funkcji szumu. W No Man's Sky w podobny sposób powstają całe planety.</p>
+    <p>A Pixar przy „Dobrym dinozaurze” zbudował krajobrazy na podstawie prawdziwych danych wysokościowych amerykańskiej służby geologicznej USGS.</p>
+    <p>Więc kto tak naprawdę stworzył te światy?</p>
+    <p class="tr">Przejście: Odpowiedź brzmi — w dużej mierze reguły.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     02 — JEDEN ALGORYTM. MILIONY MOŻLIWOŚCI.
+     ========================================================= -->
+<section class="slide s02" data-title="Jeden algorytm. Miliony możliwości.">
+  <div class="iris"><img class="bgimg kb" src="assets/ref/nms-rings.jpg" alt="No Man's Sky — krajobraz obcej planety"></div>
+  <div class="shade shade-bottom"></div><div class="shade shade-left" style="opacity:.75"></div>
+  <div class="abs copy">
+    <h2 class="h-xl" data-editable><span class="rv" style="--d:1.4s">Jeden algorytm.</span><span class="step accent">Miliony możliwości.</span></h2>
+  </div>
+  <div class="credit">No Man's Sky © Hello Games · zrzut ekranu ze strony Steam</div>
+  <aside class="notes" data-time="40">
+    <p>Ręczne wymodelowanie jednej doliny to dni pracy grafika. Tysiąca dolin — lata.</p>
+    <p>Generowanie proceduralne odwraca ten problem: zamiast tworzyć każde miejsce osobno, tworzymy reguły, które te miejsca produkują.</p>
+    <p>[Klik] No Man's Sky to najbardziej znany przykład: według twórców gra może wygenerować ponad 18 trylionów planet — dokładnie 2 do potęgi 64, bo każdą planetę wyznacza jej ziarno, czyli seed. Żadna z nich nie jest zapisana na dysku; każda jest wyliczana z algorytmu w chwili, gdy jest potrzebna. Studio Hello Games opowiadało o tej architekturze na GDC 2017.</p>
+    <p class="tr">Przejście: I to nie jest wyłącznie domena gier.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     03 — NIE TYLKO GRY
+     ========================================================= -->
+<section class="slide s03" data-title="Nie tylko gry.">
+  <div class="film f1 rv-fade"><img src="assets/ref/lion-king-pride.jpg" alt="Król Lew (2019) — kadr z filmu">
+    <div class="fcap">Król Lew (2019)<small>© Disney · disney.com</small></div></div>
+  <div class="film f2 rv-fade" style="--d:.5s"><img src="assets/ref/good-dinosaur-valley.jpg" alt="Dobry dinozaur — kadr z filmu">
+    <div class="fcap">Dobry dinozaur (2015)<small>© Disney / Pixar · disney.com</small></div></div>
+  <div class="abs copy rv" style="--d:1s"><h2 class="h-l" data-editable>Nie tylko<br><span class="gold" style="display:inline">gry.</span></h2></div>
+  <div class="abs offline step"><span class="tag gold">Render offline</span></div>
+  <aside class="notes" data-time="45">
+    <p>Kino też korzysta z tych technik. Przy „Królu Lwie” z 2019 roku studio MPC odeszło od malowanych teł. Według materiałów studia powstało 66 cyfrowych planów o łącznej powierzchni około 150 kilometrów kwadratowych, budowanych proceduralnie na podstawie fotografii referencyjnych i reguł ekosystemu.</p>
+    <p>Z kolei w „Dobrym dinozaurze” teren pochodził z rzeczywistych map wysokości. To dokładnie ta sama struktura danych, której używa mój projekt — heightmapa.</p>
+    <p>[Klik] Jest jednak zasadnicza różnica: film renderuje się offline. Pojedyncza klatka może liczyć się minutami, a nawet godzinami na farmie renderującej — i nikt nie czeka na nią przed ekranem.</p>
+    <p class="tr">Przejście: Gra nie ma takiego luksusu.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     04 — CZAS RZECZYWISTY
+     ========================================================= -->
+<section class="slide s04" data-title="Czas rzeczywisty.">
+  <img class="bgimg kb" src="assets/ref/horizon.jpg" alt="Horizon Zero Dawn — krajobraz">
+  <div class="shade shade-left"></div><div class="shade shade-bottom" style="opacity:.8"></div>
+  <div class="abs copy">
+    <div class="kicker rv" style="--d:.4s">Gra</div>
+    <h2 class="h-xl rv" style="--d:.6s;margin-top:36px" data-editable>Czas<br>rzeczywisty.</h2>
+  </div>
+  <div class="abs budget step">
+    <div class="num">16,7<em>ms</em></div>
+    <div class="mono" data-editable>na całą klatkę przy 60 FPS</div>
+  </div>
+  <div class="credit">Horizon Zero Dawn © Guerrilla / Sony Interactive Entertainment · zrzut ekranu ze strony Steam</div>
+  <aside class="notes" data-time="45">
+    <p>Gra działa w czasie rzeczywistym.</p>
+    <p>[Klik] Przy 60 klatkach na sekundę na wszystko — logikę gry, fizykę i narysowanie świata — mamy około 16,7 milisekundy.</p>
+    <p>Horizon Zero Dawn to dobry przykład kompromisu. Teren projektują tam artyści, ale roślinność, skały i wiele innych obiektów rozmieszcza w czasie rzeczywistym system proceduralny działający na karcie graficznej — Guerrilla opowiadała o nim na GDC 2017. Czyli procedury nie muszą generować wszystkiego; mogą przejąć to, co powtarzalne.</p>
+    <p>To pytanie — jak generować świat i jednocześnie zmieścić się w budżecie klatki — postanowiłem zbadać sam.</p>
+    <p class="tr">Przejście: Tak powstał mój projekt.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     05 — PWG REVEAL
+     ========================================================= -->
+<section class="slide s05" data-title="Procedural World Generator" style="background:#000">
+  <img class="bgimg" src="assets/pwg/lake-valley.jpg" alt="Dolina z jeziorem — zrzut ekranu z silnika PWG">
+  <div class="shade vignette"></div><div class="shade shade-bottom" style="opacity:.7"></div>
+  <div class="abs center">
+    <div class="pwg" data-editable>PWG</div>
+    <div class="full rv" style="--d:2.6s" data-editable>Procedural World Generator</div>
+  </div>
+  <span class="tag rv" style="--d:3.2s">Zrzut ekranu z silnika PWG</span>
+  <div class="abs stack rv" style="--d:3.4s">C++20 · OpenGL 4.5 · GLSL</div>
+  <aside class="notes" data-time="45">
+    <p>Tak powstał PWG — Procedural World Generator. To autorski silnik i edytor napisany od zera w C++20 i OpenGL 4.5, bez Unity czy Unreal Engine.</p>
+    <p>To, co widzicie, to zrzut ekranu z silnika: kształt gór, jezioro, rzeki, materiały terenu i oświetlenie są wyliczane przez program.</p>
+    <p>Moim celem nie było narysowanie jednej ładnej mapy, tylko zbudowanie konfigurowalnego narzędzia, w którym taki świat projektuje się regułami.</p>
+    <p class="tr">Przejście: Pokażę krok po kroku, jak to działa — zaczynając od najbardziej podstawowego pytania.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     06 — OD LICZB DO KRAJOBRAZU
+     ========================================================= -->
+<section class="slide s06" data-title="Od liczb do krajobrazu.">
+  <div class="abs head"><h2 class="h-m rv" style="--d:.2s" data-editable>Od liczb do krajobrazu.</h2></div>
+  <div class="abs hm" id="hmPanel">
+    <canvas id="hmCanvas" width="500" height="500"></canvas>
+    <div class="nums" id="hmNums"></div>
+  </div>
+  <div class="abs hmlabel mono rv" style="--d:.6s">heightmapa · szum z FastNoiseLite</div>
+  <canvas class="abs mesh" id="meshCanvas" width="2200" height="1400"></canvas>
+  <!-- invisible step markers: 1) numbers → heightmap  2) plane → terrain -->
+  <i class="step" data-action="heightmap"></i><i class="step" data-action="rise"></i>
+  <aside class="notes" data-time="55">
+    <p>Jak z liczb powstają góry? Teren w PWG to mapa wysokości, czyli heightmapa: siatka, w której każda komórka przechowuje jedną liczbę — wysokość w tym punkcie.</p>
+    <p>[Klik] Te liczby nie są przypadkowe w zwykłym sensie. Pochodzą z funkcji szumu gradientowego, która daje płynne, naturalnie wyglądające zmiany. Jeśli zamienimy je na odcienie szarości, dostajemy obraz — jasne to wysoko, ciemne to nisko. W projekcie używam biblioteki FastNoiseLite, także w wersji GLSL działającej na karcie graficznej.</p>
+    <p>[Klik] Kiedy potraktujemy te wartości jako wysokości wierzchołków płaskiej siatki, płaszczyzna zamienia się w krajobraz. Uczciwie dodam: to model 2,5D — jedna wysokość na punkt — więc bez jaskiń i nawisów.</p>
+    <p class="tr">Przejście: Najciekawsze jest to, że tym krajobrazem można sterować.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     07 — ZMIENIASZ PARAMETRY. ZMIENIASZ ŚWIAT.
+     ========================================================= -->
+<section class="slide s07" data-title="Zmieniasz parametry. Zmieniasz świat.">
+  <div class="abs head"><h2 class="h-m rv" style="--d:.2s" data-editable>Zmieniasz parametry.<br><span class="accent" style="display:inline">Zmieniasz świat.</span></h2></div>
+  <span class="tag rv" style="--d:.8s">PWG · wczesna wersja · ta sama kamera</span>
+  <div class="abs variants">
+    <div class="v rv" style="--d:.5s"><img src="assets/pwg/params-a.jpg" alt="PWG — wariant terenu A"><div class="lbl">A</div></div>
+    <div class="v rv" style="--d:.75s"><img src="assets/pwg/params-b.jpg" alt="PWG — wariant terenu B"><div class="lbl">B</div></div>
+    <div class="v rv" style="--d:1s"><img src="assets/pwg/params-c.jpg" alt="PWG — wariant terenu C"><div class="lbl">C</div></div>
+  </div>
+  <div class="abs seed h-m step" data-editable>Ten sam seed <b>→</b> ten sam świat.</div>
+  <aside class="notes" data-time="45">
+    <p>Funkcja szumu ma parametry: częstotliwość, liczbę oktaw, typ fraktala, amplitudę i ziarno, czyli seed.</p>
+    <p>Te trzy ujęcia pochodzą z wczesnej wersji PWG i są zrobione z tej samej kamery — zmieniałem wyłącznie parametry generatora. Ten sam algorytm daje łagodne wzgórza, ostre iglice albo zwarte pasmo górskie.</p>
+    <p>[Klik] Co ważne, generowanie jest deterministyczne: ten sam seed i te same parametry dają ten sam świat. Nie trzeba więc zapisywać całej mapy — wystarczy zapisać przepis.</p>
+    <p class="tr">Przejście: Ale jeden szum to wciąż za mało.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     08 — JEDEN SZUM NIE WYSTARCZY
+     ========================================================= -->
+<section class="slide s08" data-title="Jeden szum nie wystarczy.">
+  <div class="abs head"><h2 class="h-m rv" style="--d:.2s" data-editable>Jeden szum nie wystarczy.</h2></div>
+  <span class="tag rv" style="--d:.6s">Dane pośrednie z PWG · TerrainDebug</span>
+  <div class="m m1 rv" style="--d:.6s"><div class="img"><img src="assets/pwg/mask-elev.png" alt="Maska Elevation z PWG"></div><div class="lbl">Elevation<small>ogólne ukształtowanie</small></div></div>
+  <div class="m m2 step"><div class="img"><img src="assets/pwg/mask-mountain.png" alt="Maska Mountain z PWG"></div><div class="lbl">Mountain Mask<small>gdzie mają być góry</small></div></div>
+  <div class="m m3 step"><div class="img"><img src="assets/pwg/mask-height.png" alt="Maska Mountain Height z PWG"></div><div class="lbl">Mountain Height<small>szczegół gór</small></div></div>
+  <div class="op step" style="left:1180px">Σ</div>
+  <div class="m final step"><div class="img"><img src="assets/pwg/mask-final.png" alt="Finalna heightmapa z PWG"></div><div class="lbl">Final Height<small>ważona suma warstw</small></div></div>
+  <aside class="notes" data-time="55">
+    <p>Jeden szum daje teren jednorodny — wszędzie podobny. Prawdziwy krajobraz ma regiony: niziny, pasma górskie, doliny. Dlatego PWG składa teren z warstw.</p>
+    <p>To są prawdziwe dane pośrednie z jednej z wcześniejszych wersji silnika, podglądane przez moduł TerrainDebug. Najpierw ogólne ukształtowanie terenu.</p>
+    <p>[Klik] Potem maska, która mówi, gdzie mają powstać góry. [Klik] Potem szczegółowa wysokość samych gór.</p>
+    <p>[Klik] Na końcu shader obliczeniowy łączy warstwy ważoną sumą i lekko podbija kontrast funkcją potęgową — tak powstaje finalna heightmapa.</p>
+    <p class="tr">Przejście: Kiedy takich operacji robi się kilkanaście, potrzebny jest porządek.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     09 — OD OPERACJI DO PIPELINE'U
+     ========================================================= -->
+<section class="slide s09" data-title="Od operacji do pipeline'u.">
+  <div class="abs head"><h2 class="h-m rv" style="--d:.2s" data-editable>Od operacji do pipeline'u.</h2></div>
+  <svg class="graph" viewBox="0 0 1920 640" aria-label="Uproszczony graf nodów TerrainGraph">
+    <defs>
+      <linearGradient id="nodeHead" x1="0" x2="1"><stop offset="0" stop-color="#49D6C1"/><stop offset="1" stop-color="#49D6C1" stop-opacity=".35"/></linearGradient>
+    </defs>
+    <!-- wires (drawn after nodes) -->
+    <path id="w1" class="wire" d="M380 160 C 470 160, 450 320, 540 320" style="transition-delay:1.5s"/>
+    <path id="w2" class="wire" d="M380 480 C 470 480, 450 340, 540 340" style="transition-delay:1.6s"/>
+    <path id="w3" class="wire" d="M800 330 C 850 330, 840 330, 890 330" style="transition-delay:1.8s"/>
+    <path id="w4" class="wire" d="M1150 330 C 1200 330, 1190 330, 1240 330" style="transition-delay:2s"/>
+    <path id="w5" class="wire" d="M1500 330 C 1550 330, 1540 330, 1590 330" style="transition-delay:2.2s"/>
+    <!-- nodes: x,y set per group; real node names from the PWG editor -->
+    <g class="node" style="transition-delay:.4s"><g transform="translate(120,105)">
+      <rect width="260" height="110" rx="6" fill="#18212B" stroke="rgba(243,245,247,.18)"/><rect width="260" height="5" fill="url(#nodeHead)"/>
+      <text x="22" y="50" fill="#F3F5F7" font-family="Bricolage Grotesque" font-weight="600" font-size="30">Noise Height</text>
+      <text x="22" y="84" fill="#98A5B3" font-family="JetBrains Mono" font-size="17">Generator</text>
+      <circle cx="260" cy="55" r="8" fill="#49D6C1"/></g></g>
+    <g class="node" style="transition-delay:.6s"><g transform="translate(120,425)">
+      <rect width="260" height="110" rx="6" fill="#18212B" stroke="rgba(243,245,247,.18)"/><rect width="260" height="5" fill="url(#nodeHead)"/>
+      <text x="22" y="50" fill="#F3F5F7" font-family="Bricolage Grotesque" font-weight="600" font-size="30">Noise Mask</text>
+      <text x="22" y="84" fill="#98A5B3" font-family="JetBrains Mono" font-size="17">Generator</text>
+      <circle cx="260" cy="55" r="8" fill="#49D6C1"/></g></g>
+    <g class="node" style="transition-delay:.8s"><g transform="translate(540,275)">
+      <rect width="260" height="110" rx="6" fill="#18212B" stroke="rgba(243,245,247,.18)"/><rect width="260" height="5" fill="#98A5B3"/>
+      <text x="22" y="50" fill="#F3F5F7" font-family="Bricolage Grotesque" font-weight="600" font-size="30">Multiply</text>
+      <text x="22" y="84" fill="#98A5B3" font-family="JetBrains Mono" font-size="17">Matematyka</text>
+      <circle cx="0" cy="45" r="8" fill="#98A5B3"/><circle cx="0" cy="65" r="8" fill="#98A5B3"/><circle cx="260" cy="55" r="8" fill="#49D6C1"/></g></g>
+    <g class="node" style="transition-delay:1s"><g transform="translate(890,275)">
+      <rect width="260" height="110" rx="6" fill="#18212B" stroke="rgba(233,184,114,.45)"/><rect width="260" height="5" fill="#E9B872"/>
+      <text x="22" y="50" fill="#F3F5F7" font-family="Bricolage Grotesque" font-weight="600" font-size="30">Particle Erosion</text>
+      <text x="22" y="84" fill="#E9B872" font-family="JetBrains Mono" font-size="17">Symulacja · GPU</text>
+      <circle cx="0" cy="55" r="8" fill="#98A5B3"/><circle cx="260" cy="55" r="8" fill="#49D6C1"/></g></g>
+    <g class="node" style="transition-delay:1.2s"><g transform="translate(1240,275)">
+      <rect width="260" height="110" rx="6" fill="#18212B" stroke="rgba(233,184,114,.45)"/><rect width="260" height="5" fill="#E9B872"/>
+      <text x="22" y="50" fill="#F3F5F7" font-family="Bricolage Grotesque" font-weight="600" font-size="30">Thermal Erosion</text>
+      <text x="22" y="84" fill="#E9B872" font-family="JetBrains Mono" font-size="17">Symulacja · GPU</text>
+      <circle cx="0" cy="55" r="8" fill="#98A5B3"/><circle cx="260" cy="55" r="8" fill="#49D6C1"/></g></g>
+    <g class="node" style="transition-delay:1.4s"><g transform="translate(1590,265)">
+      <rect width="230" height="130" rx="6" fill="#10141C" stroke="#49D6C1" stroke-width="2"/><rect width="230" height="5" fill="#49D6C1"/>
+      <text x="22" y="56" fill="#F3F5F7" font-family="Bricolage Grotesque" font-weight="700" font-size="30">Output Height</text>
+      <text x="22" y="94" fill="#49D6C1" font-family="JetBrains Mono" font-size="17">→ teren 3D</text>
+      <circle cx="0" cy="65" r="8" fill="#98A5B3"/></g></g>
+    <!-- data pulses travelling along the wires -->
+    <g class="pulse">
+      <circle r="7" fill="#49D6C1"><animateMotion dur="1.6s" repeatCount="indefinite"><mpath href="#w1"/></animateMotion></circle>
+      <circle r="7" fill="#49D6C1"><animateMotion dur="1.6s" begin=".3s" repeatCount="indefinite"><mpath href="#w2"/></animateMotion></circle>
+      <circle r="7" fill="#49D6C1"><animateMotion dur="1.2s" begin=".6s" repeatCount="indefinite"><mpath href="#w3"/></animateMotion></circle>
+      <circle r="7" fill="#E9B872"><animateMotion dur="1.2s" begin=".9s" repeatCount="indefinite"><mpath href="#w4"/></animateMotion></circle>
+      <circle r="7" fill="#49D6C1"><animateMotion dur="1.2s" begin="1.2s" repeatCount="indefinite"><mpath href="#w5"/></animateMotion></circle>
+    </g>
+  </svg>
+  <div class="abs foot mono step" data-editable>Wynik jednego kroku = wejście następnego &nbsp;·&nbsp; walidacja: cykle, brakujące wejścia, typy portów</div>
+  <aside class="notes" data-time="55">
+    <p>Ten porządek zapewnia graf nodów — TerrainGraph. Każdy node to jedna operacja: generator szumu, maska, działanie matematyczne, symulacja albo wyjście.</p>
+    <p>Na ekranie jest uproszczony przykład z prawdziwymi nazwami nodów z edytora PWG: szum wysokości mnożony przez maskę, potem dwie symulacje erozji i wyjście, z którego powstaje teren 3D.</p>
+    <p>[Klik] Wynik jednego kroku staje się wejściem następnego. Zanim graf zostanie wykonany, silnik go waliduje — sprawdza cykle, brakujące wejścia i zgodność typów portów. W edytorze jest ponad trzydzieści typów nodów: od generatorów, przez kilkanaście operacji matematycznych i maski analizujące teren, po erozję, hydrologię i rozmieszczanie roślinności.</p>
+    <p class="tr">Przejście: Dwa z tych nodów są szczególne, bo to nie matematyka, tylko symulacja.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     10 — NATURA ZMIENIA TEREN
+     ========================================================= -->
+<section class="slide s10" data-title="Natura zmienia teren.">
+  <div class="photo rv-fade" style="--d:.2s"><img src="assets/pwg/slope-river.jpg" alt="Zbocze z korytem rzeki — zrzut ekranu z silnika PWG"></div>
+  <div class="abs head"><h2 class="h-m rv" style="--d:.3s" data-editable>Natura<br>zmienia teren.</h2></div>
+  <svg class="profile" id="erosionSvg" viewBox="0 0 980 420" aria-label="Przekrój terenu przed i po erozji"></svg>
+  <div class="abs legend mono rv" style="--d:.8s">
+    <span class="before"><i></i>szum</span>
+    <span class="after step-fade" id="legAfter"><i></i>po erozji</span>
+    <span class="sed step-fade" id="legSed"><i></i>osad</span>
+  </div>
+  <i class="step" data-action="erode" style="display:none"></i>
+  <div class="abs status step"><span class="tag">PWG: erozja hydrauliczna + termiczna · zaimplementowane (GPU)</span></div>
+  <div class="credit">Zrzut ekranu z silnika PWG · koryto wyznaczone przez generator hydrologii</div>
+  <aside class="notes" data-time="55">
+    <p>Szum daje kształt, ale nie daje historii. Prawdziwe góry są wyrzeźbione przez wodę i grawitację — mają żleby, osypiska i płaskie dna dolin.</p>
+    <p>[Klik] PWG symuluje to na dwa sposoby. Erozja hydrauliczna to tysiące cząstek wody liczonych na GPU: każda spływa po zboczu, wymywa materiał, przenosi go i odkłada niżej — szczyty się obniżają, a doliny wypełniają osadem. Erozja termiczna zsuwa materiał ze zboczy zbyt stromych, aż osiągną stabilny kąt.</p>
+    <p>[Klik] Obie symulacje są zaimplementowane i działają interaktywnie — to jednak uproszczone modele na mapie wysokości, a nie pełna symulacja fizyczna. Na tak ukształtowanym terenie osobny generator hydrologii wyznacza rzeki i jeziora — jedno z takich koryt widać na zdjęciu.</p>
+    <p class="tr">Przejście: Takie symulacje to miliony obliczeń. Kto je wykonuje?</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     11 — KTO WYKONUJE OBLICZENIA?
+     ========================================================= -->
+<section class="slide s11" data-title="Kto wykonuje obliczenia?">
+  <div class="abs head"><h2 class="h-m rv" style="--d:.2s" data-editable>Kto wykonuje obliczenia?</h2></div>
+  <div class="unit cpu rv" style="--d:.5s"><div class="name">CPU</div><div class="grid" id="cpuGrid"></div><div class="sub mono">komórka po komórce</div></div>
+  <div class="abs arrow rv" style="--d:.8s">→</div>
+  <div class="unit gpu step" id="gpuUnit"><div class="name">GPU</div><div class="grid" id="gpuGrid"></div><div class="sub mono">wszystkie naraz</div></div>
+  <div class="abs foot mono step" data-editable>Compute Shaders · OpenGL 4.5 · grupa robocza 8 × 8 wątków</div>
+  <aside class="notes" data-time="50">
+    <p>Heightmapa w największym wariancie PWG ma prawie 4000 na 4000 próbek, czyli około 16 milionów wartości. Gdyby procesor przeliczał je jedna po drugiej, każda zmiana parametru oznaczałaby czekanie.</p>
+    <p>[Klik] Ale te obliczenia są w dużej mierze niezależne — wartość w jednym punkcie nie czeka na sąsiada. To idealne zadanie dla karty graficznej, która ma tysiące prostych rdzeni.</p>
+    <p>[Klik] W PWG operacje grafu, maski, normalne i erozja działają jako compute shadery OpenGL 4.5, uruchamiane w grupach roboczych 8 na 8 wątków. Procesorowi zostaje to, co ma charakter sekwencyjny: edytor, hydrologia oparta na algorytmach grafowych i zarządzanie sceną.</p>
+    <p class="tr">Przejście: Policzyć teren to jedno. Trzeba go jeszcze narysować.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     12 — CHUNKI
+     ========================================================= -->
+<section class="slide s12" data-title="Chunki.">
+  <div class="abs map rv-fade" id="chunkMap" style="--d:.2s">
+    <canvas id="chunkCanvas" width="760" height="760"></canvas>
+    <div class="cells" id="chunkCells"></div>
+    <svg class="frustum step-fade" id="frustum" viewBox="0 0 760 760">
+      <path d="M380 735 L 70 60 L 690 60 Z" fill="rgba(73,214,193,.08)" stroke="#49D6C1" stroke-width="2" stroke-dasharray="8 8"/>
+      <circle cx="380" cy="735" r="12" fill="#E9B872"/>
+    </svg>
+  </div>
+  <div class="abs copy">
+    <h2 class="h-xl rv" style="--d:.4s" data-editable>Chunki.</h2>
+    <p class="mono rv" style="--d:.9s;margin-top:40px" data-editable>Mapa podzielona na fragmenty<br><b>od 3 × 3 do 31 × 31</b></p>
+    <p class="mono step" style="margin-top:28px" data-editable>Poza kamerą? <b>Nie rysujemy.</b><br>frustum culling</p>
+  </div>
+  <div class="credit">Ilustracja poglądowa · podział i culling zgodne z ChunkManager w PWG</div>
+  <aside class="notes" data-time="45">
+    <p>Policzenie terenu to jedno, narysowanie go — drugie. Dlatego mapa jest podzielona na chunki, czyli kwadratowe fragmenty. W PWG można skonfigurować od 3 do 31 chunków na bok.</p>
+    <p>[Klik] Każdy chunk jest sprawdzany względem bryły widzenia kamery. Chunki poza nią w ogóle nie są rysowane — to frustum culling.</p>
+    <p>Ważne zastrzeżenie: PWG generuje świat o skończonym, z góry ustalonym rozmiarze. Chunki służą tu do wydajnego renderingu, a nie do nieskończonego strumieniowania świata.</p>
+    <p class="tr">Przejście: A co z chunkami, które są widoczne, ale bardzo daleko?</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     13 — LOD
+     ========================================================= -->
+<section class="slide s13" data-title="LOD — Level of Detail.">
+  <div class="abs head"><h2 class="h-m rv" style="--d:.2s" data-editable>LOD — Level of Detail.</h2></div>
+  <canvas class="lod" id="lodCanvas" width="3400" height="940"></canvas>
+  <div class="abs labels rv" style="--d:1.2s">
+    <div><b>LOD0</b>128 × 128<br>32 768 △</div>
+    <div><b>LOD1</b>64 × 64<br>8 192 △</div>
+    <div><b>LOD2</b>32 × 32<br>2 048 △</div>
+    <div><b>LOD3</b>16 × 16<br>512 △</div>
+    <div><b>LOD4</b>8 × 8<br>128 △</div>
+  </div>
+  <div class="abs dist step">blisko kamery &nbsp;→&nbsp; daleko</div>
+  <aside class="notes" data-time="45">
+    <p>Tu wchodzi LOD — level of detail, czyli poziom szczegółowości.</p>
+    <p>Pojedynczy chunk w pełnej rozdzielczości ma 128 na 128 kwadratów, czyli ponad 32 tysiące trójkątów. Kiedy chunk jest daleko, zajmuje na ekranie kilka pikseli — rysowanie wszystkich tych trójkątów byłoby marnotrawstwem.</p>
+    <p>[Klik] Dlatego LODManager w PWG ma pięć poziomów. Każdy kolejny ma dwa razy mniej wierzchołków na bok, czyli cztery razy mniej trójkątów — od 32 768 do zaledwie 128. Poziom jest wybierany na podstawie odległości chunka od kamery.</p>
+    <p class="tr">Przejście: Tyle teorii. Zobaczmy to w działaniu.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     14 — PWG W PRAKTYCE (video; replace assets/pwg/pwg-demo.mp4 freely)
+     ========================================================= -->
+<section class="slide s14" data-title="PWG w praktyce.">
+  <video id="demoVideo" src="assets/pwg/pwg-demo.mp4" poster="assets/pwg/editor-ui.jpg" muted playsinline preload="metadata"></video>
+  <div class="overlay"></div>
+  <div class="abs head"><h2 class="h-m" data-editable>PWG w praktyce.</h2></div>
+  <span class="tag">Nagranie z silnika PWG</span>
+  <div class="abs hint">P / klik — odtwórz lub zatrzymaj</div>
+  <aside class="notes" data-time="65">
+    <p>To są nagrania z PWG, bez montażu efektów. Najpierw edytor grafu — buduję prosty graf: generator szumu, stała i mnożenie, podłączone do wyjścia wysokości.</p>
+    <p>Potem wynik w widoku 3D edytora, przebieg erozji na terenie i dobór materiałów z jeziorami.</p>
+    <p>A na końcu tryb eksploracji: przelot kamery nad wygenerowanym światem — jeziora, rzeki, wodospady i roślinność. Wszystko, co widać, jest renderowane w czasie rzeczywistym.</p>
+    <p class="tr">Przejście: Ładny obraz to jednak za mało. Trzeba jeszcze wiedzieć, czy ten świat działa poprawnie.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     15 — CZY TEN ŚWIAT DZIAŁA POPRAWNIE?
+     ========================================================= -->
+<section class="slide s15" data-title="Czy ten świat działa poprawnie?">
+  <img class="bgimg" src="assets/pwg/dusk-ridge.jpg" alt="">
+  <div class="abs head"><h2 class="h-m rv" style="--d:.2s" data-editable>Czy ten świat działa poprawnie?</h2></div>
+  <div class="abs rows">
+    <div class="row step"><div class="word">Powtarzalność</div><div class="desc" data-editable>ten sam seed → identyczna heightmapa<br><span class="tag gold">test porównawczy: planowany</span></div></div>
+    <div class="row step"><div class="word">Poprawność</div><div class="desc" data-editable>rzeki płyną w dół, tafla jezior jest pozioma<br><span class="tag">ocena wizualna i debug: wykonane</span></div></div>
+    <div class="row step"><div class="word accent">Wydajność</div><div class="desc" data-editable>czas grafu, erozji, hydrologii · FPS · pamięć<br><span class="tag gold">pomiary: planowane</span></div></div>
+  </div>
+  <aside class="notes" data-time="50">
+    <p>Jak ocenić generator świata? Proponuję trzy kryteria.</p>
+    <p>[Klik] Powtarzalność: ten sam seed powinien dać identyczną heightmapę. Algorytmy są deterministyczne z założenia, a formalny test porównujący wyniki jest zaplanowany.</p>
+    <p>[Klik] Poprawność: rzeki muszą płynąć w dół, a tafla jeziora musi być pozioma. Na razie sprawdzam to wizualnie i przez podgląd danych pośrednich w trybie debug. Metryki liczbowe — na przykład odchylenie poziomu tafli — są w planie.</p>
+    <p>[Klik] Wydajność: czas wykonania grafu, kroku erozji i generowania hydrologii oraz liczba klatek na sekundę dla różnych rozdzielczości. Te pomiary są częścią pracy, którą kończę — dlatego dziś nie pokazuję liczb, których jeszcze nie zmierzyłem.</p>
+    <p class="tr">Przejście: To prowadzi do tego, co dalej.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     16 — ŚWIAT NADAL SIĘ ROZWIJA
+     ========================================================= -->
+<section class="slide s16" data-title="Świat nadal się rozwija.">
+  <img class="bgimg kb" src="assets/pwg/mountain-snow.jpg" alt="Masyw górski — zrzut ekranu z silnika PWG">
+  <div class="shade shade-left"></div><div class="shade shade-top"></div>
+  <div class="abs head"><h2 class="h-m rv" style="--d:.3s" data-editable>Świat nadal się rozwija.</h2></div>
+  <div class="abs list">
+    <div class="item step"><div class="w">Erozja</div><div class="mono" data-editable>wiele etapów symulacji w jednym grafie</div></div>
+    <div class="item step"><div class="w">Woda</div><div class="mono" data-editable>od jednorazowej hydrologii do dynamicznego przepływu</div></div>
+    <div class="item step"><div class="w">Optymalizacja</div><div class="mono" data-editable>pomiary, profilowanie, wąskie gardła</div></div>
+  </div>
+  <div class="credit">Zrzut ekranu z silnika PWG</div>
+  <aside class="notes" data-time="45">
+    <p>Projekt nadal się rozwija.</p>
+    <p>[Klik] Erozja: dziś graf obsługuje jeden node erozji hydraulicznej i jeden termicznej. Kolejny krok to łączenie wielu etapów symulacji, na przykład na różnych fragmentach mapy.</p>
+    <p>[Klik] Woda: rzeki i jeziora są wyznaczane jednorazowo, a ruch wody na powierzchni jest efektem wizualnym. Prawdziwym wyzwaniem byłaby dynamiczna symulacja przepływu.</p>
+    <p>[Klik] Optymalizacja: systematyczne pomiary i profilowanie, żeby wiedzieć, gdzie naprawdę jest wąskie gardło. Architektura grafu nodów pozwala dodawać takie elementy bez przebudowy całego silnika.</p>
+    <p class="tr">Przejście: Wróćmy na koniec do pytania z początku.</p>
+  </aside>
+</section>
+
+<!-- =========================================================
+     17 — ENDING
+     ========================================================= -->
+<section class="slide s17" data-title="Nie stworzyłem jednej mapy.">
+  <img class="bgimg kb" src="assets/pwg/tree-ridge.jpg" alt="Drzewo na grani — zrzut ekranu z silnika PWG">
+  <div class="shade shade-right"></div><div class="shade shade-bottom" style="opacity:.5"></div>
+  <div class="abs copy">
+    <div class="l1 rv" style="--d:.8s" data-editable>Nie stworzyłem jednej mapy.</div>
+    <div class="l2 step" data-editable>Stworzyłem sposób<br>na tworzenie wielu.</div>
+  </div>
+  <div class="credit">PWG — Procedural World Generator · zrzut ekranu z silnika</div>
+  <aside class="notes" data-time="30">
+    <p>Na początku zapytałem, kto stworzył te światy. Odpowiedź, do której doszedłem, pisząc PWG, brzmi tak:</p>
+    <p>Nie stworzyłem jednej mapy. [pauza, klik] Stworzyłem sposób na tworzenie wielu.</p>
+    <p>Dziękuję — chętnie odpowiem na pytania.</p>
+  </aside>
+</section>
+
+</main>
+</div>
+
+<!-- presenter chrome (outside the scaled stage) -->
+<div class="counter" id="counter"></div>
+<div class="progress" id="progress"></div>
+<div class="blackout" id="blackout"></div>
+<div class="notes-panel" id="notesPanel"></div>
+<div class="help" id="help">
+  <b>→ / Spacja</b> dalej (kolejny element lub slajd)<br>
+  <b>← </b> wstecz<br>
+  <b>Home / End</b> pierwszy / ostatni slajd<br>
+  <b>F</b> pełny ekran<br>
+  <b>N</b> notatki pod slajdem<br>
+  <b>S</b> okno prowadzącego (notatki + czas)<br>
+  <b>P</b> odtwórz / zatrzymaj wideo<br>
+  <b>B</b> wygaś ekran<br>
+  <b>E</b> tryb edycji tekstu (Ctrl+S zapisuje plik)<br>
+  <b>?</b> ta pomoc
+</div>
+<div class="edit-hotzone" id="editHotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Tryb edycji (E)">EDYCJA</button>
+
+<script>
+/* ===========================================================
+   SHARED PROCEDURAL HELPERS (value noise + fBm)
+   Used only for the illustrative visualisations on slides 06, 10, 12, 13.
+   =========================================================== */
+const Noise = (() => {
+  function rng(seed){ let s = seed >>> 0 || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+  function makeLattice(seed, n){ const r = rng(seed), g = []; for (let i = 0; i <= n; i++){ g[i] = []; for (let j = 0; j <= n; j++) g[i][j] = r(); } return g; }
+  const sm = t => t * t * (3 - 2 * t);
+  function value(g, n, x, y){ x = ((x % n) + n) % n; y = ((y % n) + n) % n; const xi = Math.floor(x), yi = Math.floor(y), xf = sm(x - xi), yf = sm(y - yi);
+    const a = g[xi][yi], b = g[xi + 1][yi], c = g[xi][yi + 1], d = g[xi + 1][yi + 1]; return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf; }
+  function fbm(seed){ const N = 32, L = makeLattice(seed, N);
+    return (x, y) => { let amp = 1, f = 3, s = 0, w = 0; for (let o = 0; o < 5; o++){ s += value(L, N, x * f + o * 7.3, y * f + o * 3.1) * amp; w += amp; amp *= .5; f *= 2; } return s / w; }; }
+  return { fbm, rng };
+})();
+/* Terrain height used by several visuals: fBm with a soft island falloff, normalised to 0..1 */
+function buildHeightfield(n, seed, scale = .42){
+  const f = Noise.fbm(seed), H = []; let mn = 1e9, mx = -1e9;
+  for (let i = 0; i < n; i++){ H[i] = []; for (let j = 0; j < n; j++){
+    const u = i / (n - 1) * scale, v = j / (n - 1) * scale; let h = f(u, v); const ridge = 1 - Math.abs(f(u * 1.7 + 3, v * 1.7 + 1) * 2 - 1);
+    h = h * .6 + ridge * ridge * .55; H[i][j] = h; mn = Math.min(mn, h); mx = Math.max(mx, h); } }
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){ const t = (H[i][j] - mn) / (mx - mn); H[i][j] = Math.pow(t, 1.35); }
+  return H;
+}
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function tween(ms, fn, done){ if (reduceMotion){ fn(1); done && done(); return; } const t0 = performance.now();
+  (function f(now){ const t = Math.min(1, (now - t0) / ms); fn(1 - Math.pow(1 - t, 3)); if (t < 1) requestAnimationFrame(f); else done && done(); })(t0); }
+
+/* ===========================================================
+   SLIDE 06 — numbers → heightmap → rising wireframe terrain
+   =========================================================== */
+const Viz06 = (() => {
+  const N = 49, H = buildHeightfield(N, 11);
+  const hm = document.getElementById('hmCanvas'), nums = document.getElementById('hmNums'), panel = document.getElementById('hmPanel');
+  const mc = document.getElementById('meshCanvas'), ctx = mc.getContext('2d');
+  let rise = 0;
+  // 5×5 sampled numbers shown before the heightmap appears
+  for (let a = 0; a < 5; a++) for (let b = 0; b < 5; b++){ const s = document.createElement('span'); s.textContent = H[Math.round(b * 11 + 2)][Math.round(a * 11 + 2)].toFixed(2).replace('.', ','); nums.appendChild(s); }
+  // grayscale heightmap image
+  (() => { const c = hm.getContext('2d'), img = c.createImageData(N, N);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){ const v = H[i][j] * 255, k = (j * N + i) * 4; img.data[k] = v; img.data[k + 1] = v; img.data[k + 2] = v; img.data[k + 3] = 255; }
+    const t = document.createElement('canvas'); t.width = N; t.height = N; t.getContext('2d').putImageData(img, 0, 0);
+    c.imageSmoothingEnabled = true; c.drawImage(t, 0, 0, 500, 500); })();
+  function draw(){
+    const W = mc.width, Hh = mc.height; ctx.clearRect(0, 0, W, Hh);
+    const cx = W * .5, cy = Hh * .32, sx = W * .0092, sy = W * .0046, amp = Hh * .42 * rise;
+    const P = (i, j) => [cx + (i - j) * sx * 1.02, cy + (i + j) * sy - H[i][j] * amp];
+    ctx.lineWidth = 2;
+    const bands = 6, paths = Array.from({ length: bands }, () => new Path2D());
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++){
+      const p = P(i, j);
+      if (i + 1 < N){ const q = P(i + 1, j), b = Math.min(bands - 1, Math.floor((H[i][j] + H[i + 1][j]) / 2 * bands)); paths[b].moveTo(p[0], p[1]); paths[b].lineTo(q[0], q[1]); }
+      if (j + 1 < N){ const q = P(i, j + 1), b = Math.min(bands - 1, Math.floor((H[i][j] + H[i][j + 1]) / 2 * bands)); paths[b].moveTo(p[0], p[1]); paths[b].lineTo(q[0], q[1]); }
+    }
+    for (let b = 0; b < bands; b++){
+      const t = b / (bands - 1);
+      // flat plane: neutral grey; risen terrain: teal lowlands → gold peaks
+      const r = Math.round(73 + (233 - 73) * t * rise + (152 - 73) * (1 - rise)), g = Math.round(214 + (184 - 214) * t * rise + (165 - 214) * (1 - rise)), bl = Math.round(193 + (114 - 193) * t * rise + (179 - 193) * (1 - rise));
+      ctx.strokeStyle = `rgba(${r},${g},${bl},${.38 + .45 * t * rise})`; ctx.stroke(paths[b]);
+    }
+  }
+  return {
+    enter(){ rise = 0; panel.classList.remove('on-map'); draw(); },
+    step(action, on){
+      if (action === 'heightmap') panel.classList.toggle('on-map', on);
+      if (action === 'rise'){ const from = rise, to = on ? 1 : 0; tween(2600, t => { rise = from + (to - from) * t; draw(); }); }
+    },
+    reveal(){ panel.classList.add('on-map'); rise = 1; draw(); }
+  };
+})();
+
+/* ===========================================================
+   SLIDE 10 — terrain cross-section before / after erosion
+   =========================================================== */
+const Viz10 = (() => {
+  const svg = document.getElementById('erosionSvg'), NS = 'http://www.w3.org/2000/svg', W = 980, Hh = 420, n = 140;
+  const r = Noise.rng(5), f = Noise.fbm(23);
+  const before = [], after = [];
+  for (let i = 0; i < n; i++){ const x = i / (n - 1); before.push(.25 + f(x * 1.4, .37) * .55 + Math.sin(x * 9) * .05 + (r() - .5) * .06); }
+  // illustrative "erosion": smoothed profile, peaks lowered, valleys filled with sediment
+  const sm = before.map((_, i) => { let s = 0, w = 0; for (let k = -6; k <= 6; k++){ const j = Math.min(n - 1, Math.max(0, i + k)), ww = Math.exp(-k * k / 18); s += before[j] * ww; w += ww; } return s / w; });
+  const mean = sm.reduce((a, b) => a + b) / n;
+  for (let i = 0; i < n; i++) after.push(sm[i] > mean ? sm[i] - (sm[i] - mean) * .22 : sm[i] + (mean - sm[i]) * .28);
+  const X = i => i / (n - 1) * W, Y = h => Hh - h * Hh * .95;
+  const line = arr => arr.map((h, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(h).toFixed(1)).join(' ');
+  const el = (t, a) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; };
+  el('line', { x1: 0, y1: Hh, x2: W, y2: Hh, stroke: 'rgba(243,245,247,.2)', 'stroke-width': 2 });
+  const sed = el('path', { fill: 'rgba(233,184,114,.55)', opacity: 0 });
+  const pBefore = el('path', { d: line(before), fill: 'none', stroke: '#98A5B3', 'stroke-width': 4, 'stroke-linejoin': 'round' });
+  const pAfter = el('path', { d: line(before), fill: 'none', stroke: '#49D6C1', 'stroke-width': 5, 'stroke-linejoin': 'round', opacity: 0 });
+  // sediment = area where the eroded profile lies above the original one
+  let sd = ''; for (let i = 0; i < n; i++) sd += (i ? 'L' : 'M') + X(i) + ' ' + Y(Math.max(after[i], before[i]));
+  for (let i = n - 1; i >= 0; i--) sd += 'L' + X(i) + ' ' + Y(before[i]); sed.setAttribute('d', sd + 'Z');
+  // water droplets sliding down the slopes of the eroded profile
+  const drops = [];
+  for (let k = 0; k < 9; k++) drops.push(el('circle', { r: 6, fill: '#49D6C1', opacity: 0 }));
+  let running = false, raf = 0;
+  function animateDrops(){
+    const t0 = performance.now();
+    const seeds = drops.map((_, k) => ({ i: Math.floor(n * (k + .5) / drops.length), off: k * 0.37 }));
+    (function frame(now){
+      if (!running) return;
+      drops.forEach((d, k) => { const s = seeds[k]; const phase = ((now - t0) / 2600 + s.off) % 1;
+        // walk downhill from the seed point
+        let i = s.i; const steps = Math.floor(phase * 22); for (let q = 0; q < steps; q++){ const l = Math.max(0, i - 1), rr = Math.min(n - 1, i + 1); const nx = after[l] < after[rr] ? l : rr; if (after[nx] < after[i]) i = nx; }
+        d.setAttribute('cx', X(i)); d.setAttribute('cy', Y(after[i]) - 8); d.setAttribute('opacity', (Math.sin(phase * Math.PI) * .9).toFixed(2)); });
+      raf = requestAnimationFrame(frame); })(t0);
+  }
+  return {
+    enter(){ pAfter.setAttribute('opacity', 0); pAfter.setAttribute('d', line(before)); sed.setAttribute('opacity', 0); pBefore.setAttribute('opacity', 1); drops.forEach(d => d.setAttribute('opacity', 0)); },
+    leave(){ running = false; cancelAnimationFrame(raf); },
+    step(action, on){
+      if (action !== 'erode') return;
+      document.getElementById('legAfter').classList.toggle('on', on); document.getElementById('legSed').classList.toggle('on', on);
+      if (on){ pAfter.setAttribute('opacity', 1); pBefore.setAttribute('opacity', .45);
+        tween(2400, t => { pAfter.setAttribute('d', line(before.map((b, i) => b + (after[i] - b) * t))); sed.setAttribute('opacity', (t * .9).toFixed(2)); });
+        if (!reduceMotion){ running = true; animateDrops(); } }
+      else { running = false; this.enter(); }
+    }
+  };
+})();
+
+/* ===========================================================
+   SLIDE 11 — CPU (sequential) vs GPU (parallel) tiles
+   =========================================================== */
+(() => {
+  const cpu = document.getElementById('cpuGrid'), gpu = document.getElementById('gpuGrid'), r = Noise.rng(3);
+  for (let k = 0; k < 64; k++){
+    const a = document.createElement('div'); a.className = 'tile'; a.style.setProperty('--t', (k * 0.11).toFixed(2) + 's'); cpu.appendChild(a);
+    const b = document.createElement('div'); b.className = 'tile'; b.style.setProperty('--t', (r() * 0.25).toFixed(2) + 's'); gpu.appendChild(b);
+  }
+})();
+
+/* ===========================================================
+   SLIDE 12 — hill-shaded map split into 9×9 chunks + frustum culling
+   =========================================================== */
+const Viz12 = (() => {
+  const c = document.getElementById('chunkCanvas'), ctx = c.getContext('2d'), N = 190, H = buildHeightfield(N, 41);
+  const img = ctx.createImageData(N, N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){
+    const dx = H[Math.min(N - 1, i + 1)][j] - H[Math.max(0, i - 1)][j], dy = H[i][Math.min(N - 1, j + 1)] - H[i][Math.max(0, j - 1)];
+    const shade = Math.max(0, Math.min(1, .55 - dx * 5 - dy * 3)), h = H[i][j], k = (j * N + i) * 4;
+    img.data[k] = 16 + shade * 85 + h * 70; img.data[k + 1] = 22 + shade * 92 + h * 52; img.data[k + 2] = 30 + shade * 90 + h * 30; img.data[k + 3] = 255; }
+  const t = document.createElement('canvas'); t.width = N; t.height = N; t.getContext('2d').putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(t, 0, 0, 760, 760);
+  const cells = document.getElementById('chunkCells');
+  // frustum triangle (camera at bottom-centre): apex (380,735), far edge y=60, x 70..690
+  const inside = (x, y) => { const tt = (735 - y) / 675; if (tt < 0 || tt > 1) return false; const half = 310 * tt; return Math.abs(x - 380) <= half + 20; };
+  for (let row = 0; row < 9; row++) for (let col = 0; col < 9; col++){
+    const d = document.createElement('div'); d.className = 'cell'; d.style.setProperty('--t', ((row + col) * 0.07 + .5).toFixed(2) + 's');
+    const cx = col * 760 / 9 + 42, cy = row * 760 / 9 + 42; d.classList.add(inside(cx, cy) ? 'in' : 'out'); cells.appendChild(d); }
+  const map = document.getElementById('chunkMap'), fr = document.getElementById('frustum');
+  return { step(_a, on){ map.classList.toggle('cull', on); fr.classList.toggle('on', on); }, enter(){ map.classList.remove('cull'); fr.classList.remove('on'); } };
+})();
+// slide 12's culling is driven by the copy-line step; wire it up via data-action
+document.querySelector('.s12 .copy .step').dataset.action = 'cull';
+
+/* ===========================================================
+   SLIDE 13 — the same terrain patch at five LOD levels
+   =========================================================== */
+const Viz13 = (() => {
+  const c = document.getElementById('lodCanvas'), ctx = c.getContext('2d'), N = 33, H = buildHeightfield(N, 77);
+  const levels = [32, 16, 8, 4, 2]; let shown = 0;
+  function patch(k, alpha){
+    const q = levels[k], step = (N - 1) / q, slot = c.width / 5, cx = slot * k + slot / 2, cy = c.height * .3, s = slot * .0135, amp = c.height * .32;
+    const P = (i, j) => { const ii = Math.round(i * step), jj = Math.round(j * step); return [cx + (i * step - j * step) * s, cy + (i * step + j * step) * s * .5 - H[ii][jj] * amp]; };
+    ctx.strokeStyle = k === 0 ? `rgba(73,214,193,${.75 * alpha})` : `rgba(243,245,247,${(.62 - k * .05) * alpha})`; ctx.lineWidth = k === 0 ? 1.6 : 2.2;
+    ctx.beginPath();
+    for (let i = 0; i <= q; i++) for (let j = 0; j <= q; j++){
+      const p = P(i, j);
+      if (i < q){ const r = P(i + 1, j); ctx.moveTo(p[0], p[1]); ctx.lineTo(r[0], r[1]); }
+      if (j < q){ const r = P(i, j + 1); ctx.moveTo(p[0], p[1]); ctx.lineTo(r[0], r[1]); }
+      if (i < q && j < q){ const r = P(i + 1, j + 1); ctx.moveTo(p[0], p[1]); ctx.lineTo(r[0], r[1]); } // triangle diagonal
+    }
+    ctx.stroke();
+  }
+  function drawAll(progress){ ctx.clearRect(0, 0, c.width, c.height); for (let k = 0; k < 5; k++){ const a = Math.max(0, Math.min(1, progress * 5 - k)); if (a > 0) patch(k, a); } }
+  return { enter(){ tween(1600, t => drawAll(t)); }, reveal(){ drawAll(1); } };
+})();
+
+/* ===========================================================
+   SLIDE 14 — demo video (muted, no audio track); plays while the slide is shown
+   =========================================================== */
+const Video14 = (() => {
+  const v = document.getElementById('demoVideo'), slide = v.closest('.slide');
+  v.addEventListener('play', () => slide.classList.add('playing'));
+  v.addEventListener('pause', () => slide.classList.remove('playing'));
+  v.addEventListener('click', () => v.paused ? v.play() : v.pause());
+  v.addEventListener('error', () => showPlaceholder(v, 'assets/pwg/pwg-demo.mp4', 'Nagranie demonstracyjne PWG — patrz ASSETS_NEEDED.md'));
+  return { enter(){ v.currentTime = 0; if (!reduceMotion) v.play().catch(() => {}); }, leave(){ v.pause(); }, toggle(){ v.paused ? v.play().catch(() => {}) : v.pause(); } };
+})();
+
+/* ===========================================================
+   MISSING-ASSET PLACEHOLDERS — any image/video that fails to load is
+   replaced by a clearly marked box naming the expected file.
+   =========================================================== */
+function showPlaceholder(el, path, label){
+  const box = document.createElement('div'); box.className = 'ph';
+  box.innerHTML = `<div>BRAK PLIKU</div><div>${path}</div><small>${label || 'Podmień plik w folderze assets/ — patrz ASSETS_NEEDED.md'}</small>`;
+  const host = el.parentElement; if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  el.style.display = 'none'; host.appendChild(box);
+}
+document.querySelectorAll('.deck-stage img').forEach(img => {
+  const fail = () => showPlaceholder(img, img.getAttribute('src'), img.alt);
+  if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) fail(); else img.addEventListener('error', fail);
+});
+
+/* ===========================================================
+   SLIDE PRESENTATION CONTROLLER
+   - fixed 1920×1080 stage scaled to the window
+   - progressive steps (.step) before moving to the next slide
+   - keyboard, wheel, touch navigation; URL hash (#n) deep links
+   =========================================================== */
+const hooks = { 's06': Viz06, 's10': Viz10, 's12': Viz12, 's13': Viz13, 's14': Video14 };
+class SlidePresentation {
+  constructor(){
+    this.stage = document.getElementById('deckStage');
+    this.slides = [...document.querySelectorAll('.slide')];
+    this.steps = this.slides.map(s => [...s.querySelectorAll('.step')]);
+    this.current = -1; this.stepIdx = 0; this.notesOpen = false; this.speakerWin = null; this.t0 = null;
+    this.setupStageScale(); this.setupKeyboardNav(); this.setupWheelNav(); this.setupTouchNav();
+    const fromHash = parseInt(location.hash.slice(1), 10);
+    this.go(isNaN(fromHash) ? 0 : fromHash, 0);
+    window.addEventListener('hashchange', () => { const n = parseInt(location.hash.slice(1), 10); if (!isNaN(n) && n !== this.current) this.go(n, 0); });
+  }
+  setupStageScale(){
+    const scale = () => { const f = Math.min(innerWidth / 1920, innerHeight / 1080);
+      this.stage.style.transform = `translate(${(innerWidth - 1920 * f) / 2}px, ${(innerHeight - 1080 * f) / 2}px) scale(${f})`; };
+    scale(); addEventListener('resize', scale);
+  }
+  hook(i){ const s = this.slides[i]; if (!s) return null; const k = [...s.classList].find(c => hooks[c]); return k ? hooks[k] : null; }
+  go(index, stepIdx){
+    index = Math.max(0, Math.min(index, this.slides.length - 1));
+    const prev = this.current;
+    if (index !== prev){
+      if (prev >= 0){ const p = this.slides[prev]; p.classList.remove('active', 'visible'); p.classList.add('leaving'); setTimeout(() => p.classList.remove('leaving'), 700); const h = this.hook(prev); h && h.leave && h.leave(); }
+      this.current = index; const s = this.slides[index]; s.classList.remove('leaving');
+      // reset steps, then show slide
+      this.steps[index].forEach(st => { st.classList.remove('on'); });
+      void s.offsetWidth; s.classList.add('active', 'visible');
+      const h = this.hook(index); h && h.enter && h.enter();
+      this.stepIdx = 0;
+      // when stepping backwards into a slide, reveal all its steps instantly
+      const target = stepIdx === 'all' ? this.steps[index].length : stepIdx;
+      for (let k = 0; k < target; k++) this.applyStep(k, true);
+      if (stepIdx === 'all' && h && h.reveal) h.reveal();
+      if (history.replaceState) history.replaceState(null, '', '#' + index);
+      if (!this.t0 && index > 0) this.t0 = Date.now();
+    }
+    this.updateChrome();
+  }
+  applyStep(k, on){
+    const st = this.steps[this.current][k]; if (!st) return;
+    st.classList.toggle('on', on);
+    const action = st.dataset.action, h = this.hook(this.current);
+    if (action && h && h.step) h.step(action, on);
+    if (st.id === 'gpuUnit') st.classList.toggle('on', on);
+    this.stepIdx = on ? k + 1 : k;
+  }
+  next(){ if (this.stepIdx < this.steps[this.current].length) { this.applyStep(this.stepIdx, true); this.updateChrome(); } else if (this.current < this.slides.length - 1) this.go(this.current + 1, 0); }
+  prev(){ if (this.stepIdx > 0){ this.applyStep(this.stepIdx - 1, false); this.updateChrome(); } else if (this.current > 0) this.go(this.current - 1, 'all'); }
+  setupKeyboardNav(){
+    document.addEventListener('keydown', e => {
+      if (e.target.isContentEditable) return;
+      const k = e.key;
+      if (['ArrowRight', 'ArrowDown', ' ', 'PageDown', 'Enter'].includes(k)){ e.preventDefault(); this.next(); }
+      else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)){ e.preventDefault(); this.prev(); }
+      else if (k === 'Home'){ e.preventDefault(); this.go(0, 0); }
+      else if (k === 'End'){ e.preventDefault(); this.go(this.slides.length - 1, 0); }
+      else if (k === 'f' || k === 'F'){ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
+      else if (k === 'n' || k === 'N'){ this.notesOpen = !this.notesOpen; this.updateChrome(); }
+      else if (k === 's' || k === 'S'){ this.openSpeaker(); }
+      else if (k === 'b' || k === 'B' || k === '.'){ document.getElementById('blackout').classList.toggle('on'); }
+      else if (k === 'p' || k === 'P'){ if (this.slides[this.current].classList.contains('s14')) Video14.toggle(); }
+      else if (k === '?' || k === 'h' || k === 'H'){ document.getElementById('help').classList.toggle('open'); }
+      else if (k === 'Escape'){ document.getElementById('help').classList.remove('open'); }
+    });
+  }
+  setupWheelNav(){ let lock = 0; addEventListener('wheel', e => { if (Date.now() - lock < 700 || Math.abs(e.deltaY) < 20) return; lock = Date.now(); e.deltaY > 0 ? this.next() : this.prev(); }, { passive: true }); }
+  setupTouchNav(){ let x0 = null; addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+    addEventListener('touchend', e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 50) dx < 0 ? this.next() : this.prev(); x0 = null; }, { passive: true }); }
+  notesHTML(i){ const n = this.slides[i] && this.slides[i].querySelector('.notes'); return n ? n.innerHTML : ''; }
+  updateChrome(){
+    const total = this.slides.length, i = this.current, s = this.slides[i], nSteps = this.steps[i].length;
+    document.getElementById('counter').textContent = `${String(i).padStart(2, '0')} / ${String(total - 1).padStart(2, '0')}` + (nSteps ? `  ·  ${this.stepIdx}/${nSteps}` : '');
+    document.getElementById('progress').style.width = (i / (total - 1) * 100) + '%';
+    const panel = document.getElementById('notesPanel');
+    panel.classList.toggle('open', this.notesOpen);
+    panel.innerHTML = `<h4>${String(i).padStart(2, '0')} · ${s.dataset.title}</h4>` + this.notesHTML(i);
+    this.updateSpeaker();
+  }
+  /* separate presenter window: current notes, next slide, elapsed time */
+  openSpeaker(){
+    if (this.speakerWin && !this.speakerWin.closed){ this.speakerWin.focus(); return; }
+    const w = window.open('', 'pwg-speaker', 'width=900,height=700'); if (!w) return; this.speakerWin = w;
+    w.document.write(`<!DOCTYPE html><html lang="pl"><head><meta charset="utf-8"><title>Notatki — PWG</title><style>
+      body{margin:0;background:#10141C;color:#F3F5F7;font:400 21px/1.55 'Bricolage Grotesque',system-ui,sans-serif;padding:28px 36px}
+      h1{font-size:34px;margin:6px 0 18px} .meta{font:500 15px monospace;color:#49D6C1;letter-spacing:.12em;display:flex;justify-content:space-between}
+      .tr{color:#E9B872} .next{margin-top:28px;padding-top:16px;border-top:1px solid #2a3440;color:#98A5B3;font-size:17px} .timer{font:700 28px monospace;color:#E9B872}
+      </style></head><body><div class="meta"><span id="pos"></span><span class="timer" id="timer">00:00</span></div><h1 id="title"></h1><div id="notes"></div><div class="next" id="next"></div></body></html>`);
+    w.document.close();
+    w.addEventListener('keydown', e => { if (['ArrowRight', ' ', 'PageDown'].includes(e.key)){ e.preventDefault(); this.next(); } if (['ArrowLeft', 'PageUp'].includes(e.key)){ e.preventDefault(); this.prev(); } });
+    clearInterval(this.timerId);
+    this.timerId = setInterval(() => { if (!w.closed && this.t0){ const s = Math.floor((Date.now() - this.t0) / 1000); w.document.getElementById('timer').textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); } }, 1000);
+    this.updateSpeaker();
+  }
+  updateSpeaker(){
+    const w = this.speakerWin; if (!w || w.closed) return; const i = this.current, s = this.slides[i], nx = this.slides[i + 1];
+    const d = w.document, nSteps = this.steps[i].length;
+    d.getElementById('pos').textContent = `SLAJD ${i} / ${this.slides.length - 1}` + (nSteps ? ` · KROK ${this.stepIdx}/${nSteps}` : '') + ` · ~${(s.querySelector('.notes') || {}).dataset?.time || '?'} s`;
+    d.getElementById('title').textContent = s.dataset.title;
+    d.getElementById('notes').innerHTML = this.notesHTML(i);
+    d.getElementById('next').textContent = nx ? 'Następny: ' + nx.dataset.title : 'Koniec prezentacji';
+  }
+}
+const deck = new SlidePresentation();
+
+/* ===========================================================
+   INLINE EDITING (E) — edits are kept in localStorage; Ctrl+S downloads the edited HTML
+   =========================================================== */
+const editor = (() => {
+  const KEY = 'pwg-deck-edits-v1', els = [...document.querySelectorAll('[data-editable]')];
+  try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved && saved.length === els.length) els.forEach((e, i) => { if (saved[i] != null) e.innerHTML = saved[i]; }); } catch (_) {}
+  const btn = document.getElementById('editToggle');
+  const api = { isActive: false,
+    toggleEditMode(){ this.isActive = !this.isActive; document.body.classList.toggle('editing', this.isActive); btn.classList.toggle('active', this.isActive);
+      els.forEach(e => e.contentEditable = this.isActive ? 'true' : 'false'); if (!this.isActive) this.save(); },
+    save(){ try { localStorage.setItem(KEY, JSON.stringify(els.map(e => e.innerHTML))); } catch (_) {} },
+    download(){ this.save(); const clone = document.documentElement.cloneNode(true); clone.querySelectorAll('[contenteditable]').forEach(e => e.removeAttribute('contenteditable'));
+      clone.querySelector('body').classList.remove('editing'); clone.querySelectorAll('.slide').forEach(s => s.classList.remove('active', 'visible', 'leaving'));
+      const blob = new Blob(['<!DOCTYPE html>\n' + clone.outerHTML], { type: 'text/html' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'index.html'; a.click(); } };
+  btn.addEventListener('click', () => api.toggleEditMode());
+  const hz = document.getElementById('editHotzone'); let hide = null;
+  hz.addEventListener('mouseenter', () => { clearTimeout(hide); btn.classList.add('show'); });
+  hz.addEventListener('mouseleave', () => { hide = setTimeout(() => { if (!api.isActive) btn.classList.remove('show'); }, 400); });
+  btn.addEventListener('mouseenter', () => clearTimeout(hide));
+  btn.addEventListener('mouseleave', () => { hide = setTimeout(() => { if (!api.isActive) btn.classList.remove('show'); }, 400); });
+  hz.addEventListener('click', () => api.toggleEditMode());
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'e' || e.key === 'E') && !e.target.isContentEditable){ api.toggleEditMode(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 's'){ e.preventDefault(); api.download(); }
+  });
+  document.addEventListener('input', () => api.save());
+  return api;
+})();
+</script>
+</body>
+</html>
