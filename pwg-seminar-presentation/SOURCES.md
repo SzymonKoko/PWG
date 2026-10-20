@@ -12,14 +12,14 @@ Wszystkie pliki w `assets/pwg/` pochodzą z własnych nagrań i materiałów aut
 | `lake-valley.jpg` | klatka z `mount1.mp4` | 05 |
 | `params-a/b/c.jpg` | klatki z `Videos/2026-04-09 17-04-06.mp4` (wczesna wersja PWG, ta sama kamera) | 07 |
 | `mask-elev/mountain/height/final.png` | podglądy TerrainDebug ze sprawozdania z postępów (`Desktop/Sprawozdanie_z_postepów_projektu/images/elev.png`, `mountain.png`, `height.png`, `final.png`); kanał R przekonwertowany na skalę szarości | 08, 11 |
-| `slope-river.jpg` | klatka z `Videos/mount2.mp4` | 10 |
-| `pwg-demo.mp4` | montaż (bez efektów) z nagrań: `2026-07-13 19-38-20.mp4` (graf), `2026-07-13 20-23-36.mp4` (erozja), `2026-07-13 20-26-13.mp4` (materiały/jeziora), `mount1.mp4`, `mount2.mp4` (eksploracja) | 14 |
-| `editor-ui.jpg` | klatka z `2026-07-13 19-38-20.mp4` (plakat wideo) | 14 |
+| `erosion-sim.mp4`, `erosion-sim-poster.jpg` | nagranie `assets/pwg/nowe/2026-10-20 19-19-58 - Trim.mp4` (20.10.2026): symulacja erozji z podglądem cząstek, stała kamera; bez pierwszych 0,5 s (kursor), bez dźwięku, 1280 × 720 | 10 |
+| `pwg-demo.mp4`, `pwg-demo-poster.jpg` | montaż ok. 51 s (bez efektów) z przelotów w trybie eksploracji: `mount1.mp4` (12–30 s), `mount2.mp4` (112–127 s), `nowe/pustynia.mp4` (5–15 s), `mount1.mp4` (50–58 s) | 14 |
+| `desert-dunes.jpg` | klatka z `assets/pwg/nowe/pustynia.mp4` (9 s) | 17 (drugie tło) |
 | `dusk-ridge.jpg` | klatka z `mount2.mp4` | 15 |
 | `mountain-snow.jpg` | klatka z `mount2.mp4` | 16 |
 | `tree-ridge.jpg` | klatka z `mount2.mp4` | 17 |
 
-Pozostałe klatki w `assets/pwg/` (`island-*.jpg`, `lake-cliffs.jpg`, `river-grass.jpg`, `graph-*.jpg`, `editor-materials.jpg`) są zapasowymi zrzutami do ewentualnej podmiany.
+Pozostałe klatki w `assets/pwg/` (`island-*.jpg`, `lake-cliffs.jpg`, `river-grass.jpg`, `slope-river.jpg`, `graph-*.jpg`, `editor-ui.jpg`, `editor-materials.jpg`) są zapasowymi zrzutami do ewentualnej podmiany. Folder `assets/pwg/nowe/` zawiera surowe nagrania źródłowe i jest wyłączony z repozytorium (`.gitignore`).
 
 Ilustracje na slajdach 06, 10, 12 i 13 (siatka, przekrój erozji, mapa chunków, siatki LOD) są **ilustracjami poglądowymi** rysowanymi w przeglądarce. Dane liczbowe na nich pochodzą z kodu PWG:
 - 5 poziomów LOD, krok `1 << lod`, chunk 129 wierzchołków → 128/64/32/16/8 kwadratów na bok: `src/terrain/lod/LODManager.cpp`, `src/graphics/mesh/meshManager.cpp` (`CreatePlaneMesh`).

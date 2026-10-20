@@ -10,7 +10,7 @@ Jeśli plik zniknie albo będzie miał złą nazwę, slajd pokaże przerywaną r
 
 | Plik | Slajd | Co jest teraz | Co nagrać |
 |---|---|---|---|
-| `pwg-demo.mp4` | 14 | Montaż ok. 90 s z nagrań lipcowych i wrześniowych: graf → teren → erozja → materiały/jeziora → eksploracja. Brakuje podglądu masek debug i wyraźnego przełączenia Editor → Play. | Jedno ciągłe nagranie 60–90 s (1920 × 1080 lub 1280 × 720, H.264, bez dźwięku): 1) tryb edytora, 2) zmiana parametru w nodzie, 3) Run Graph, 4) podgląd masek / tryb debug, 5) przełączenie na tryb eksploracji, 6) przelot kamery. Plakat: `editor-ui.jpg`. |
+| `pwg-demo.mp4` | 14 | Montaż ok. 51 s z samych przelotów w trybie eksploracji: góry z jeziorem → zbocza i rzeki → pustynia → widok całej mapy. Fragmenty z edytora zostały usunięte na życzenie autora. | Opcjonalnie: krótki fragment z edytora (zmiana parametru → Run Graph → podgląd masek), jeśli na seminarium ma być widoczny sam proces tworzenia. Plakat: `pwg-demo-poster.jpg`. |
 | `params-a.jpg`, `params-b.jpg`, `params-c.jpg` | 07 | Wczesna wersja PWG (kwiecień 2026), płaski kolor, ta sama kamera. Na slajdzie podpisane jako „wczesna wersja”. | Trzy zrzuty z aktualnej wersji z **identycznej kamery**, różniące się jednym parametrem (np. frequency albo seed). Jeśli podmienisz, zmień etykietę na slajdzie 07 (tekst `PWG · wczesna wersja · ta sama kamera`) i zdanie w notatkach. |
 | `mask-elev.png`, `mask-mountain.png`, `mask-height.png`, `mask-final.png` | 08 (`mask-final` także w tle siatki na 11) | Prawdziwe podglądy TerrainDebug ze starszej wersji (passy Elevation / MountainMask / MountainHeight / Final), 208 px, przeskalowane. | Podglądy masek z aktualnego grafu (np. Noise Height, Noise Mask, Slope Mask, Output Height), kwadratowe, min. 480 × 480, w skali szarości. Przy zmianie nazw nodów zaktualizuj podpisy na slajdzie 08. |
 
@@ -20,7 +20,7 @@ Jeśli plik zniknie albo będzie miał złą nazwę, slajd pokaże przerywaną r
 |---|---|---|
 | `chunks-debug.jpg` | 12 | Widok z góry z zaznaczonymi granicami chunków (jeśli tryb debug je rysuje) albo wireframe całej mapy. Wymaga małej zmiany w HTML: dodaj `<img class="bgimg" src="assets/pwg/chunks-debug.jpg">` w `.s12 .map` zamiast `<canvas>`. |
 | `lod-wireframe.jpg` | 13 | Wireframe terenu (Debug → Wireframe) z daleka, na którym widać gęstsze chunki blisko kamery i rzadsze w oddali. |
-| `erosion-before.jpg` / `erosion-after.jpg` | 10 | Ten sam kadr przed i po erozji hydraulicznej (Reset Erosion → zrzut → Start Erosion → zrzut). Teraz slajd ma poglądowy przekrój i prawdziwy zrzut koryta (`slope-river.jpg`). |
+| *(zrobione 20.10)* | 10 | Slajd pokazuje teraz prawdziwe nagranie symulacji erozji z cząstkami (`erosion-sim.mp4`). Opcjonalnie: dłuższe ujęcie od `Reset Erosion` do stanu końcowego, w którym zmiana jest bardziej widoczna. Wtedy podmień `erosion-sim.mp4` i `erosion-sim-poster.jpg`. |
 
 ## Dane, których prezentacja świadomie NIE zawiera
 

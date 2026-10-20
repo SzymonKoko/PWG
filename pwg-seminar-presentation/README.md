@@ -33,7 +33,7 @@ Przed wystąpieniem przejdź raz całą prezentację, żeby przeglądarka zbufor
 | E | tryb edycji tekstów (Ctrl+S pobiera zmieniony `index.html`) |
 | ? | pomoc |
 
-Działają też kółko myszy i przesunięcie palcem. Adres `index.html#7` otwiera wprost slajd 7.
+Działają też kółko myszy i przesunięcie palcem. Adres `index.html#7` otwiera wprost slajd 7, a `index.html#17.1` otwiera slajd 17 z odsłoniętym pierwszym krokiem.
 
 Licznik w prawym dolnym rogu pokazuje `slajd / ostatni · krok / liczba kroków`.
 

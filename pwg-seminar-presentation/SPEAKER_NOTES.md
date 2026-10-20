@@ -24,11 +24,11 @@ Plik generowany z notatek w `index.html` (`<aside class="notes">`) skryptem `too
 | 11 | Kto wykonuje obliczenia? | 50 s |
 | 12 | Chunki. | 45 s |
 | 13 | LOD — Level of Detail. | 45 s |
-| 14 | PWG w praktyce. | 65 s |
+| 14 | PWG w praktyce. | 55 s |
 | 15 | Czy ten świat działa poprawnie? | 50 s |
 | 16 | Świat nadal się rozwija. | 45 s |
 | 17 | Nie stworzyłem jednej mapy. | 30 s |
-| | **Razem** | **830 s ≈ 13.8 min** |
+| | **Razem** | **820 s ≈ 13.7 min** |
 
 ## 00 · Tytuł
 
@@ -204,7 +204,7 @@ Szum daje kształt, ale nie daje historii. Prawdziwe góry są wyrzeźbione prze
 
 [Klik] PWG symuluje to na dwa sposoby. Erozja hydrauliczna to tysiące cząstek wody liczonych na GPU: każda spływa po zboczu, wymywa materiał, przenosi go i odkłada niżej — szczyty się obniżają, a doliny wypełniają osadem. Erozja termiczna zsuwa materiał ze zboczy zbyt stromych, aż osiągną stabilny kąt.
 
-[Klik] Obie symulacje są zaimplementowane i działają interaktywnie — to jednak uproszczone modele na mapie wysokości, a nie pełna symulacja fizyczna. Na tak ukształtowanym terenie osobny generator hydrologii wyznacza rzeki i jeziora — jedno z takich koryt widać na zdjęciu.
+[Klik] Obie symulacje są zaimplementowane i działają interaktywnie — to jednak uproszczone modele na mapie wysokości, a nie pełna symulacja fizyczna. Po prawej widać nagranie z PWG: symulacja działa na żywo, a białe punkty to cząstki wody, które spływają po zboczach i przenoszą materiał. Na tak ukształtowanym terenie osobny generator hydrologii wyznacza potem rzeki i jeziora.
 
 **Przejście:** Takie symulacje to miliony obliczeń. Kto je wykonuje?
 
@@ -260,15 +260,15 @@ Pojedynczy chunk w pełnej rozdzielczości ma 128 na 128 kwadratów, czyli ponad
 
 ## 14 · PWG w praktyce.
 
-**Czas:** ok. 65 s
+**Czas:** ok. 55 s
 
 **Narracja:**
 
-To są nagrania z PWG, bez montażu efektów. Najpierw edytor grafu — buduję prosty graf: generator szumu, stała i mnożenie, podłączone do wyjścia wysokości.
+To są nagrania z PWG, bez żadnych efektów dodanych w montażu — przelot kamery w trybie eksploracji.
 
-Potem wynik w widoku 3D edytora, przebieg erozji na terenie i dobór materiałów z jeziorami.
+Najpierw górski świat: jezioro, którego poziom wyznaczył generator hydrologii, zbocza wyrzeźbione erozją, rzeki, wodospady i roślinność rozmieszczona proceduralnie.
 
-A na końcu tryb eksploracji: przelot kamery nad wygenerowanym światem — jeziora, rzeki, wodospady i roślinność. Wszystko, co widać, jest renderowane w czasie rzeczywistym.
+Potem zupełnie inny świat — pustynia z wydmami, stworzona tym samym silnikiem. Na koniec widok całej mapy z góry. Wszystko, co widać, jest renderowane w czasie rzeczywistym.
 
 **Przejście:** Ładny obraz to jednak za mało. Trzeba jeszcze wiedzieć, czy ten świat działa poprawnie.
 
@@ -318,7 +318,7 @@ Projekt nadal się rozwija.
 
 Na początku zapytałem, kto stworzył te światy. Odpowiedź, do której doszedłem, pisząc PWG, brzmi tak:
 
-Nie stworzyłem jednej mapy. [pauza, klik] Stworzyłem sposób na tworzenie wielu.
+Nie stworzyłem jednej mapy. [pauza, klik — tło przechodzi z gór w pustynię, też wygenerowaną w PWG] Stworzyłem sposób na tworzenie wielu.
 
 Dziękuję — chętnie odpowiem na pytania.
 
