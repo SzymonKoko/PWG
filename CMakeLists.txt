@@ -47,16 +47,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(assimp)
 
-FetchContent_Declare(
-	imguizmo
-	GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
-	GIT_TAG master
-)
-FetchContent_GetProperties(imguizmo)
-if(NOT imguizmo_POPULATED)
-	FetchContent_Populate(imguizmo)
-endif()
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(ASSET_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets)
 
@@ -80,7 +70,6 @@ set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
-	${imguizmo_SOURCE_DIR}/src/ImGuizmo.cpp
 )
 
 # Group source files in Visual Studio
@@ -130,7 +119,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/libs
 	${imgui_SOURCE_DIR}
-	${imguizmo_SOURCE_DIR}/src
     ${imgui_SOURCE_DIR}/backends
 )
 
