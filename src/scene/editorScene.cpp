@@ -519,12 +519,33 @@ void pwg::EditorScene::Update(const float& dt)
 
 void pwg::EditorScene::Draw()
 {
-    DrawOutliner();
     m_viewportInputCaptured = false;
+
+    if (!m_mainViewFullscreen)
+    {
+        DrawOutliner();
+    }
+    else
+    {
+        m_terrainGraphInputCaptured = false;
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->Pos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(viewport->Size, ImGuiCond_Always);
+        ImGui::SetNextWindowViewport(viewport->ID);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    }
 
     m_showMainView = true;
     {
-    ImGui::Begin("Main View", nullptr, ImGuiWindowFlags_NoCollapse);
+    const ImGuiWindowFlags mainViewFlags = m_mainViewFullscreen
+        ? ImGuiWindowFlags_NoDecoration |
+          ImGuiWindowFlags_NoMove |
+          ImGuiWindowFlags_NoResize |
+          ImGuiWindowFlags_NoSavedSettings |
+          ImGuiWindowFlags_NoDocking |
+          ImGuiWindowFlags_NoBringToFrontOnFocus
+        : ImGuiWindowFlags_NoCollapse;
+    ImGui::Begin(m_mainViewFullscreen ? "Main View Fullscreen" : "Main View", nullptr, mainViewFlags);
 
     ImVec2 windowSize = ImGui::GetContentRegionAvail();
 
@@ -621,6 +642,12 @@ void pwg::EditorScene::Draw()
     ImGui::EndChild();
 
     ImGui::End();
+    }
+
+    if (m_mainViewFullscreen)
+    {
+        ImGui::PopStyleVar();
+        return;
     }
 
     if (m_showTerrainControls)
@@ -970,6 +997,16 @@ bool& pwg::EditorScene::ShowVegetationLibrary()
 bool& pwg::EditorScene::ShowTerrainGraph()
 {
     return m_showTerrainGraph;
+}
+
+void pwg::EditorScene::SetMainViewFullscreen(bool fullscreen)
+{
+    m_mainViewFullscreen = fullscreen;
+}
+
+bool pwg::EditorScene::IsMainViewFullscreen() const
+{
+    return m_mainViewFullscreen;
 }
 
 const std::string& pwg::EditorScene::GetProjectLayoutIni() const

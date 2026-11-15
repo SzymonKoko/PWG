@@ -5,7 +5,7 @@ layout (r32f, binding = 0) writeonly uniform image2D u_output;
 
 uniform sampler2D u_value;
 uniform int u_size;
-uniform int u_operation; // 0 slope, 1 curvature, 2 blur
+uniform int u_operation; // 0 slope, 1 curvature, 2 blur, 3 erode, 4 dilate
 uniform int u_radius;
 uniform int u_mode; // curvature: 0 both, 1 ridges, 2 valleys
 uniform float u_scale;
@@ -69,6 +69,25 @@ void main()
             }
         }
         result = sum / max(weight, 1.0);
+    }
+    else if (u_operation == 3 || u_operation == 4)
+    {
+        int radius = clamp(u_radius, 1, 8);
+        float eroded = result;
+        float dilated = result;
+        for (int y = -8; y <= 8; ++y)
+        {
+            for (int x = -8; x <= 8; ++x)
+            {
+                if (x * x + y * y <= radius * radius)
+                {
+                    float sampleValue = ReadValue(texelCoord + ivec2(x, y));
+                    eroded = min(eroded, sampleValue);
+                    dilated = max(dilated, sampleValue);
+                }
+            }
+        }
+        result = u_operation == 3 ? eroded : dilated;
     }
 
     imageStore(u_output, texelCoord, vec4(result, 0.0, 0.0, 1.0));

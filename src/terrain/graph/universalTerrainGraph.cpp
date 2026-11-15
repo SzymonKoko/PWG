@@ -258,6 +258,12 @@ namespace pwg
 			{ "blurMask", "Blur Mask", "Terrain", { Input("mask", "Mask") }, { Output("mask", "Mask") }, {
 				IntParam("radius", "Radius", 2, 1.0f, 8.0f)
 			} },
+			{ "erodeMask", "Erode Mask", "Terrain", { Input("mask", "Mask") }, { Output("mask", "Mask") }, {
+				IntParam("radius", "Radius", 2, 1.0f, 8.0f)
+			} },
+			{ "dilateMask", "Dilate Mask", "Terrain", { Input("mask", "Mask") }, { Output("mask", "Mask") }, {
+				IntParam("radius", "Radius", 2, 1.0f, 8.0f)
+			} },
 			{ "terrace", "Terrace", "Terrain", { Input("height", "Height") }, { Output("height", "Height") }, {
 				FloatParam("min", "Min Height", 0.0f, -20000.0f, 20000.0f),
 				FloatParam("max", "Max Height", 1.0f, -20000.0f, 20000.0f),
@@ -401,7 +407,10 @@ namespace pwg
 			float b = floatParam("max", 1.0f);
 			return { std::min(a, b), std::max(a, b), true };
 		}
-		if (node->typeId == "blurMask") return inputRange("mask");
+		if (node->typeId == "blurMask" || node->typeId == "erodeMask" || node->typeId == "dilateMask")
+		{
+			return inputRange("mask");
+		}
 		if (node->typeId == "power")
 		{
 			auto value = inputRange("value");

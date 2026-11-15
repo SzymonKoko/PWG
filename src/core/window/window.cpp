@@ -108,6 +108,52 @@ void pwg::Window::EnableVSync(bool enabled)
     }
 }
 
+void pwg::Window::SetFullscreen(bool fullscreen)
+{
+    if (!m_window || m_fullscreen == fullscreen)
+    {
+        return;
+    }
+
+    if (fullscreen)
+    {
+        glfwGetWindowPos(m_window, &m_windowedX, &m_windowedY);
+        glfwGetWindowSize(m_window, &m_windowedWidth, &m_windowedHeight);
+		m_windowedMaximized = glfwGetWindowAttrib(m_window, GLFW_MAXIMIZED) == GLFW_TRUE;
+
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = monitor ? glfwGetVideoMode(monitor) : nullptr;
+        if (!monitor || !mode)
+        {
+            PWG_ERROR("Failed to enter fullscreen mode: primary monitor is unavailable");
+            return;
+        }
+
+		// Keep the existing window and OpenGL context so OBS Window Capture does not
+		// lose its source during an exclusive display-mode switch.
+		glfwSetWindowAttrib(m_window, GLFW_DECORATED, GLFW_FALSE);
+		glfwRestoreWindow(m_window);
+		glfwSetWindowPos(m_window, 0, 0);
+		glfwSetWindowSize(m_window, mode->width, mode->height);
+        m_windowWidth = static_cast<uint16_t>(mode->width);
+        m_windowHeight = static_cast<uint16_t>(mode->height);
+    }
+    else
+    {
+		glfwSetWindowAttrib(m_window, GLFW_DECORATED, GLFW_TRUE);
+		glfwSetWindowPos(m_window, m_windowedX, m_windowedY);
+		glfwSetWindowSize(m_window, m_windowedWidth, m_windowedHeight);
+		if (m_windowedMaximized)
+		{
+			glfwMaximizeWindow(m_window);
+		}
+        m_windowWidth = static_cast<uint16_t>(m_windowedWidth);
+        m_windowHeight = static_cast<uint16_t>(m_windowedHeight);
+    }
+
+    m_fullscreen = fullscreen;
+}
+
 void pwg::Window::PollEvents()
 {
     glfwPollEvents();
@@ -148,6 +194,13 @@ void pwg::Window::CountFPS(const float& dt)
 void pwg::Window::framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+
+    auto appWindow = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    if (appWindow && width > 0 && height > 0)
+    {
+        appWindow->m_windowWidth = static_cast<uint16_t>(width);
+        appWindow->m_windowHeight = static_cast<uint16_t>(height);
+    }
 }
 
 void pwg::Window::scroll_callback(GLFWwindow* window, double xoffset, double yoffset)

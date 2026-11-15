@@ -66,8 +66,20 @@ void pwg::Gui::Update(const float& dt)
 		return;
 	}
 
-	EnableDockSpace();
-	DrawStatusBar();
+	EditorScene* editor = m_scene->GetEditorScene();
+	if (editor && ImGui::IsKeyPressed(ImGuiKey_F10, false))
+	{
+		const bool fullscreen = !editor->IsMainViewFullscreen();
+		m_window.SetFullscreen(fullscreen);
+		editor->SetMainViewFullscreen(m_window.IsFullscreen());
+	}
+
+	const bool mainViewFullscreen = editor && editor->IsMainViewFullscreen();
+	if (!mainViewFullscreen)
+	{
+		EnableDockSpace();
+		DrawStatusBar();
+	}
 	//ImGui::ShowDemoWindow();
 
 	m_scene->Update(dt);
@@ -250,6 +262,13 @@ void pwg::Gui::DrawMainMenuBar()
 	{
 		bool mainViewAlwaysOn = true;
 		ImGui::MenuItem("Main View", nullptr, &mainViewAlwaysOn, false);
+		if (ImGui::MenuItem("Fullscreen Main View", "F10", editor->IsMainViewFullscreen()))
+		{
+			const bool fullscreen = !editor->IsMainViewFullscreen();
+			m_window.SetFullscreen(fullscreen);
+			editor->SetMainViewFullscreen(m_window.IsFullscreen());
+		}
+		ImGui::Separator();
 		ImGui::MenuItem("Outliner", nullptr, &editor->ShowOutliner());
 		ImGui::MenuItem("Terrain Graph", nullptr, &editor->ShowTerrainGraph());
 		ImGui::MenuItem("Material Library", nullptr, &editor->ShowMaterialLibrary());

@@ -88,6 +88,9 @@ namespace pwg
 
 		void EnableVSync(bool enabled);
 
+		void SetFullscreen(bool fullscreen);
+		bool IsFullscreen() const { return m_fullscreen; }
+
 	private:
 		GLFWwindow* m_window;				/**< Pointer to the GLFW window instance. */
 		MouseInput& m_mouseInput;			/**< Reference to the mouse input handler. */
@@ -97,6 +100,12 @@ namespace pwg
 		uint16_t m_windowHeight{ 900 };		/**< Current window height in pixels. */
 		uint16_t m_screenWidth{ 0 };		/**< Current screen width in pixels. */
 		uint16_t m_screenHeight{ 0 };		/**< Current screen height in pixels. */
+		int m_windowedX{ 0 };
+		int m_windowedY{ 0 };
+		int m_windowedWidth{ 1600 };
+		int m_windowedHeight{ 900 };
+		bool m_windowedMaximized{ false };
+		bool m_fullscreen{ false };
 		float m_deltaTime{ 0.0f };			/**< Time elapsed between the last and current frame. */
 		float m_lastFrame{ 0.0f };			/**< Timestamp of the last rendered frame. */
 		float m_frameTimeLimit{ 0.0f };

@@ -428,9 +428,11 @@ namespace pwg
 				shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 				setOutput(*node, outputPort, output);
 			}
-			else if (node->typeId == "slopeMask" || node->typeId == "curvatureMask" || node->typeId == "blurMask")
+			else if (node->typeId == "slopeMask" || node->typeId == "curvatureMask" || node->typeId == "blurMask" ||
+				node->typeId == "erodeMask" || node->typeId == "dilateMask")
 			{
-				const char* inputPort = node->typeId == "blurMask" ? "mask" : "height";
+				const bool usesMaskInput = node->typeId == "blurMask" || node->typeId == "erodeMask" || node->typeId == "dilateMask";
+				const char* inputPort = usesMaskInput ? "mask" : "height";
 				auto value = inputFor(*node, inputPort);
 				if (!value)
 				{
@@ -440,6 +442,8 @@ namespace pwg
 				int operation = 0;
 				if (node->typeId == "curvatureMask") operation = 1;
 				else if (node->typeId == "blurMask") operation = 2;
+				else if (node->typeId == "erodeMask") operation = 3;
+				else if (node->typeId == "dilateMask") operation = 4;
 				auto shader = m_computeShaders["UniversalMaskFilter"];
 				shader->ActivateShader();
 				value->texture->Bind(0);
@@ -1215,13 +1219,19 @@ namespace pwg
 				shader->DispatchForTexture(m_size, m_size);
 				shader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 			}
-			else if (node->typeId == "slopeMask" || node->typeId == "curvatureMask" || node->typeId == "blurMask")
+			else if (node->typeId == "slopeMask" || node->typeId == "curvatureMask" || node->typeId == "blurMask" ||
+				node->typeId == "erodeMask" || node->typeId == "dilateMask")
 			{
-				const char* inputPort = node->typeId == "blurMask" ? "mask" : "height";
+				const bool usesMaskInput = node->typeId == "blurMask" || node->typeId == "erodeMask" || node->typeId == "dilateMask";
+				const char* inputPort = usesMaskInput ? "mask" : "height";
 				auto value = inputFor(*node, inputPort);
 				if (!value) continue;
 				auto output = makeOutput(*node, "mask");
-				int operation = node->typeId == "curvatureMask" ? 1 : (node->typeId == "blurMask" ? 2 : 0);
+				int operation = 0;
+				if (node->typeId == "curvatureMask") operation = 1;
+				else if (node->typeId == "blurMask") operation = 2;
+				else if (node->typeId == "erodeMask") operation = 3;
+				else if (node->typeId == "dilateMask") operation = 4;
 				auto shader = m_computeShaders["UniversalMaskFilter"];
 				shader->ActivateShader();
 				value->texture->Bind(0);

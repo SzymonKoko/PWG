@@ -96,6 +96,8 @@ namespace pwg
 		bool& ShowTerrainGraph();
 		bool& ShowWorld();
 		bool& ShowOutliner();
+		void SetMainViewFullscreen(bool fullscreen);
+		bool IsMainViewFullscreen() const;
 
 	private:
 
@@ -147,6 +149,7 @@ namespace pwg
 		bool m_showCameraSettings{ true };
 		bool m_showVegetationLibrary{ true };
 		bool m_showTerrainGraph{ true };
+		bool m_mainViewFullscreen{ false };
 		bool m_terrainGraphInputCaptured{ false };
 		bool m_dirty{ false };
 		bool m_viewportInputCaptured{ false };
