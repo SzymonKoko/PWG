@@ -12,7 +12,9 @@ include(FetchContent)
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG docking
+    # Pinned commit on the docking branch (v1.93.0-docking-70, 2026-11-10) so builds
+    # and measurements do not change when upstream docking moves.
+    GIT_TAG cf53467ab0db7a783f04b32dd9160e6aa5b720ef
 )
 
 FetchContent_MakeAvailable(imgui)
