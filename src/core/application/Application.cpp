@@ -37,8 +37,8 @@ void pwg::Application::Update()
     m_window->Update(m_window->GetDeltaTime());
     m_keyboardInput->Update();
     m_mouseInput->Update();
+    // Gui::Update runs the single scene update of the frame (welcome screen and editor).
     m_gui->Update(m_window->GetDeltaTime());
-    m_scene->Update(m_window->GetDeltaTime());
 }
 
 void pwg::Application::Render()

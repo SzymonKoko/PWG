@@ -62,6 +62,9 @@ void pwg::Gui::Update(const float& dt)
 		DrawWelcomeScreen();
 		DrawAboutWindow();
 		DrawUnsavedChangesPopup();
+		// The scene keeps updating behind the welcome screen (first terrain generation),
+		// but is not drawn. This is the only scene update in a welcome-screen frame.
+		m_scene->Update(dt);
 		m_suppressDirtyDetection = false;
 		return;
 	}
@@ -82,6 +85,7 @@ void pwg::Gui::Update(const float& dt)
 	}
 	//ImGui::ShowDemoWindow();
 
+	// Single scene update of an editor frame, before Draw so the frame renders this update.
 	m_scene->Update(dt);
 	m_scene->Draw();
 	if (!m_suppressDirtyDetection && m_scene->GetEditorScene() && m_scene->GetEditorScene()->ConsumeDirtyFlag())
