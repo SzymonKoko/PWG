@@ -18,6 +18,18 @@ Potem otwórz `http://localhost:8000` i naciśnij **F**.
 
 Przed wystąpieniem przejdź raz całą prezentację, żeby przeglądarka zbuforowała obrazy i wideo.
 
+## Wersja PDF
+
+`PWG-prezentacja.pdf` ma 18 stron w formacie 1920 × 1080, po jednej na slajd. Każdy slajd jest w stanie końcowym: wszystkie kroki odsłonięte, bez animacji, a w miejscu filmów są ich klatki-plakaty.
+
+Tę wersję daje tryb `index.html?print`. Żeby odtworzyć PDF po zmianach, uruchom w folderze prezentacji (Chrome lub Edge):
+
+```bash
+"C:/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --no-pdf-header-footer --virtual-time-budget=20000 --print-to-pdf="PWG-prezentacja.pdf" "file:///C:/dev/Procedural%20World%20Generation/pwg-seminar-presentation/index.html?print"
+```
+
+Możesz też otworzyć `index.html?print` w przeglądarce i wydrukować do PDF (Ctrl+P, marginesy: brak, grafika tła: włączona).
+
 ## Sterowanie
 
 | Klawisz | Działanie |

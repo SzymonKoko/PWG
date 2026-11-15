@@ -1,2 +1,2 @@
-Zmienić w editorscene glfw window na window
-zrobic loda
+Dodać mask preview w node editorze (runtime)
+Kontrolki wiatru

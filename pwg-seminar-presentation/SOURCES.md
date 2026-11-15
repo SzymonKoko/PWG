@@ -13,7 +13,7 @@ Wszystkie pliki w `assets/pwg/` pochodzą z własnych nagrań i materiałów aut
 | `params-a/b/c.jpg` | klatki z `Videos/2026-04-09 17-04-06.mp4` (wczesna wersja PWG, ta sama kamera) | 07 |
 | `mask-elev/mountain/height/final.png` | podglądy TerrainDebug ze sprawozdania z postępów (`Desktop/Sprawozdanie_z_postepów_projektu/images/elev.png`, `mountain.png`, `height.png`, `final.png`); kanał R przekonwertowany na skalę szarości | 08, 11 |
 | `erosion-sim.mp4`, `erosion-sim-poster.jpg` | nagranie `assets/pwg/nowe/2026-10-20 19-19-58 - Trim.mp4` (20.10.2026): symulacja erozji z podglądem cząstek, stała kamera; bez pierwszych 0,5 s (kursor), bez dźwięku, 1280 × 720 | 10 |
-| `pwg-demo.mp4`, `pwg-demo-poster.jpg` | montaż ok. 51 s (bez efektów) z przelotów w trybie eksploracji: `mount1.mp4` (12–30 s), `mount2.mp4` (112–127 s), `nowe/pustynia.mp4` (5–15 s), `mount1.mp4` (50–58 s) | 14 |
+| `pwg-demo.mp4`, `pwg-demo-poster.jpg` | montaż ok. 72 s (bez efektów): `nowe/timelapse.mp4` (całe nagranie 3:32 z edytora grafu, przyspieszone ×10, z napisem „TIMELAPSE ×10”), potem przeloty w trybie eksploracji: `mount1.mp4` (12–30 s), `mount2.mp4` (112–127 s), `nowe/pustynia.mp4` (5–15 s), `mount1.mp4` (50–58 s) | 14 |
 | `desert-dunes.jpg` | klatka z `assets/pwg/nowe/pustynia.mp4` (9 s) | 17 (drugie tło) |
 | `dusk-ridge.jpg` | klatka z `mount2.mp4` | 15 |
 | `mountain-snow.jpg` | klatka z `mount2.mp4` | 16 |

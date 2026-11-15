@@ -318,7 +318,7 @@ body{font-family:var(--font-display);color:var(--text);-webkit-font-smoothing:an
 .s14 .head{left:var(--pad);top:90px;transition:opacity 1.2s,transform 1.2s}
 .s14.playing .head,.s14.playing .overlay{opacity:0}
 .s14 .tag{position:absolute;right:var(--pad);top:100px}
-.s14 .hint{left:var(--pad);bottom:60px;font:400 18px var(--font-mono);color:rgba(243,245,247,.6);transition:opacity 1s}
+.s14 .hint{right:var(--pad);bottom:60px;font:400 18px var(--font-mono);color:rgba(243,245,247,.6);transition:opacity 1s}
 .s14.playing .hint{opacity:0}
 
 /* ===========================================================
@@ -356,6 +356,21 @@ body{font-family:var(--font-display);color:var(--text);-webkit-font-smoothing:an
 
 /* speaker notes are stored in each slide but never shown on stage */
 .notes{display:none}
+
+/* ===========================================================
+   PRINT / PDF MODE — index.html?print reveals every slide in its final
+   state (all steps shown, no motion); used for PDF export.
+   =========================================================== */
+@page{size:1920px 1080px;margin:0}
+body.printing *,body.printing *::before,body.printing *::after{transition:none!important;animation:none!important}
+body.printing .slide{opacity:1!important}
+body.printing .rv,body.printing .rv-fade,body.printing .step,body.printing .step-fade{opacity:1!important;transform:none!important}
+body.printing .kb,body.printing .triptych .panel img,body.printing .s05 .bgimg{transform:none!important}
+body.printing .s11 .cpu .tile:nth-child(-n+27){background:rgba(233,184,114,.22)}
+body.printing .s11 .cpu .tile:nth-child(28){background:rgba(233,184,114,.75)}
+body.printing .s11 .gpu .tile{background:rgba(73,214,193,.35)}
+body.printing .s09 .pulse,body.printing .s14 .hint,body.printing .counter,body.printing .progress,body.printing .notes-panel,body.printing .help,body.printing .edit-hotzone,body.printing .edit-toggle,body.printing .blackout{display:none!important}
+@media print{html,body{background:var(--bg)!important}}
 
 /* ===========================================================
    PRESENTER CHROME (outside the stage, never part of a slide)
@@ -728,8 +743,9 @@ body.editing [data-editable]{outline:1px dashed rgba(73,214,193,.6);outline-offs
   <div class="abs head"><h2 class="h-m" data-editable>PWG w praktyce.</h2></div>
   <span class="tag">Nagranie z silnika PWG</span>
   <div class="abs hint">P / klik — odtwórz lub zatrzymaj</div>
-  <aside class="notes" data-time="55">
-    <p>To są nagrania z PWG, bez żadnych efektów dodanych w montażu — przelot kamery w trybie eksploracji.</p>
+  <aside class="notes" data-time="70">
+    <p>To są nagrania z PWG, bez żadnych efektów dodanych w montażu. Najpierw timelapse przyspieszony dziesięciokrotnie: około trzech i pół minuty pracy w edytorze grafu. Zaczynam od płaskiej płaszczyzny, dokładam generatory szumu, operacje matematyczne i maski, a teren po każdym uruchomieniu grafu zmienia się na żywo.</p>
+    <p>Potem przelot kamery w trybie eksploracji po gotowych światach.</p>
     <p>Najpierw górski świat: jezioro, którego poziom wyznaczył generator hydrologii, zbocza wyrzeźbione erozją, rzeki, wodospady i roślinność rozmieszczona proceduralnie.</p>
     <p>Potem zupełnie inny świat — pustynia z wydmami, stworzona tym samym silnikiem. Na koniec widok całej mapy z góry. Wszystko, co widać, jest renderowane w czasie rzeczywistym.</p>
     <p class="tr">Przejście: Ładny obraz to jednak za mało. Trzeba jeszcze wiedzieć, czy ten świat działa poprawnie.</p>
@@ -1141,6 +1157,21 @@ class SlidePresentation {
   }
 }
 const deck = new SlidePresentation();
+
+/* PDF export: index.html?print — visit every slide with all steps revealed,
+   then keep them all visible and swap videos for their poster frames. */
+if (new URLSearchParams(location.search).has('print')){
+  deck.slides.forEach((_, i) => deck.go(i, 'all'));
+  document.body.classList.add('printing');
+  deck.slides.forEach(s => s.classList.add('active', 'visible'));
+  document.querySelectorAll('.deck-stage video').forEach(v => {
+    v.pause(); const img = document.createElement('img');
+    img.src = v.getAttribute('poster'); img.alt = v.getAttribute('aria-label') || '';
+    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-width:none;max-height:none';
+    v.replaceWith(img);
+  });
+  document.querySelector('.s14').classList.remove('playing');
+}
 
 /* ===========================================================
    INLINE EDITING (E) — edits are kept in localStorage; Ctrl+S downloads the edited HTML

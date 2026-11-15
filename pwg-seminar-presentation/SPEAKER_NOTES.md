@@ -24,11 +24,11 @@ Plik generowany z notatek w `index.html` (`<aside class="notes">`) skryptem `too
 | 11 | Kto wykonuje obliczenia? | 50 s |
 | 12 | Chunki. | 45 s |
 | 13 | LOD — Level of Detail. | 45 s |
-| 14 | PWG w praktyce. | 55 s |
+| 14 | PWG w praktyce. | 70 s |
 | 15 | Czy ten świat działa poprawnie? | 50 s |
 | 16 | Świat nadal się rozwija. | 45 s |
 | 17 | Nie stworzyłem jednej mapy. | 30 s |
-| | **Razem** | **820 s ≈ 13.7 min** |
+| | **Razem** | **835 s ≈ 13.9 min** |
 
 ## 00 · Tytuł
 
@@ -260,11 +260,13 @@ Pojedynczy chunk w pełnej rozdzielczości ma 128 na 128 kwadratów, czyli ponad
 
 ## 14 · PWG w praktyce.
 
-**Czas:** ok. 55 s
+**Czas:** ok. 70 s
 
 **Narracja:**
 
-To są nagrania z PWG, bez żadnych efektów dodanych w montażu — przelot kamery w trybie eksploracji.
+To są nagrania z PWG, bez żadnych efektów dodanych w montażu. Najpierw timelapse przyspieszony dziesięciokrotnie: około trzech i pół minuty pracy w edytorze grafu. Zaczynam od płaskiej płaszczyzny, dokładam generatory szumu, operacje matematyczne i maski, a teren po każdym uruchomieniu grafu zmienia się na żywo.
+
+Potem przelot kamery w trybie eksploracji po gotowych światach.
 
 Najpierw górski świat: jezioro, którego poziom wyznaczył generator hydrologii, zbocza wyrzeźbione erozją, rzeki, wodospady i roślinność rozmieszczona proceduralnie.
 

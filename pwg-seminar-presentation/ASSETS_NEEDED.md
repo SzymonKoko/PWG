@@ -10,7 +10,7 @@ Jeśli plik zniknie albo będzie miał złą nazwę, slajd pokaże przerywaną r
 
 | Plik | Slajd | Co jest teraz | Co nagrać |
 |---|---|---|---|
-| `pwg-demo.mp4` | 14 | Montaż ok. 51 s z samych przelotów w trybie eksploracji: góry z jeziorem → zbocza i rzeki → pustynia → widok całej mapy. Fragmenty z edytora zostały usunięte na życzenie autora. | Opcjonalnie: krótki fragment z edytora (zmiana parametru → Run Graph → podgląd masek), jeśli na seminarium ma być widoczny sam proces tworzenia. Plakat: `pwg-demo-poster.jpg`. |
+| `pwg-demo.mp4` | 14 | Montaż ok. 72 s: timelapse ×10 budowania terenu w edytorze grafu (21 s), potem przeloty w trybie eksploracji: góry z jeziorem → zbocza i rzeki → pustynia → widok całej mapy. | Opcjonalnie: timelapse z aktualnej wersji z podglądem masek debug. Plakat: `pwg-demo-poster.jpg`. |
 | `params-a.jpg`, `params-b.jpg`, `params-c.jpg` | 07 | Wczesna wersja PWG (kwiecień 2026), płaski kolor, ta sama kamera. Na slajdzie podpisane jako „wczesna wersja”. | Trzy zrzuty z aktualnej wersji z **identycznej kamery**, różniące się jednym parametrem (np. frequency albo seed). Jeśli podmienisz, zmień etykietę na slajdzie 07 (tekst `PWG · wczesna wersja · ta sama kamera`) i zdanie w notatkach. |
 | `mask-elev.png`, `mask-mountain.png`, `mask-height.png`, `mask-final.png` | 08 (`mask-final` także w tle siatki na 11) | Prawdziwe podglądy TerrainDebug ze starszej wersji (passy Elevation / MountainMask / MountainHeight / Final), 208 px, przeskalowane. | Podglądy masek z aktualnego grafu (np. Noise Height, Noise Mask, Slope Mask, Output Height), kwadratowe, min. 480 × 480, w skali szarości. Przy zmianie nazw nodów zaktualizuj podpisy na slajdzie 08. |
 
