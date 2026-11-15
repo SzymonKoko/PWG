@@ -30,6 +30,9 @@ void pwg::Renderer::BeginFrame()
 
 void pwg::Renderer::EndFrame()
 {
+	// Polygon mode is global GL state: without this reset the post-process quad and the next
+	// frame's shadow pass were drawn as lines, so the main view showed only the quad's diagonal.
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
@@ -100,16 +103,15 @@ bool pwg::Renderer::IsSphereVisible(const glm::vec3& center, float radius, float
 }
 void pwg::Renderer::DrawAll()
 {
+	// The sky stays filled so wireframe lines are drawn over it.
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	DrawSkyBox();
+
+	// Wireframe covers the scene geometry drawn until EndFrame (terrain here, then vegetation and water).
 	if (m_debugSettings.wireframe)
 	{
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	}
-	else
-	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	}
-
-	DrawSkyBox();
 
 	for (auto& r : m_renderQueue)
 	{
