@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include "window.h"
+#include "debug/debugView.h"
 
 
 pwg::Window::Window(MouseInput& mouseInput, KeyboardInput& keyboardInput)
@@ -86,6 +87,7 @@ void pwg::Window::SetWindowSize(float width, float height)
 
 void pwg::Window::SetFramerateLimit(unsigned int limit)
 {
+    m_framerateLimit = limit;
     if (limit > 0)
     {
         m_frameTimeLimit = 1.0f / (float)limit;
@@ -98,6 +100,7 @@ void pwg::Window::SetFramerateLimit(unsigned int limit)
 
 void pwg::Window::EnableVSync(bool enabled)
 {
+    m_vsyncEnabled = enabled;
     if (enabled)
     {
         glfwSwapInterval(1);
@@ -161,6 +164,7 @@ void pwg::Window::PollEvents()
 
 void pwg::Window::SwapBuffers()
 {
+    debug::FramePhaseTimer swapTimer(debug::FramePhase::SWAP);
     glfwSwapBuffers(m_window);
 }
 

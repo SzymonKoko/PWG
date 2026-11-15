@@ -78,6 +78,18 @@ namespace pwg
 		float GetFrameTimeLimit() { return m_frameTimeLimit; }
 
 		/**
+		* @brief Getter for the frame rate limit set with SetFramerateLimit.
+		* @return Limit in frames per second, 0 if the frame rate is not limited.
+		*/
+		unsigned int GetFramerateLimit() const { return m_framerateLimit; }
+
+		/**
+		* @brief Getter for the swap interval state set with EnableVSync.
+		* @return True if VSync (swap interval 1) is enabled.
+		*/
+		bool IsVSyncEnabled() const { return m_vsyncEnabled; }
+
+		/**
 		* @brief Sets a new window size.
 		* @param width New width in pixels.
 		* @param height New height in pixels.
@@ -109,6 +121,8 @@ namespace pwg
 		float m_deltaTime{ 0.0f };			/**< Time elapsed between the last and current frame. */
 		float m_lastFrame{ 0.0f };			/**< Timestamp of the last rendered frame. */
 		float m_frameTimeLimit{ 0.0f };
+		unsigned int m_framerateLimit{ 0 };	/**< Frame rate limit in FPS, 0 = unlimited. */
+		bool m_vsyncEnabled{ false };		/**< Last value passed to EnableVSync. */
 
 		/**
 		* @brief Polls GLFW window events such as input and resize.

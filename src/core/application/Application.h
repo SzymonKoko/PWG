@@ -10,6 +10,7 @@
 #include <entt/entt.hpp>
 #include "resources/resourceManager.h"
 #include "graphics/renderer/renderer.h"
+#include "debug/debugView.h"
 
 namespace pwg
 {
@@ -48,6 +49,7 @@ namespace pwg
 	private:
 
 		std::unique_ptr<pwg::Window> m_window;						/**< Pointer to the main application window */
+		std::unique_ptr<pwg::debug::DebugView> m_debugView;			/**< Debug View core: frame timing, profilers, benchmark mode */
 		std::unique_ptr<pwg::KeyboardInput> m_keyboardInput;		/**< Keyboard input handler */
 		std::unique_ptr<pwg::MouseInput> m_mouseInput;				/**< Mouse input handler */
 		std::unique_ptr<pwg::Gui> m_gui;							/**< Graphical user interface manager */

@@ -141,6 +141,15 @@ target_link_libraries(${PROJECT_NAME}
 		Ole32
 )
 
+# Debug View measurement points (CPU scopes inside the frame, GPU timer queries).
+# OFF compiles them to nothing; frame timing and benchmark mode stay in every build.
+option(PWG_DEBUG_VIEW_INSTRUMENTATION "Compile Debug View instrumentation (CPU scopes, GPU timer queries)" ON)
+if(PWG_DEBUG_VIEW_INSTRUMENTATION)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE PWG_DEBUG_VIEW_INSTRUMENTATION=1)
+else()
+	target_compile_definitions(${PROJECT_NAME} PRIVATE PWG_DEBUG_VIEW_INSTRUMENTATION=0)
+endif()
+
 # Configure output directories for game
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin

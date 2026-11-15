@@ -10,6 +10,7 @@
 #include "platform/nativeDialogs.h"
 #include "project/projectSerializer.h"
 #include "yaml-cpp/yaml.h"
+#include "debug/debugView.h"
 
 #include <filesystem>
 #include <algorithm>
@@ -64,7 +65,10 @@ void pwg::Gui::Update(const float& dt)
 		DrawUnsavedChangesPopup();
 		// The scene keeps updating behind the welcome screen (first terrain generation),
 		// but is not drawn. This is the only scene update in a welcome-screen frame.
-		m_scene->Update(dt);
+		{
+			PWG_CPU_SCOPE("Scene::Update");
+			m_scene->Update(dt);
+		}
 		m_suppressDirtyDetection = false;
 		return;
 	}
@@ -86,8 +90,14 @@ void pwg::Gui::Update(const float& dt)
 	//ImGui::ShowDemoWindow();
 
 	// Single scene update of an editor frame, before Draw so the frame renders this update.
-	m_scene->Update(dt);
-	m_scene->Draw();
+	{
+		PWG_CPU_SCOPE("Scene::Update");
+		m_scene->Update(dt);
+	}
+	{
+		PWG_CPU_SCOPE("Scene::Draw");
+		m_scene->Draw();
+	}
 	if (!m_suppressDirtyDetection && m_scene->GetEditorScene() && m_scene->GetEditorScene()->ConsumeDirtyFlag())
 	{
 		MarkProjectDirty();
@@ -101,7 +111,13 @@ void pwg::Gui::Update(const float& dt)
 void pwg::Gui::Render()
 {
 	ImGui::Render();
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	{
+		// Main context only: the platform windows below render in other GL contexts,
+		// which cannot see the query objects.
+		PWG_GPU_SCOPE(debug::GpuPass::IMGUI);
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	}
+	PWG_GPU_FRAME_END();
 
 	ImGuiIO& io = ImGui::GetIO();
 	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -392,6 +408,26 @@ void pwg::Gui::DrawStatusBar()
 
 	float fps = m_frameDeltaTime > 0.0001f ? 1.0f / m_frameDeltaTime : 0.0f;
 	ImGui::Text("FPS: %.0f", fps);
+
+	if (debug::DebugView::HasInstance())
+	{
+		const debug::DebugView& debugView = debug::DebugView::Get();
+		const debug::RollingStats& frameStats = debugView.GetFrameStats().GetFrameMsStats();
+		if (debug::DebugView::IsEnabled() && frameStats.count > 0)
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("|");
+			ImGui::SameLine();
+			ImGui::Text("Frame: %.2f ms", frameStats.mean);
+		}
+		if (debugView.IsBenchmarkMode())
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("|");
+			ImGui::SameLine();
+			ImGui::TextColored(ImVec4(1.0f, 0.62f, 0.2f, 1.0f), "BENCHMARK");
+		}
+	}
 
 	if (editor)
 	{

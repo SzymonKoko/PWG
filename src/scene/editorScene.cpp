@@ -5,6 +5,7 @@
 #include "controls/terrainGraphEditor.h"
 #include "controls/environmentControls.h"
 #include "platform/nativeDialogs.h"
+#include "debug/debugView.h"
 
 #include <algorithm>
 #include <cctype>
@@ -554,8 +555,18 @@ void pwg::EditorScene::Draw()
         ImGuiWindowFlags_NoScrollbar |
         ImGuiWindowFlags_NoScrollWithMouse);
 
+    // Benchmark mode renders at a fixed resolution so results do not depend on the window layout.
+    const bool benchmarkMode = debug::DebugView::HasInstance() && debug::DebugView::Get().IsBenchmarkMode();
     int width = static_cast<int>(windowSize.x);
     int height = static_cast<int>(windowSize.y);
+    if (benchmarkMode)
+    {
+        width = debug::DebugView::Get().GetBenchmarkRenderWidth();
+        height = debug::DebugView::Get().GetBenchmarkRenderHeight();
+    }
+
+    // Start of the gpu_frame_ms span (scene and ImGui rendering of the main context).
+    PWG_GPU_FRAME_START();
 
     if (m_frameBuffer->GetWidth() != width || m_frameBuffer->GetHeight() != height)
     {
@@ -633,9 +644,17 @@ void pwg::EditorScene::Draw()
     m_postProcessor->Render(m_hdrFrameBuffer->GetTextureID(), m_environment->GetSettings(), width, height);
     m_frameBuffer->Unbind();
 
+    ImVec2 imageSize = windowSize;
+    if (benchmarkMode && width > 0 && height > 0 && windowSize.x > 0.0f && windowSize.y > 0.0f)
+    {
+        // Fit the fixed-size image into the view, keeping its aspect ratio.
+        const float scale = std::min(windowSize.x / static_cast<float>(width), windowSize.y / static_cast<float>(height));
+        imageSize = ImVec2(static_cast<float>(width) * scale, static_cast<float>(height) * scale);
+        ImGui::SetCursorPos(ImVec2((windowSize.x - imageSize.x) * 0.5f, (windowSize.y - imageSize.y) * 0.5f));
+    }
     ImGui::Image(
         (ImTextureID)(intptr_t)m_frameBuffer->GetTextureID(),
-        windowSize,
+        imageSize,
         ImVec2(0, 1), ImVec2(1, 0)
     );
 
@@ -681,6 +700,11 @@ void pwg::EditorScene::Draw()
         if (ImGui::BeginTabItem("Masks"))
         {
             controls::ShowMaskPreviews(m_terrain->GetChunkManager());
+            ImGui::EndTabItem();
+        }
+        if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Performance"))
+        {
+            debug::DebugView::Get().DrawPerformanceTab();
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
