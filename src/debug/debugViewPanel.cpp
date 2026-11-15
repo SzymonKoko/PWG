@@ -24,6 +24,12 @@ namespace
 		}
 	}
 
+	/** @brief Writes an unsigned counter. */
+	void CountCell(uint64_t value)
+	{
+		ImGui::Text("%llu", static_cast<unsigned long long>(value));
+	}
+
 	void StatsRow(const char* name, const pwg::debug::RollingStats& stats)
 	{
 		ImGui::TableNextRow();
@@ -158,23 +164,41 @@ void pwg::debug::DebugView::DrawProfilerSection()
 		static_cast<unsigned long long>(m_gpu.GetDroppedCount()));
 	ImGui::TextDisabled("Counter bits: TIME_ELAPSED %d, TIMESTAMP %d. Results arrive K frames late and are never waited for.",
 		m_gpu.GetTimeElapsedBits(), m_gpu.GetTimestampBits());
+	ImGui::Checkbox("Time each shadow cascade (TIMESTAMP pairs inside the shadow pass)", &m_detailedShadowTiming);
 
-	if (ImGui::BeginTable("GpuPasses", 2, tableFlags))
+	// CPU ms is command submission of the last counted frame; GPU ms is the latest harvested result,
+	// K frames older. The two are different quantities and are never added.
+	const RenderCounters* lastCounters = m_render.HasLastFrame() ? &m_render.GetLastFrame() : nullptr;
+	if (ImGui::BeginTable("GpuPasses", 3, tableFlags))
 	{
 		ImGui::TableSetupColumn("pass");
+		ImGui::TableSetupColumn("CPU ms (submit)");
 		ImGui::TableSetupColumn("GPU ms (latest)");
 		ImGui::TableHeadersRow();
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn(); ImGui::TextUnformatted("frame (timestamps)");
+		ImGui::TableNextColumn(); ValueCell(NotAvailable);
 		ImGui::TableNextColumn(); ValueCell(m_gpu.GetLatestFrameMs());
 		for (size_t pass = 0; pass < GpuPassCount; ++pass)
 		{
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn(); ImGui::TextUnformatted(GetGpuPassName(static_cast<GpuPass>(pass)));
+			ImGui::TableNextColumn(); ValueCell(lastCounters ? lastCounters->cpuPassMs[pass] : NotAvailable);
 			ImGui::TableNextColumn(); ValueCell(m_gpu.GetLatestPassMs(static_cast<GpuPass>(pass)));
+			if (static_cast<GpuPass>(pass) == GpuPass::SHADOW)
+			{
+				for (size_t span = 0; span < GpuSpanCount; ++span)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn(); ImGui::Text("  %s", GetGpuSpanName(static_cast<GpuSpan>(span)));
+					ImGui::TableNextColumn(); ValueCell(NotAvailable);
+					ImGui::TableNextColumn(); ValueCell(m_gpu.GetLatestSpanMs(static_cast<GpuSpan>(span)));
+				}
+			}
 		}
 		ImGui::EndTable();
 	}
+	ImGui::TextDisabled("CPU ms of imgui is in the Gui::Render scope below. Cascade rows need the option above.");
 
 	// --- CPU scopes of the last finished frame ---
 	ImGui::SeparatorText("CPU scopes (last frame)");
@@ -215,5 +239,148 @@ void pwg::debug::DebugView::DrawProfilerSection()
 			ImGui::Text("frame %llu  %s  %.3f ms", static_cast<unsigned long long>(it->frameIndex), it->name, it->ms);
 		}
 		ImGui::TreePop();
+	}
+}
+
+void pwg::debug::DebugView::DrawRenderTab()
+{
+	if constexpr (!InstrumentationCompiled)
+	{
+		ImGui::TextDisabled("Instrumentation compiled out (PWG_DEBUG_VIEW_INSTRUMENTATION=OFF). No render counters.");
+	}
+	else
+	{
+		DrawRenderCounters();
+	}
+}
+
+void pwg::debug::DebugView::DrawRenderCounters()
+{
+	if (!IsEnabled())
+	{
+		ImGui::TextDisabled("Enable the Debug View in the Performance tab to count draws, chunks and instances.");
+	}
+	if (!m_render.HasLastFrame())
+	{
+		ImGui::TextDisabled("No counted frame yet.");
+		return;
+	}
+
+	const RenderCounters& counters = m_render.GetLastFrame();
+	const ImGuiTableFlags tableFlags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+	ImGui::TextDisabled("Frame %llu, the last frame counted from begin to end.", static_cast<unsigned long long>(m_render.GetLastFrameIndex()));
+
+	// --- Draw calls and triangles per pass ---
+	ImGui::SeparatorText("Draw calls and triangles");
+	if (ImGui::BeginTable("RenderPasses", 3, tableFlags))
+	{
+		ImGui::TableSetupColumn("pass");
+		ImGui::TableSetupColumn("draw calls");
+		ImGui::TableSetupColumn("triangles");
+		ImGui::TableHeadersRow();
+		uint64_t totalDraws = 0;
+		uint64_t totalTriangles = 0;
+		for (size_t slot = 0; slot < CounterPassCount; ++slot)
+		{
+			if (slot == static_cast<size_t>(GpuPass::IMGUI))
+			{
+				continue;	// ImGui draws are not counted; its GPU time is in the Performance tab.
+			}
+			const PassCounters& pass = counters.passes[slot];
+			totalDraws += pass.drawCalls;
+			totalTriangles += pass.triangles;
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn(); ImGui::TextUnformatted(GetCounterPassName(slot));
+			ImGui::TableNextColumn(); CountCell(pass.drawCalls);
+			ImGui::TableNextColumn(); CountCell(pass.triangles);
+		}
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn(); ImGui::TextUnformatted("total");
+		ImGui::TableNextColumn(); CountCell(totalDraws);
+		ImGui::TableNextColumn(); CountCell(totalTriangles);
+		ImGui::EndTable();
+	}
+	ImGui::TextDisabled("Counted per GL draw command. Points add no triangles. ImGui draws are not counted.");
+
+	// --- Shadow cascades ---
+	ImGui::SeparatorText("Shadow cascades");
+	if (ImGui::BeginTable("ShadowCascades", 5, tableFlags))
+	{
+		ImGui::TableSetupColumn("cascade");
+		ImGui::TableSetupColumn("draw calls");
+		ImGui::TableSetupColumn("triangles");
+		ImGui::TableSetupColumn("chunks");
+		ImGui::TableSetupColumn("tree instances");
+		ImGui::TableHeadersRow();
+		for (size_t cascade = 0; cascade < ShadowCascadeCount; ++cascade)
+		{
+			const CascadeCounters& values = counters.cascades[cascade];
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn(); ImGui::Text("%zu", cascade);
+			ImGui::TableNextColumn(); CountCell(values.drawCalls);
+			ImGui::TableNextColumn(); CountCell(values.triangles);
+			ImGui::TableNextColumn(); CountCell(values.chunks);
+			ImGui::TableNextColumn(); CountCell(values.vegetationInstances);
+		}
+		ImGui::EndTable();
+	}
+
+	// --- Terrain chunks ---
+	ImGui::SeparatorText("Terrain chunks (main pass)");
+	if (!counters.chunksCounted)
+	{
+		ImGui::TextDisabled("Terrain chunks were not drawn in this frame.");
+	}
+	else if (ImGui::BeginTable("TerrainChunks", static_cast<int>(TerrainLodCount) + 3, tableFlags))
+	{
+		char label[16];
+		for (size_t lod = 0; lod < TerrainLodCount; ++lod)
+		{
+			std::snprintf(label, sizeof(label), "LOD%zu", lod);
+			ImGui::TableSetupColumn(label);
+		}
+		ImGui::TableSetupColumn("visible");
+		ImGui::TableSetupColumn("culled");
+		ImGui::TableSetupColumn("total");
+		ImGui::TableHeadersRow();
+		ImGui::TableNextRow();
+		for (size_t lod = 0; lod < TerrainLodCount; ++lod)
+		{
+			ImGui::TableNextColumn(); CountCell(counters.chunksVisible[lod]);
+		}
+		const uint32_t visible = counters.GetVisibleChunks();
+		ImGui::TableNextColumn(); CountCell(visible);
+		ImGui::TableNextColumn(); CountCell(counters.chunkCount > visible ? counters.chunkCount - visible : 0);
+		ImGui::TableNextColumn(); CountCell(counters.chunkCount);
+		ImGui::EndTable();
+	}
+
+	// --- Vegetation ---
+	ImGui::SeparatorText("Vegetation instances");
+	ImGui::Text("Main pass: %llu visible, %llu culled  |  Shadow pass: %llu (all cascades)",
+		static_cast<unsigned long long>(counters.vegetationVisible),
+		static_cast<unsigned long long>(counters.vegetationCulled),
+		static_cast<unsigned long long>(counters.vegetationShadow));
+	ImGui::TextDisabled("Culled covers both the distance and the frustum test (Renderer::IsSphereVisible).");
+	if (ImGui::BeginTable("VegetationModels", 4, tableFlags))
+	{
+		ImGui::TableSetupColumn("model");
+		ImGui::TableSetupColumn("visible");
+		ImGui::TableSetupColumn("culled");
+		ImGui::TableSetupColumn("shadow");
+		ImGui::TableHeadersRow();
+		for (const VegetationModelCounters& model : counters.models)
+		{
+			if (!model.counted)
+			{
+				continue;
+			}
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn(); ImGui::TextUnformatted(model.name.c_str());
+			ImGui::TableNextColumn(); CountCell(model.visible);
+			ImGui::TableNextColumn(); CountCell(model.culled);
+			ImGui::TableNextColumn(); CountCell(model.shadow);
+		}
+		ImGui::EndTable();
 	}
 }

@@ -595,8 +595,11 @@ void pwg::EditorScene::Draw()
     if (shadowsEnabled)
     {
         m_shadowMap->Resize(environmentLighting.shadowResolution);
+        static_assert(DirectionalShadowMap::CascadeCount <= static_cast<int>(debug::ShadowCascadeCount), "Debug View counts at most ShadowCascadeCount cascades");
+        PWG_RENDER_PASS(debug::GpuPass::SHADOW, "Render::Shadow");
         for (int cascade = 0; cascade < DirectionalShadowMap::CascadeCount; ++cascade)
         {
+            PWG_SHADOW_CASCADE(cascade);
             m_shadowMap->BeginCascade(cascade, environmentLighting, activeCamera);
             m_terrain->DrawShadowMap(m_terrainShadowShader, m_shadowMap->GetLightSpaceMatrix(cascade));
             if (m_vegetationSystem)
@@ -630,18 +633,28 @@ void pwg::EditorScene::Draw()
     m_renderer.SetShadowMaps(shadowMatrices, shadowTextures, cascadeSplits, shadowsEnabled);
     m_renderer.AddSkyBox(m_skybox);
     m_renderer.AddToQueue(m_terrain.get());
-    m_renderer.DrawAll();
+    {
+        PWG_RENDER_PASS(debug::GpuPass::TERRAIN, "Render::Terrain");
+        m_renderer.DrawAll();
+    }
     if (m_vegetationSystem)
     {
+        PWG_RENDER_PASS(debug::GpuPass::VEGETATION, "Render::Vegetation");
         m_vegetationSystem->Draw(m_renderer, m_terrain);
     }
-	m_terrain->DrawWater(m_renderer);
+    {
+        PWG_RENDER_PASS(debug::GpuPass::WATER, "Render::Water");
+        m_terrain->DrawWater(m_renderer);
+    }
     m_renderer.EndFrame();
     m_hdrFrameBuffer->Unbind();
 
     m_frameBuffer->Bind();
     glClear(GL_COLOR_BUFFER_BIT);
-    m_postProcessor->Render(m_hdrFrameBuffer->GetTextureID(), m_environment->GetSettings(), width, height);
+    {
+        PWG_RENDER_PASS(debug::GpuPass::POST_PROCESS, "Render::Post");
+        m_postProcessor->Render(m_hdrFrameBuffer->GetTextureID(), m_environment->GetSettings(), width, height);
+    }
     m_frameBuffer->Unbind();
 
     ImVec2 imageSize = windowSize;
@@ -705,6 +718,11 @@ void pwg::EditorScene::Draw()
         if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Performance"))
         {
             debug::DebugView::Get().DrawPerformanceTab();
+            ImGui::EndTabItem();
+        }
+        if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Render"))
+        {
+            debug::DebugView::Get().DrawRenderTab();
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();

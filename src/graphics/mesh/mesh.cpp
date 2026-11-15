@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "core/logger/logger.h"
+#include "debug/debugView.h"
 #include "mesh.h"
 
 #include <algorithm>
@@ -49,10 +50,12 @@ namespace pwg
 		if (!m_indices.empty())
 		{
 			glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
+			PWG_RENDER_COUNT(AddDraw(m_indices.size() / 3));
 		}
 		else
 		{
 			glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());
+			PWG_RENDER_COUNT(AddDraw(m_vertices.size() / 3));
 		}
 
 		glBindVertexArray(0);
@@ -82,10 +85,12 @@ namespace pwg
 		if (!m_indices.empty())
 		{
 			glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(transforms.size()));
+			PWG_RENDER_COUNT(AddDraw(m_indices.size() / 3 * transforms.size()));
 		}
 		else
 		{
 			glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(m_vertices.size()), static_cast<GLsizei>(transforms.size()));
+			PWG_RENDER_COUNT(AddDraw(m_vertices.size() / 3 * transforms.size()));
 		}
 
 		for (unsigned int location = 4; location < 8; ++location)

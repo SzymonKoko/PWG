@@ -1,6 +1,7 @@
 #include "chunkManager.h"
 #include "terrain/masks/mask.h"
 #include "graphics/renderer/renderer.h"
+#include "debug/debugView.h"
 #include <glad/glad.h>
 #include <algorithm>
 #include <cmath>
@@ -263,6 +264,8 @@ namespace pwg
 			return;
 		}
 
+		static_assert(MAX_LOD == static_cast<int>(debug::TerrainLodCount), "Debug View counts TerrainLodCount LOD levels");
+		PWG_RENDER_COUNT(SetChunkCount(static_cast<uint32_t>(m_chunkCount * m_chunkCount)));
 		for (int i = 0; i < m_chunkCount; i++)
 		{
 			for (int j = 0; j < m_chunkCount; j++)
@@ -272,6 +275,7 @@ namespace pwg
 				{
 					continue;
 				}
+				PWG_RENDER_COUNT(AddVisibleChunk(chunk.lod));
 
 				auto mesh = m_lodManager->GetMesh(chunk.lod);
 				glm::vec2 uvOffset = (glm::vec2(chunk.chunkCoords.x * (m_terrainSettings.chunkSize - 1), chunk.chunkCoords.y * (m_terrainSettings.chunkSize - 1)) + glm::vec2(0.5f)) / glm::vec2(m_worldSize);
@@ -325,6 +329,7 @@ namespace pwg
 				shader->SetUniformVec2("u_uvOffset", uvOffset);
 				shader->SetUniformVec2("u_uvScale", uvScale);
 				mesh->Draw();
+				PWG_RENDER_COUNT(AddShadowChunk());
 			}
 		}
 		heightMask->second->texture->Unbind();

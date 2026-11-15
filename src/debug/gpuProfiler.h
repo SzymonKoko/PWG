@@ -12,7 +12,8 @@ namespace pwg::debug
 	* @brief Non-blocking GPU timing with query objects (OpenGL 4.5 spec 4.2, 4.3).
 	*
 	* Each pass has one TIME_ELAPSED query per frame slot in a ring of K slots. A TIMESTAMP pair spans the
-	* scene and ImGui rendering of the frame. At the start of frame n the slot n mod K, which holds frame
+	* scene and ImGui rendering of the frame, and one TIMESTAMP pair per GpuSpan times work nested inside a
+	* pass (TIME_ELAPSED queries cannot nest, but a TIMESTAMP may be issued while one is active, spec 4.3). At the start of frame n the slot n mod K, which holds frame
 	* n - K, is harvested: a result is read with GL_QUERY_RESULT only after GL_QUERY_RESULT_AVAILABLE
 	* returned GL_TRUE. A query that is not ready is dropped and counted, never waited for and never
 	* written as 0. At most one TIME_ELAPSED query is active at a time, and each pass is timed at most once
@@ -24,7 +25,7 @@ namespace pwg::debug
 		static constexpr uint32_t DefaultRingFrames = 4;
 		static constexpr uint32_t MaxRingFrames = 16;
 
-		GpuProfiler() { m_latestPassMs.fill(NotAvailable); }
+		GpuProfiler() { m_latestPassMs.fill(NotAvailable); m_latestSpanMs.fill(NotAvailable); }
 		~GpuProfiler() = default;
 		GpuProfiler(const GpuProfiler&) = delete;
 		GpuProfiler& operator=(const GpuProfiler&) = delete;
@@ -53,6 +54,10 @@ namespace pwg::debug
 		void MarkFrameStart();
 		void MarkFrameEnd();
 
+		/** @brief First and second TIMESTAMP of a span. Returns false if the span is not timed (repeated in this frame). */
+		bool BeginSpan(GpuSpan span);
+		void EndSpan(GpuSpan span);
+
 		uint32_t GetRingFrames() const { return static_cast<uint32_t>(m_slots.size()); }
 		uint64_t GetDroppedCount() const { return m_dropped; }
 		uint64_t GetHarvestedCount() const { return m_harvested; }
@@ -62,6 +67,7 @@ namespace pwg::debug
 		/** @brief Latest available GPU time of a pass (ms), NotAvailable before the first result. */
 		double GetLatestPassMs(GpuPass pass) const { return m_latestPassMs[static_cast<size_t>(pass)]; }
 		double GetLatestFrameMs() const { return m_latestFrameMs; }
+		double GetLatestSpanMs(GpuSpan span) const { return m_latestSpanMs[static_cast<size_t>(span)]; }
 
 	private:
 		struct Slot
@@ -73,11 +79,17 @@ namespace pwg::debug
 			unsigned int frameEndQuery{ 0 };
 			bool frameStartIssued{ false };
 			bool frameEndIssued{ false };
+			std::array<unsigned int, GpuSpanCount * 2> spanQueries{};		/**< Begin and end TIMESTAMP per span. */
+			std::array<uint8_t, GpuSpanCount> spanState{};					/**< 0 not issued, 1 begun, 2 begun and ended. */
 		};
 
 		/** @brief Reads every issued query of the slot that is available and drops the rest. Never blocks. */
 		void HarvestSlot(Slot& slot, FrameStats* stats);
 		bool ReadIfAvailable(unsigned int query, uint64_t& result);
+
+		/** @brief Reads a start/end TIMESTAMP pair if both are available. Returns the span in ms, or NotAvailable. */
+		double ReadTimestampSpan(unsigned int startQuery, unsigned int endQuery);
+		void CountDropped(FrameRecord* record);
 		void DeleteQueries();
 
 		std::vector<Slot> m_slots;
@@ -90,6 +102,7 @@ namespace pwg::debug
 		bool m_reportedMisuse{ false };
 		std::array<double, GpuPassCount> m_latestPassMs{};
 		double m_latestFrameMs{ NotAvailable };
+		std::array<double, GpuSpanCount> m_latestSpanMs{};
 	};
 } // namespace pwg::debug
 

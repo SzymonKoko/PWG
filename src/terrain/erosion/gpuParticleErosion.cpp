@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "debug/debugView.h"
 #include "graphics/shader/computeShader.h"
 #include "graphics/shader/shader.h"
 #include "graphics/texture/texture.h"
@@ -178,6 +179,8 @@ namespace pwg
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glDrawArrays(GL_POINTS, 0, m_activeParticles);
+		// One draw command; points are not triangles, so it adds none.
+		PWG_RENDER_COUNT(AddDraw(0));
 		glDisable(GL_BLEND);
 		glBindVertexArray(0);
 	}

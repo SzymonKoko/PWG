@@ -1,4 +1,5 @@
 #include "postProcessor.h"
+#include "debug/debugView.h"
 
 #include <glad/glad.h>
 #include <glm/vec2.hpp>
@@ -41,6 +42,7 @@ namespace pwg
 		glBindTexture(GL_TEXTURE_2D, sourceTexture);
 		glBindVertexArray(m_vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
+		PWG_RENDER_COUNT(AddDraw(2));
 		glBindVertexArray(0);
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}

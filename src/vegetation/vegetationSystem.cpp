@@ -1,6 +1,7 @@
 #include "vegetationSystem.h"
 
 #include "core/logger/logger.h"
+#include "debug/debugView.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/config.h>
@@ -791,10 +792,13 @@ namespace pwg
 					workerBatches[static_cast<std::size_t>(workerIndex)][batch].push_back(instance.model);
 				}
 			}
+			// Counters are summed here, after the OpenMP loop, never inside it.
+			std::size_t visibleInstances = 0;
 			for (std::size_t batch = 0; batch < batches.size(); ++batch)
 			{
 				std::size_t total = 0;
 				for (const auto& local : workerBatches) total += local[batch].size();
+				visibleInstances += total;
 				batches[batch].reserve(total);
 				for (auto& local : workerBatches)
 				{
@@ -803,10 +807,16 @@ namespace pwg
 				}
 			}
 			float renderDistance = 1.0f;
+			std::size_t candidateInstances = 0;
 			for (const auto& instance : source)
 			{
-				if (instance.modelIndex == modelIndex) renderDistance = std::max(renderDistance, instance.renderDistance);
+				if (instance.modelIndex == modelIndex)
+				{
+					renderDistance = std::max(renderDistance, instance.renderDistance);
+					++candidateInstances;
+				}
 			}
+			PWG_RENDER_COUNT(AddVegetation(modelIndex, model->assetId, visibleInstances, candidateInstances));
 			for (std::size_t submeshIndex = 0; submeshIndex < model->submeshes.size(); ++submeshIndex)
 			{
 				const auto& submesh = model->submeshes[submeshIndex];
@@ -860,10 +870,13 @@ namespace pwg
 #endif
 				workerBatches[static_cast<std::size_t>(workerIndex)][batch].push_back(instance.model);
 			}
+			// Counted after the OpenMP loop, never inside it.
+			std::size_t shadowInstances = 0;
 			for (std::size_t batch = 0; batch < batches.size(); ++batch)
 			{
 				std::size_t total = 0;
 				for (const auto& local : workerBatches) total += local[batch].size();
+				shadowInstances += total;
 				batches[batch].reserve(total);
 				for (auto& local : workerBatches)
 				{
@@ -871,6 +884,7 @@ namespace pwg
 						std::make_move_iterator(local[batch].begin()), std::make_move_iterator(local[batch].end()));
 				}
 			}
+			PWG_RENDER_COUNT(AddVegetationShadow(modelIndex, model->assetId, shadowInstances));
 			for (std::size_t submeshIndex = 0; submeshIndex < model->submeshes.size(); ++submeshIndex)
 			{
 				const auto& submesh = model->submeshes[submeshIndex];

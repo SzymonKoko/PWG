@@ -31,6 +31,38 @@ namespace pwg::debug
 	const char* GetGpuPassName(GpuPass pass);
 
 	/**
+	* @brief GPU spans timed with a TIMESTAMP pair. A span may lie inside an active TIME_ELAPSED pass
+	* (spec 4.3), which is how work nested in a pass is timed: TIME_ELAPSED queries cannot nest (spec 4.2).
+	*/
+	enum class GpuSpan : uint8_t
+	{
+		SHADOW_CASCADE_0,
+		SHADOW_CASCADE_1,
+		SHADOW_CASCADE_2,
+		COUNT
+	};
+
+	constexpr size_t GpuSpanCount = static_cast<size_t>(GpuSpan::COUNT);
+
+	/** @brief Number of shadow cascades with their own span and counters. */
+	constexpr size_t ShadowCascadeCount = 3;
+
+	/** @brief Number of terrain LOD levels counted per frame (MAX_LOD in LODManager.h). */
+	constexpr size_t TerrainLodCount = 5;
+
+	/**
+	* @brief Counter slots: one per GpuPass plus a last slot for draws outside any pass scope.
+	*/
+	constexpr size_t CounterPassCount = GpuPassCount + 1;
+	constexpr size_t OtherCounterPass = GpuPassCount;
+
+	/** @brief Short span name used in the UI. */
+	const char* GetGpuSpanName(GpuSpan span);
+
+	/** @brief Counter slot name: the pass name, or "other" for the last slot. */
+	const char* GetCounterPassName(size_t slot);
+
+	/**
 	* @brief Frame-level CPU phases measured with steady_clock in every build.
 	*/
 	enum class FramePhase : uint8_t
@@ -57,7 +89,18 @@ namespace pwg::debug
 		std::array<double, FramePhaseCount> phaseMs{};						/**< CPU time per FramePhase. */
 		double gpuFrameMs{ NotAvailable };									/**< TIMESTAMP span over scene and ImGui rendering. */
 		std::array<double, GpuPassCount> gpuPassMs{};						/**< TIME_ELAPSED per pass, NotAvailable if not timed. */
+		std::array<double, GpuSpanCount> gpuSpanMs{};						/**< TIMESTAMP span per GpuSpan, NotAvailable if not timed. */
 		uint32_t gpuDropped{ 0 };											/**< GPU samples of this frame that were not ready when their slot was reused. */
+
+		// Render counters (section 5.5). Valid only if countersValid is true; otherwise they are "not available", not 0.
+		bool countersValid{ false };										/**< Counting was on for the whole frame. */
+		std::array<uint32_t, CounterPassCount> drawCalls{};					/**< GL draw commands per counter slot. */
+		std::array<uint64_t, CounterPassCount> triangles{};					/**< Submitted triangles per counter slot. */
+		std::array<uint32_t, TerrainLodCount> chunksVisible{};				/**< Main pass: chunks drawn per LOD. */
+		uint32_t chunksCulled{ 0 };											/**< Main pass: chunk count minus drawn chunks. */
+		uint64_t vegetationVisible{ 0 };									/**< Main pass: instances drawn, summed over models. */
+		uint64_t vegetationCulled{ 0 };										/**< Main pass: candidates minus drawn instances. */
+		uint64_t vegetationShadow{ 0 };										/**< Shadow pass: tree instances drawn, summed over cascades. */
 	};
 
 	/**

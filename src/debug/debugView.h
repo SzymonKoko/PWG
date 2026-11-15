@@ -8,6 +8,7 @@
 #include "debug/cpuProfiler.h"
 #include "debug/frameStats.h"
 #include "debug/gpuProfiler.h"
+#include "debug/renderStats.h"
 
 // Set by CMake (option PWG_DEBUG_VIEW_INSTRUMENTATION, default ON).
 #ifndef PWG_DEBUG_VIEW_INSTRUMENTATION
@@ -74,17 +75,28 @@ namespace pwg::debug
 		/** @brief Ring size K of the GPU query ring, applied at the next frame begin. */
 		void SetGpuRingFrames(uint32_t frames) { m_requestedRingFrames = frames; }
 
+		/** @brief Detailed option: one TIMESTAMP span per shadow cascade inside the shadow pass timer. Off by default. */
+		void SetDetailedShadowTiming(bool enabled) { m_detailedShadowTiming = enabled; }
+		bool IsDetailedShadowTiming() const { return m_detailedShadowTiming; }
+
 		uint64_t GetFrameIndex() const { return m_frameIndex; }
 		CpuProfiler& GetCpuProfiler() { return m_cpu; }
 		GpuProfiler& GetGpuProfiler() { return m_gpu; }
+		RenderStats& GetRenderStats() { return m_render; }
 		const FrameStats& GetFrameStats() const { return m_frameStats; }
 
 		/** @brief "Performance" tab of the Debug window (debugViewPanel.cpp). */
 		void DrawPerformanceTab();
 
+		/** @brief "Render" tab of the Debug window: render counters (debugViewPanel.cpp). */
+		void DrawRenderTab();
+
 	private:
 		/** @brief GPU query and CPU scope part of the Performance tab (instrumented builds only). */
 		void DrawProfilerSection();
+
+		/** @brief Counter tables of the Render tab (instrumented builds only). */
+		void DrawRenderCounters();
 
 		static inline DebugView* s_instance{ nullptr };
 		static inline std::atomic<bool> s_enabled{ false };
@@ -92,12 +104,14 @@ namespace pwg::debug
 		Window& m_window;
 		CpuProfiler m_cpu;
 		GpuProfiler m_gpu;
+		RenderStats m_render;
 		FrameStats m_frameStats;
 
 		uint64_t m_frameIndex{ 0 };
 		bool m_frameStarted{ false };
 		bool m_gpuInitialized{ false };
 		uint32_t m_requestedRingFrames{ GpuProfiler::DefaultRingFrames };
+		bool m_detailedShadowTiming{ false };
 		Clock::time_point m_frameBegin{};
 
 		bool m_benchmark{ false };
@@ -188,6 +202,86 @@ namespace pwg::debug
 		GpuPass m_pass;
 		bool m_active{ false };
 	};
+
+	/**
+	* @brief RAII render pass, use through PWG_RENDER_PASS. Combines a CPU scope, the pass's TIME_ELAPSED
+	* timer and the counter slot of the draws inside it. Its CPU time is command submission, not GPU time.
+	*/
+	class RenderPassScope
+	{
+	public:
+		RenderPassScope(GpuPass pass, const char* name) : m_cpu(name), m_gpu(pass), m_pass(pass)
+		{
+			if (DebugView::IsEnabled())
+			{
+				m_previous = DebugView::Get().GetRenderStats().BeginPass(pass);
+				m_start = DebugView::Clock::now();
+				m_active = true;
+			}
+		}
+		~RenderPassScope()
+		{
+			if (m_active && DebugView::HasInstance())
+			{
+				DebugView::Get().GetRenderStats().EndPass(m_pass, m_previous, DebugView::Clock::now() - m_start);
+			}
+		}
+		RenderPassScope(const RenderPassScope&) = delete;
+		RenderPassScope& operator=(const RenderPassScope&) = delete;
+
+	private:
+		CpuScope m_cpu;
+		GpuScope m_gpu;
+		GpuPass m_pass;
+		size_t m_previous{ OtherCounterPass };
+		DebugView::Clock::time_point m_start{};
+		bool m_active{ false };
+	};
+
+	/**
+	* @brief RAII shadow cascade inside the shadow pass, use through PWG_SHADOW_CASCADE.
+	* Sets the cascade of the shadow counters and, with the detailed option on, times the cascade with a
+	* TIMESTAMP pair. A TIME_ELAPSED timer cannot be used here because the shadow pass timer is active.
+	*/
+	class ShadowCascadeScope
+	{
+	public:
+		explicit ShadowCascadeScope(int cascade)
+		{
+			if (!DebugView::IsEnabled())
+			{
+				return;
+			}
+			DebugView& view = DebugView::Get();
+			view.GetRenderStats().SetCascade(cascade);
+			m_counting = true;
+			if (view.IsDetailedShadowTiming() && cascade >= 0 && static_cast<size_t>(cascade) < ShadowCascadeCount)
+			{
+				m_span = static_cast<GpuSpan>(static_cast<size_t>(GpuSpan::SHADOW_CASCADE_0) + static_cast<size_t>(cascade));
+				m_spanActive = view.GetGpuProfiler().BeginSpan(m_span);
+			}
+		}
+		~ShadowCascadeScope()
+		{
+			if (!m_counting || !DebugView::HasInstance())
+			{
+				return;
+			}
+			DebugView& view = DebugView::Get();
+			if (m_spanActive)
+			{
+				view.GetGpuProfiler().EndSpan(m_span);
+			}
+			view.GetRenderStats().SetCascade(-1);
+		}
+		ShadowCascadeScope(const ShadowCascadeScope&) = delete;
+		ShadowCascadeScope& operator=(const ShadowCascadeScope&) = delete;
+
+	private:
+		GpuSpan m_span{ GpuSpan::COUNT };
+		bool m_counting{ false };
+		bool m_spanActive{ false };
+	};
 } // namespace pwg::debug
 
 #define PWG_DEBUG_CONCAT_INNER(a, b) a##b
@@ -201,11 +295,20 @@ namespace pwg::debug
 /** @brief Start and end TIMESTAMP of gpu_frame_ms. */
 #define PWG_GPU_FRAME_START() do { if (::pwg::debug::DebugView::IsEnabled()) ::pwg::debug::DebugView::Get().GetGpuProfiler().MarkFrameStart(); } while (0)
 #define PWG_GPU_FRAME_END() do { if (::pwg::debug::DebugView::IsEnabled()) ::pwg::debug::DebugView::Get().GetGpuProfiler().MarkFrameEnd(); } while (0)
+/** @brief Render pass: CPU scope `name` (string literal), GPU timer of `pass` and counter slot of its draws. */
+#define PWG_RENDER_PASS(pass, name) ::pwg::debug::RenderPassScope PWG_DEBUG_CONCAT(pwgRenderPass_, __LINE__){ pass, name }
+/** @brief Shadow cascade `cascade` inside the shadow pass: cascade counters and the optional per-cascade span. */
+#define PWG_SHADOW_CASCADE(cascade) ::pwg::debug::ShadowCascadeScope PWG_DEBUG_CONCAT(pwgShadowCascade_, __LINE__){ cascade }
+/** @brief Calls a RenderStats member, e.g. PWG_RENDER_COUNT(AddDraw(n)). The arguments are evaluated only when enabled. */
+#define PWG_RENDER_COUNT(call) do { if (::pwg::debug::DebugView::IsEnabled()) ::pwg::debug::DebugView::Get().GetRenderStats().call; } while (0)
 #else
 #define PWG_CPU_SCOPE(name) ((void)0)
 #define PWG_GPU_SCOPE(pass) ((void)0)
 #define PWG_GPU_FRAME_START() ((void)0)
 #define PWG_GPU_FRAME_END() ((void)0)
+#define PWG_RENDER_PASS(pass, name) ((void)0)
+#define PWG_SHADOW_CASCADE(cascade) ((void)0)
+#define PWG_RENDER_COUNT(call) ((void)0)
 #endif
 
 #endif // !SRC_DEBUG_DEBUGVIEW_H_

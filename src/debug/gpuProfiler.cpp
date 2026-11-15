@@ -3,6 +3,7 @@
 #include "core/logger/logger.h"
 
 #include <algorithm>
+#include <cmath>
 
 void pwg::debug::GpuProfiler::Init(uint32_t ringFrames, FrameStats* stats)
 {
@@ -24,6 +25,7 @@ void pwg::debug::GpuProfiler::Init(uint32_t ringFrames, FrameStats* stats)
 		glCreateQueries(GL_TIME_ELAPSED, static_cast<GLsizei>(GpuPassCount), slot.passQueries.data());
 		glCreateQueries(GL_TIMESTAMP, 1, &slot.frameStartQuery);
 		glCreateQueries(GL_TIMESTAMP, 1, &slot.frameEndQuery);
+		glCreateQueries(GL_TIMESTAMP, static_cast<GLsizei>(slot.spanQueries.size()), slot.spanQueries.data());
 		slot.frameIndex = UINT64_MAX;
 	}
 
@@ -38,6 +40,7 @@ void pwg::debug::GpuProfiler::Init(uint32_t ringFrames, FrameStats* stats)
 	m_activePass = GpuPass::COUNT;
 	m_latestPassMs.fill(NotAvailable);
 	m_latestFrameMs = NotAvailable;
+	m_latestSpanMs.fill(NotAvailable);
 
 	PWG_INFO("GPU profiler: ring of {} frames, counter bits TIME_ELAPSED={} TIMESTAMP={}",
 		m_slots.size(), m_timeElapsedBits, m_timestampBits);
@@ -62,6 +65,7 @@ void pwg::debug::GpuProfiler::DeleteQueries()
 		glDeleteQueries(static_cast<GLsizei>(GpuPassCount), slot.passQueries.data());
 		glDeleteQueries(1, &slot.frameStartQuery);
 		glDeleteQueries(1, &slot.frameEndQuery);
+		glDeleteQueries(static_cast<GLsizei>(slot.spanQueries.size()), slot.spanQueries.data());
 	}
 }
 
@@ -150,6 +154,40 @@ void pwg::debug::GpuProfiler::MarkFrameEnd()
 	m_current->frameEndIssued = true;
 }
 
+bool pwg::debug::GpuProfiler::BeginSpan(GpuSpan span)
+{
+	const size_t index = static_cast<size_t>(span);
+	if (!m_current || index >= GpuSpanCount)
+	{
+		return false;
+	}
+	// A second begin in the same frame would overwrite the first TIMESTAMP of the span.
+	if (m_current->spanState[index] != 0)
+	{
+		if (!m_reportedMisuse)
+		{
+			PWG_ERROR("GPU profiler: span '{}' not timed (repeated in one frame)", GetGpuSpanName(span));
+			m_reportedMisuse = true;
+		}
+		return false;
+	}
+	// A TIMESTAMP may be issued while a TIME_ELAPSED query is active (spec 4.3), so a span can lie inside a pass.
+	glQueryCounter(m_current->spanQueries[index * 2], GL_TIMESTAMP);
+	m_current->spanState[index] = 1;
+	return true;
+}
+
+void pwg::debug::GpuProfiler::EndSpan(GpuSpan span)
+{
+	const size_t index = static_cast<size_t>(span);
+	if (!m_current || index >= GpuSpanCount || m_current->spanState[index] != 1)
+	{
+		return;
+	}
+	glQueryCounter(m_current->spanQueries[index * 2 + 1], GL_TIMESTAMP);
+	m_current->spanState[index] = 2;
+}
+
 bool pwg::debug::GpuProfiler::ReadIfAvailable(unsigned int query, uint64_t& result)
 {
 	GLint available = GL_FALSE;
@@ -163,6 +201,28 @@ bool pwg::debug::GpuProfiler::ReadIfAvailable(unsigned int query, uint64_t& resu
 	glGetQueryObjectui64v(query, GL_QUERY_RESULT, &value);
 	result = value;
 	return true;
+}
+
+double pwg::debug::GpuProfiler::ReadTimestampSpan(unsigned int startQuery, unsigned int endQuery)
+{
+	uint64_t startNs = 0;
+	uint64_t endNs = 0;
+	// Check the end first: if it is available, the earlier start is too (spec 4.2.1), but both are
+	// checked so that no read can wait.
+	if (ReadIfAvailable(endQuery, endNs) && ReadIfAvailable(startQuery, startNs))
+	{
+		return static_cast<double>(endNs - startNs) * 1.0e-6;
+	}
+	return NotAvailable;
+}
+
+void pwg::debug::GpuProfiler::CountDropped(FrameRecord* record)
+{
+	++m_dropped;
+	if (record)
+	{
+		++record->gpuDropped;
+	}
 }
 
 void pwg::debug::GpuProfiler::HarvestSlot(Slot& slot, FrameStats* stats)
@@ -190,23 +250,15 @@ void pwg::debug::GpuProfiler::HarvestSlot(Slot& slot, FrameStats* stats)
 		}
 		else
 		{
-			++m_dropped;
-			if (record)
-			{
-				++record->gpuDropped;
-			}
+			CountDropped(record);
 		}
 	}
 
 	if (slot.frameStartIssued && slot.frameEndIssued)
 	{
-		uint64_t startNs = 0;
-		uint64_t endNs = 0;
-		// Check the end first: if it is available, the earlier start is too (spec 4.2.1), but both are
-		// checked so that no read can wait.
-		if (ReadIfAvailable(slot.frameEndQuery, endNs) && ReadIfAvailable(slot.frameStartQuery, startNs))
+		const double ms = ReadTimestampSpan(slot.frameStartQuery, slot.frameEndQuery);
+		if (!std::isnan(ms))
 		{
-			const double ms = static_cast<double>(endNs - startNs) * 1.0e-6;
 			m_latestFrameMs = ms;
 			++m_harvested;
 			if (record)
@@ -216,13 +268,34 @@ void pwg::debug::GpuProfiler::HarvestSlot(Slot& slot, FrameStats* stats)
 		}
 		else
 		{
-			++m_dropped;
-			if (record)
-			{
-				++record->gpuDropped;
-			}
+			CountDropped(record);
 		}
 	}
 	slot.frameStartIssued = false;
 	slot.frameEndIssued = false;
+
+	for (size_t span = 0; span < GpuSpanCount; ++span)
+	{
+		const uint8_t state = slot.spanState[span];
+		slot.spanState[span] = 0;
+		if (state == 0)
+		{
+			continue;
+		}
+		// A span that was begun but never ended has no result and counts as dropped.
+		const double ms = state == 2 ? ReadTimestampSpan(slot.spanQueries[span * 2], slot.spanQueries[span * 2 + 1]) : NotAvailable;
+		if (!std::isnan(ms))
+		{
+			m_latestSpanMs[span] = ms;
+			++m_harvested;
+			if (record)
+			{
+				record->gpuSpanMs[span] = ms;
+			}
+		}
+		else
+		{
+			CountDropped(record);
+		}
+	}
 }

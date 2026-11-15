@@ -34,6 +34,22 @@ const char* pwg::debug::GetGpuPassName(GpuPass pass)
 	}
 }
 
+const char* pwg::debug::GetGpuSpanName(GpuSpan span)
+{
+	switch (span)
+	{
+	case GpuSpan::SHADOW_CASCADE_0: return "shadow cascade 0";
+	case GpuSpan::SHADOW_CASCADE_1: return "shadow cascade 1";
+	case GpuSpan::SHADOW_CASCADE_2: return "shadow cascade 2";
+	default: return "unknown";
+	}
+}
+
+const char* pwg::debug::GetCounterPassName(size_t slot)
+{
+	return slot < GpuPassCount ? GetGpuPassName(static_cast<GpuPass>(slot)) : "other";
+}
+
 pwg::debug::FrameStats::FrameStats(uint32_t capacity, uint32_t window)
 	: m_records(std::max<uint32_t>(capacity, 1)),
 	  m_window(std::clamp<uint32_t>(window, 1, std::max<uint32_t>(capacity, 1)))
@@ -52,6 +68,7 @@ pwg::debug::FrameRecord& pwg::debug::FrameStats::BeginRecord(uint64_t frameIndex
 	record = FrameRecord{};
 	record.frameIndex = frameIndex;
 	record.gpuPassMs.fill(NotAvailable);
+	record.gpuSpanMs.fill(NotAvailable);
 	return record;
 }
 

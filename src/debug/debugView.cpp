@@ -74,6 +74,7 @@ void pwg::debug::DebugView::BeginFrame()
 		}
 		m_gpu.BeginFrame(m_frameIndex, m_frameStats);
 		m_cpu.BeginFrame(m_frameIndex);
+		m_render.BeginFrame(m_frameIndex, IsEnabled());
 	}
 }
 
@@ -83,6 +84,7 @@ void pwg::debug::DebugView::EndFrame()
 	{
 		m_gpu.EndFrame();
 		m_cpu.EndFrame();
+		m_render.EndFrame(IsEnabled(), m_frameStats.Find(m_frameIndex));
 	}
 }
 
