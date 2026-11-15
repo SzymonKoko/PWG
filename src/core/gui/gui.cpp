@@ -204,7 +204,7 @@ void pwg::Gui::ApplyDarkGraphiteStyle()
 	colors[ImGuiCol_ButtonActive] = ImVec4(0.20f, 0.42f, 0.62f, 1.00f);
 	colors[ImGuiCol_Tab] = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
 	colors[ImGuiCol_TabHovered] = ImVec4(0.26f, 0.50f, 0.72f, 0.80f);
-	colors[ImGuiCol_TabActive] = ImVec4(0.18f, 0.38f, 0.55f, 1.00f);
+	colors[ImGuiCol_TabSelected] = ImVec4(0.18f, 0.38f, 0.55f, 1.00f);
 	colors[ImGuiCol_CheckMark] = ImVec4(0.40f, 0.72f, 1.00f, 1.00f);
 	colors[ImGuiCol_SliderGrab] = ImVec4(0.34f, 0.60f, 0.84f, 1.00f);
 	colors[ImGuiCol_SliderGrabActive] = ImVec4(0.46f, 0.76f, 1.00f, 1.00f);
