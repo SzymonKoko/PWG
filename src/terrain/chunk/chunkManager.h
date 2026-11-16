@@ -141,6 +141,7 @@ namespace pwg
 			void* fence{ nullptr };
 			std::size_t byteSize{ 0 };
 			bool pending{ false };
+			std::uint64_t queuedFrame{ UINT64_MAX };		/**< Debug View: frame of the queue, for the readback latency. */
 		};
 		std::array<HeightReadbackSlot, 2> m_heightReadbacks{};
 		std::size_t m_nextHeightReadback{ 0 };

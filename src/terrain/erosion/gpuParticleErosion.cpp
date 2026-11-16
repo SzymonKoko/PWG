@@ -94,6 +94,8 @@ namespace pwg
 
 	float GpuParticleErosion::GetAmount() const { return m_amount; }
 	int GpuParticleErosion::GetParticleCount() const { return m_activeParticles; }
+	unsigned int GpuParticleErosion::GetStepCount() const { return m_step; }
+	bool GpuParticleErosion::RanTalusLastStep() const { return m_lastStepTalus; }
 
 	void GpuParticleErosion::Step(
 		const std::shared_ptr<Texture>& height,
@@ -104,6 +106,8 @@ namespace pwg
 		const std::shared_ptr<Texture>& erosion,
 		const std::shared_ptr<Texture>& erosionDelta)
 	{
+		PWG_CPU_SCOPE("GpuParticleErosion::Step");
+		m_lastStepTalus = false;
 		if (!m_particleShader || !m_applyShader || m_activeParticles <= 0) return;
 
 		m_particleShader->ActivateShader();
@@ -149,6 +153,7 @@ namespace pwg
 
 		if (m_talusShader && (m_step & 7u) == 0u)
 		{
+			m_lastStepTalus = true;
 			for (int iteration = 0; iteration < 2; ++iteration)
 			{
 				m_talusShader->ActivateShader();

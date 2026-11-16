@@ -1,4 +1,5 @@
 #include "terrainComputePipeline.h"
+#include "debug/debugView.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -71,6 +72,28 @@ namespace pwg
 			glBindTexture(GL_TEXTURE_2D, 0);
 			masks[name] = mask;
 			return mask;
+		}
+
+		/** @brief Hands the worker's stage times of a finished hydrology run to the Debug View (main thread). */
+		void PublishHydrologyTiming(const DrainageNetworkResult& result)
+		{
+			if constexpr (debug::InstrumentationCompiled)
+			{
+				if (!debug::DebugView::IsEnabled()) return;
+				auto& stats = debug::DebugView::Get().GetSimulationStats();
+				if (!result.IsValid())
+				{
+					stats.AbortHydrologyRun();
+					return;
+				}
+				std::array<const char*, DrainageNetworkResult::StageCount> names{};
+				for (size_t i = 0; i < names.size(); ++i)
+				{
+					names[i] = DrainageNetworkGenerator::GetStageName(static_cast<int>(i) + 1);
+				}
+				stats.SubmitHydrologyResult(result.stageMs.data(), result.stageMs.size(), names.data(),
+					result.resampleMs, result.workerMs);
+			}
 		}
 	}
 
@@ -208,6 +231,10 @@ namespace pwg
 
 	bool TerrainComputePipeline::ExecuteUniversalGraph(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
+		// TIMESTAMP span over the whole call; the nodes inside use TIME_ELAPSED (design 5.6).
+		PWG_SIM_EVENT_GPU(graphEvent, debug::SimEventType::GRAPH_EXECUTE, debug::GpuEventMode::SPAN);
+		PWG_SIM_EVENT_SET(graphEvent, resolution, m_size);
+		PWG_SIM_EVENT_SET(graphEvent, success, false);
 		PauseParticleErosion();
 		PauseThermalErosion();
 		m_particleErosionReady = false;
@@ -251,6 +278,12 @@ namespace pwg
 			{
 				continue;
 			}
+			PWG_SIM_EVENT_GPU(nodeEvent, debug::SimEventType::GRAPH_NODE, debug::GpuEventMode::ELAPSED);
+			PWG_SIM_EVENT_DO(nodeEvent,
+				nodeEvent.Event().nodeId = node->id;
+				nodeEvent.Event().nodeType = node->typeId;
+				nodeEvent.Event().nodeEnabled = node->enabled;
+				nodeEvent.Event().resolution = m_size);
 			if (!node->enabled)
 			{
 				if (node->typeId == "particleErosion" || node->typeId == "thermalErosion")
@@ -530,6 +563,8 @@ namespace pwg
 			// Asset nodes are compiled separately so spawning cannot reset erosion or water.
 		}
 
+		PWG_SIM_EVENT_GPU(maskPassEvent, debug::SimEventType::GRAPH_MASK_PASS, debug::GpuEventMode::ELAPSED);
+		PWG_SIM_EVENT_SET(maskPassEvent, resolution, m_size);
 		masks.at("WaterMask")->texture->ClearTexture();
 		masks.at("SedimentMask")->texture->ClearTexture();
 		masks.at("FlowAccumulationMask")->texture->ClearTexture();
@@ -551,6 +586,8 @@ namespace pwg
 		m_hydrologyGenerated = false;
 		m_hydrologyStatus = "Hydrology ready to generate";
 		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
+		PWG_SIM_EVENT_END(maskPassEvent);
+		PWG_SIM_EVENT_GPU(previewEvent, debug::SimEventType::GRAPH_PREVIEWS, debug::GpuEventMode::ELAPSED);
 		for (const auto& node : m_universalGraphAsset.nodes)
 		{
 			if (!node.enabled || node.typeId != "particleErosion") continue;
@@ -622,8 +659,10 @@ namespace pwg
 				previewShader->MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 			}
 		}
+		PWG_SIM_EVENT_END(previewEvent);
 		m_terrainMasks = masks;
 		InvalidateWaterRenderCache();
+		PWG_SIM_EVENT_SET(graphEvent, success, true);
 		return true;
 	}
 
@@ -675,6 +714,8 @@ namespace pwg
 	bool TerrainComputePipeline::StepParticleErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
 		if (!m_particleErosionReady || !m_gpuParticleErosion) return false;
+		PWG_SIM_EVENT(stepEvent, debug::SimEventType::HYDRAULIC_STEP);
+		PWG_SIM_EVENT_GPU_BEGIN(stepEvent, debug::GpuEventMode::ELAPSED);
 		m_gpuParticleErosion->Step(
 			masks.at("FinalHeight")->texture,
 			masks.at("ErosionWaterMask")->texture,
@@ -683,9 +724,19 @@ namespace pwg
 			masks.at("DepositMask")->texture,
 			masks.at("ErosionMask")->texture,
 			masks.at("ErosionDelta")->texture);
+		PWG_SIM_EVENT_GPU_END(stepEvent);
 		++m_particleStepCount;
+		PWG_SIM_EVENT_DO(stepEvent,
+			stepEvent.Event().stepIndex = m_particleStepCount;
+			stepEvent.Event().solverStep = m_gpuParticleErosion->GetStepCount();
+			stepEvent.Event().talusStep = m_gpuParticleErosion->RanTalusLastStep();
+			stepEvent.Event().activeParticles = m_gpuParticleErosion->GetParticleCount();
+			stepEvent.Event().refreshStep = (m_particleStepCount & 3u) == 0u;
+			stepEvent.Event().resolution = m_size);
 		if ((m_particleStepCount & 3u) == 0u)
 		{
+			PWG_SIM_EVENT_GPU(refreshEvent, debug::SimEventType::HYDRAULIC_REFRESH, debug::GpuEventMode::ELAPSED);
+			PWG_SIM_EVENT_SET(refreshEvent, stepIndex, m_particleStepCount);
 			RefreshMaskPass(masks);
 			RefreshParticleErosionPreviews(masks);
 		}
@@ -825,6 +876,7 @@ namespace pwg
 	bool TerrainComputePipeline::StepThermalErosion(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks)
 	{
 		if (!m_thermalErosionReady || !m_gpuThermalErosion) return false;
+		PWG_SIM_EVENT(stepEvent, debug::SimEventType::THERMAL_STEP);
 		if (!m_thermalErosionInitialized)
 		{
 			masks.at("ThermalBaseHeight")->texture->CopyFrom(*masks.at("FinalHeight")->texture);
@@ -837,6 +889,8 @@ namespace pwg
 			m_thermalErosionInitialized = true;
 		}
 
+		// Includes the synchronous stability check on every 8th solver step (design F7).
+		PWG_SIM_EVENT_GPU_BEGIN(stepEvent, debug::GpuEventMode::ELAPSED);
 		const bool stepped = m_gpuThermalErosion->Step(
 			masks.at("FinalHeight")->texture,
 			m_thermalHardness,
@@ -844,15 +898,26 @@ namespace pwg
 			masks.at("ThermalDebrisMask")->texture,
 			masks.at("ThermalErosionMask")->texture,
 			masks.at("ThermalDepositionMask")->texture);
+		PWG_SIM_EVENT_GPU_END(stepEvent);
 		if (!stepped)
 		{
+			// No step ran (already stable or nothing to do), so there is no step to report.
+			PWG_SIM_EVENT_DISCARD(stepEvent);
 			if (m_gpuThermalErosion->IsStable()) PauseThermalErosion();
 			return false;
 		}
 
 		++m_thermalStepCount;
+		PWG_SIM_EVENT_DO(stepEvent,
+			stepEvent.Event().stepIndex = m_thermalStepCount;
+			stepEvent.Event().solverStep = m_gpuThermalErosion->GetStepCount();
+			stepEvent.Event().stable = m_gpuThermalErosion->IsStable();
+			stepEvent.Event().refreshStep = (m_thermalStepCount & 3u) == 0u;
+			stepEvent.Event().resolution = m_size);
 		if ((m_thermalStepCount & 3u) == 0u)
 		{
+			PWG_SIM_EVENT_GPU(refreshEvent, debug::SimEventType::THERMAL_REFRESH, debug::GpuEventMode::ELAPSED);
+			PWG_SIM_EVENT_SET(refreshEvent, stepIndex, m_thermalStepCount);
 			RefreshMaskPass(masks);
 			RefreshThermalErosionPreviews(masks);
 		}
@@ -1017,8 +1082,13 @@ namespace pwg
 			m_hydrologyStatus = "Add a Drainage Network node first";
 			return false;
 		}
+		PWG_SIM_CALL(BeginHydrologyRun());
+		PWG_SIM_EVENT(readbackEvent, debug::SimEventType::HYDROLOGY_READBACK);
+		PWG_SIM_EVENT_SET(readbackEvent, resolution, m_size);
 		auto height = masks.at("FinalHeight")->texture->ReadFloatData();
+		PWG_SIM_EVENT_END(readbackEvent);
 		if (!m_drainageNetworkGenerator->Start(std::move(height), m_size, settings)) return false;
+		PWG_SIM_CALL(MarkHydrologyStarted());
 		m_hydrologyStatus = "Preparing heightmap";
 		return true;
 	}
@@ -1029,12 +1099,15 @@ namespace pwg
 		if (m_drainageNetworkGenerator->IsRunning()) m_hydrologyStatus = m_drainageNetworkGenerator->GetStage();
 		DrainageNetworkResult result;
 		if (!m_drainageNetworkGenerator->TryTakeResult(result)) return false;
+		PublishHydrologyTiming(result);
 		if (!result.IsValid())
 		{
 			m_hydrologyStatus = result.cancelled ? "Hydrology cancelled" : "Hydrology generation failed";
 			return false;
 		}
 
+		PWG_SIM_EVENT(uploadEvent, debug::SimEventType::HYDROLOGY_UPLOAD);
+		PWG_SIM_EVENT_SET(uploadEvent, resolution, m_size);
 		auto upload = [&](const char* name, const std::vector<float>& values)
 		{
 			masks.at(name)->texture->UpdateFloatData(values, m_size, m_size);
@@ -1058,6 +1131,7 @@ namespace pwg
 		}
 		RefreshHydrologyGraphOutputs(masks);
 		m_graph->ExecutePasses(TerrainPassTypes::MASK, masks, m_terrainPassContext);
+		PWG_SIM_EVENT_END(uploadEvent);
 		m_terrainMasks = masks;
 		m_hydrologyGenerated = true;
 		m_hydrologyStatus = "Hydrology ready";

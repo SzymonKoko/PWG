@@ -8,6 +8,31 @@
 
 namespace pwg::debug
 {
+	/** @brief How a one-shot GPU event is timed. */
+	enum class GpuEventMode : uint8_t
+	{
+		ELAPSED,	/**< TIME_ELAPSED query. Falls back to a TIMESTAMP pair while another TIME_ELAPSED query is active. */
+		SPAN		/**< TIMESTAMP pair. May contain ELAPSED events and passes (spec 4.3). */
+	};
+
+	/** @brief Timer that measured a one-shot GPU event. */
+	enum class GpuTimerKind : uint8_t
+	{
+		NONE,			/**< Not timed on the GPU (no GPU part, or the event pool refused it). */
+		TIME_ELAPSED,
+		TIMESTAMP_PAIR
+	};
+
+	/** @brief Short name of a GpuTimerKind for the UI. */
+	const char* GetGpuTimerKindName(GpuTimerKind kind);
+
+	/** @brief Result of a one-shot GPU event, produced by GpuProfiler::HarvestEvents. */
+	struct GpuEventResult
+	{
+		uint64_t id{ 0 };
+		double ms{ NotAvailable };
+	};
+
 	/**
 	* @brief Non-blocking GPU timing with query objects (OpenGL 4.5 spec 4.2, 4.3).
 	*
@@ -18,6 +43,10 @@ namespace pwg::debug
 	* returned GL_TRUE. A query that is not ready is dropped and counted, never waited for and never
 	* written as 0. At most one TIME_ELAPSED query is active at a time, and each pass is timed at most once
 	* per frame. All queries live in the main GL context (query objects are not shared between contexts).
+	*
+	* One-shot events (graph nodes, erosion steps) use a separate pool of query objects that grows on demand.
+	* An event stays in the pool until its result is available, so it is never dropped; HarvestEvents reads
+	* the available ones once per frame without blocking and recycles their query objects.
 	*/
 	class GpuProfiler
 	{
@@ -58,6 +87,21 @@ namespace pwg::debug
 		bool BeginSpan(GpuSpan span);
 		void EndSpan(GpuSpan span);
 
+		/**
+		* @brief Starts a one-shot GPU event. Returns its id, or 0 if it is not timed (profiler not initialised,
+		* pool full). `kind` receives the timer actually used: an ELAPSED event becomes a TIMESTAMP pair while a
+		* pass or another ELAPSED event holds the single TIME_ELAPSED query (spec 4.2).
+		*/
+		uint64_t BeginEvent(GpuEventMode mode, GpuTimerKind* kind = nullptr);
+		void EndEvent(uint64_t id);
+
+		/** @brief Appends the results of finished events that are available to `out`. Never blocks. */
+		void HarvestEvents(std::vector<GpuEventResult>& out);
+
+		size_t GetPendingEventCount() const { return m_events.size(); }
+		uint64_t GetEventFallbackCount() const { return m_eventFallbacks; }
+		uint64_t GetEventRefusedCount() const { return m_eventsRefused; }
+
 		uint32_t GetRingFrames() const { return static_cast<uint32_t>(m_slots.size()); }
 		uint64_t GetDroppedCount() const { return m_dropped; }
 		uint64_t GetHarvestedCount() const { return m_harvested; }
@@ -91,6 +135,21 @@ namespace pwg::debug
 		double ReadTimestampSpan(unsigned int startQuery, unsigned int endQuery);
 		void CountDropped(FrameRecord* record);
 		void DeleteQueries();
+		void DeleteEventQueries();
+		unsigned int TakeEventQuery(bool elapsed);
+		void RecycleEventQueries(bool elapsed, unsigned int first, unsigned int second);
+
+		/** @brief One-shot event in the pool, in issue order. */
+		struct EventQuery
+		{
+			uint64_t id{ 0 };
+			unsigned int first{ 0 };		/**< TIME_ELAPSED query, or the start TIMESTAMP. */
+			unsigned int second{ 0 };		/**< End TIMESTAMP (pairs only). */
+			bool elapsed{ false };
+			bool ended{ false };
+		};
+
+		static constexpr size_t MaxPendingEvents = 4096;
 
 		std::vector<Slot> m_slots;
 		Slot* m_current{ nullptr };
@@ -103,6 +162,14 @@ namespace pwg::debug
 		std::array<double, GpuPassCount> m_latestPassMs{};
 		double m_latestFrameMs{ NotAvailable };
 		std::array<double, GpuSpanCount> m_latestSpanMs{};
+
+		std::vector<EventQuery> m_events;
+		std::vector<unsigned int> m_freeElapsedQueries;
+		std::vector<unsigned int> m_freeTimestampQueries;
+		uint64_t m_nextEventId{ 1 };
+		uint64_t m_activeElapsedEvent{ 0 };		/**< Event that holds the TIME_ELAPSED query, 0 if none. */
+		uint64_t m_eventFallbacks{ 0 };
+		uint64_t m_eventsRefused{ 0 };
 	};
 } // namespace pwg::debug
 

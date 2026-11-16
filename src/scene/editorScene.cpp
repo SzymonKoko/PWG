@@ -725,6 +725,11 @@ void pwg::EditorScene::Draw()
             debug::DebugView::Get().DrawRenderTab();
             ImGui::EndTabItem();
         }
+        if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Simulation"))
+        {
+            debug::DebugView::Get().DrawSimulationTab();
+            ImGui::EndTabItem();
+        }
         ImGui::EndTabBar();
     }
 

@@ -34,6 +34,9 @@ namespace pwg
 		void SetAmount(float amount);
 		float GetAmount() const;
 		int GetParticleCount() const;
+		unsigned int GetStepCount() const;
+		/** @brief True if the last Step also ran the talus relaxation (every 8th step). Read by the Debug View. */
+		bool RanTalusLastStep() const;
 
 	private:
 		unsigned int CreateAtomicTexture();
@@ -44,6 +47,7 @@ namespace pwg
 		int m_activeParticles{ 0 };
 		int m_seed{ 1337 };
 		unsigned int m_step{ 0 };
+		bool m_lastStepTalus{ false };
 		float m_amount{ 0.35f };
 		unsigned int m_particleBuffer{ 0 };
 		unsigned int m_debugVao{ 0 };

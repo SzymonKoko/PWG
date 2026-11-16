@@ -4,6 +4,7 @@
 #include <cmath>
 #include <glad/glad.h>
 
+#include "debug/debugView.h"
 #include "graphics/shader/computeShader.h"
 #include "graphics/texture/texture.h"
 
@@ -137,11 +138,18 @@ namespace pwg
 		++m_step;
 		if ((m_step & 7u) == 0u)
 		{
+			// Synchronous: glGetTextureImage waits for the step to finish on the GPU (design F7).
+			PWG_SIM_EVENT(checkEvent, debug::SimEventType::THERMAL_CHECK);
 			unsigned int maximum = 0;
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 			glGetTextureImage(m_maxTransfer, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, sizeof(maximum), &maximum);
 			m_stableChecks = maximum <= 2u ? m_stableChecks + 1 : 0;
 			m_stable = m_stableChecks >= 4;
+			PWG_SIM_EVENT_SET(checkEvent, solverStep, m_step);
+			PWG_SIM_EVENT_SET(checkEvent, stable, m_stable);
+			PWG_SIM_EVENT_END(checkEvent);
+			// Step returns early once stable, so this is the step at which it became stable.
+			if (m_stable) PWG_SIM_CALL(SubmitThermalStable(m_step));
 		}
 		return true;
 	}

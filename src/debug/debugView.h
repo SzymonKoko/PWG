@@ -4,11 +4,13 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <utility>
 #include <vector>
 #include "debug/cpuProfiler.h"
 #include "debug/frameStats.h"
 #include "debug/gpuProfiler.h"
 #include "debug/renderStats.h"
+#include "debug/simulationStats.h"
 
 // Set by CMake (option PWG_DEBUG_VIEW_INSTRUMENTATION, default ON).
 #ifndef PWG_DEBUG_VIEW_INSTRUMENTATION
@@ -84,6 +86,7 @@ namespace pwg::debug
 		GpuProfiler& GetGpuProfiler() { return m_gpu; }
 		RenderStats& GetRenderStats() { return m_render; }
 		const FrameStats& GetFrameStats() const { return m_frameStats; }
+		SimulationStats& GetSimulationStats() { return m_sim; }
 
 		/** @brief "Performance" tab of the Debug window (debugViewPanel.cpp). */
 		void DrawPerformanceTab();
@@ -91,12 +94,18 @@ namespace pwg::debug
 		/** @brief "Render" tab of the Debug window: render counters (debugViewPanel.cpp). */
 		void DrawRenderTab();
 
+		/** @brief "Simulation" tab of the Debug window: graph, erosion, hydrology and readback timing (debugViewPanel.cpp). */
+		void DrawSimulationTab();
+
 	private:
 		/** @brief GPU query and CPU scope part of the Performance tab (instrumented builds only). */
 		void DrawProfilerSection();
 
 		/** @brief Counter tables of the Render tab (instrumented builds only). */
 		void DrawRenderCounters();
+
+		/** @brief Tables of the Simulation tab (instrumented builds only). */
+		void DrawSimulationTables();
 
 		static inline DebugView* s_instance{ nullptr };
 		static inline std::atomic<bool> s_enabled{ false };
@@ -106,6 +115,8 @@ namespace pwg::debug
 		GpuProfiler m_gpu;
 		RenderStats m_render;
 		FrameStats m_frameStats;
+		SimulationStats m_sim;
+		std::vector<GpuEventResult> m_gpuEventResults;	/**< Reused by BeginFrame. */
 
 		uint64_t m_frameIndex{ 0 };
 		bool m_frameStarted{ false };
@@ -121,6 +132,7 @@ namespace pwg::debug
 		bool m_savedVSync{ false };
 
 		std::vector<float> m_plotScratch;		/**< Used by DrawPerformanceTab only. */
+		std::vector<SimEvent> m_simScratch;		/**< Used by DrawSimulationTab only. */
 	};
 
 	/**
@@ -282,6 +294,86 @@ namespace pwg::debug
 		bool m_counting{ false };
 		bool m_spanActive{ false };
 	};
+
+	/**
+	* @brief RAII one-shot event (design section 5.6), use through the PWG_SIM_EVENT macros. Main thread only.
+	*
+	* The CPU time runs from construction to End() or destruction. The GPU part is optional: either the
+	* whole lifetime (second constructor) or a sub-range with BeginGpu/EndGpu. When the Debug View is
+	* disabled it costs one branch and the default construction of an empty SimEvent, and records nothing.
+	*/
+	class SimEventScope
+	{
+	public:
+		explicit SimEventScope(SimEventType type)
+		{
+			if (DebugView::IsEnabled())
+			{
+				DebugView::Get().GetSimulationStats().Open(m_event, type);
+				m_active = true;
+				m_start = DebugView::Clock::now();
+			}
+		}
+		SimEventScope(SimEventType type, GpuEventMode mode) : SimEventScope(type)
+		{
+			BeginGpu(mode);
+		}
+		~SimEventScope() { End(); }
+		SimEventScope(const SimEventScope&) = delete;
+		SimEventScope& operator=(const SimEventScope&) = delete;
+
+		bool IsActive() const { return m_active; }
+		SimEvent& Event() { return m_event; }
+
+		/** @brief Starts the GPU timer of the event. Only the first call has an effect. */
+		void BeginGpu(GpuEventMode mode)
+		{
+			if (m_active && !m_gpuStarted && DebugView::HasInstance())
+			{
+				m_event.gpuEvent = DebugView::Get().GetGpuProfiler().BeginEvent(mode, &m_event.gpuTimer);
+				m_gpuStarted = true;
+			}
+		}
+
+		void EndGpu()
+		{
+			if (m_gpuStarted && !m_gpuEnded && DebugView::HasInstance())
+			{
+				DebugView::Get().GetGpuProfiler().EndEvent(m_event.gpuEvent);
+				m_gpuEnded = true;
+			}
+		}
+
+		/** @brief Drops the event: nothing is submitted, and a GPU result that arrives later is ignored. */
+		void Discard()
+		{
+			EndGpu();
+			m_active = false;
+		}
+
+		/** @brief Ends the event before the end of the scope. Later calls have no effect. */
+		void End()
+		{
+			if (!m_active)
+			{
+				return;
+			}
+			m_active = false;
+			EndGpu();
+			m_event.cpuMs = std::chrono::duration<double, std::milli>(DebugView::Clock::now() - m_start).count();
+			if (DebugView::HasInstance())
+			{
+				DebugView::Get().GetSimulationStats().Close(std::move(m_event));
+			}
+		}
+
+	private:
+		SimEvent m_event;
+		DebugView::Clock::time_point m_start{};
+		bool m_active{ false };
+		bool m_gpuStarted{ false };
+		bool m_gpuEnded{ false };
+	};
 } // namespace pwg::debug
 
 #define PWG_DEBUG_CONCAT_INNER(a, b) a##b
@@ -301,6 +393,21 @@ namespace pwg::debug
 #define PWG_SHADOW_CASCADE(cascade) ::pwg::debug::ShadowCascadeScope PWG_DEBUG_CONCAT(pwgShadowCascade_, __LINE__){ cascade }
 /** @brief Calls a RenderStats member, e.g. PWG_RENDER_COUNT(AddDraw(n)). The arguments are evaluated only when enabled. */
 #define PWG_RENDER_COUNT(call) do { if (::pwg::debug::DebugView::IsEnabled()) ::pwg::debug::DebugView::Get().GetRenderStats().call; } while (0)
+/** @brief One-shot event `var` of SimEventType `type`, CPU-timed until the end of the scope or PWG_SIM_EVENT_END. */
+#define PWG_SIM_EVENT(var, type) ::pwg::debug::SimEventScope var{ type }
+/** @brief As PWG_SIM_EVENT, with a GPU timer (a pwg::debug::GpuEventMode) over the same range. */
+#define PWG_SIM_EVENT_GPU(var, type, mode) ::pwg::debug::SimEventScope var{ type, mode }
+/** @brief GPU timer over a sub-range of the event. */
+#define PWG_SIM_EVENT_GPU_BEGIN(var, mode) var.BeginGpu(mode)
+#define PWG_SIM_EVENT_GPU_END(var) var.EndGpu()
+/** @brief Sets a SimEvent field. `value` is evaluated only when the event is recorded. */
+#define PWG_SIM_EVENT_SET(var, member, value) do { if (var.IsActive()) var.Event().member = (value); } while (0)
+/** @brief Runs `statement` only when the event is recorded. */
+#define PWG_SIM_EVENT_DO(var, statement) do { if (var.IsActive()) { statement; } } while (0)
+#define PWG_SIM_EVENT_END(var) var.End()
+#define PWG_SIM_EVENT_DISCARD(var) var.Discard()
+/** @brief Calls a SimulationStats member. The arguments are evaluated only when enabled. */
+#define PWG_SIM_CALL(call) do { if (::pwg::debug::DebugView::IsEnabled()) ::pwg::debug::DebugView::Get().GetSimulationStats().call; } while (0)
 #else
 #define PWG_CPU_SCOPE(name) ((void)0)
 #define PWG_GPU_SCOPE(pass) ((void)0)
@@ -309,6 +416,15 @@ namespace pwg::debug
 #define PWG_RENDER_PASS(pass, name) ((void)0)
 #define PWG_SHADOW_CASCADE(cascade) ((void)0)
 #define PWG_RENDER_COUNT(call) ((void)0)
+#define PWG_SIM_EVENT(var, type) ((void)0)
+#define PWG_SIM_EVENT_GPU(var, type, mode) ((void)0)
+#define PWG_SIM_EVENT_GPU_BEGIN(var, mode) ((void)0)
+#define PWG_SIM_EVENT_GPU_END(var) ((void)0)
+#define PWG_SIM_EVENT_SET(var, member, value) ((void)0)
+#define PWG_SIM_EVENT_DO(var, statement) ((void)0)
+#define PWG_SIM_EVENT_END(var) ((void)0)
+#define PWG_SIM_EVENT_DISCARD(var) ((void)0)
+#define PWG_SIM_CALL(call) ((void)0)
 #endif
 
 #endif // !SRC_DEBUG_DEBUGVIEW_H_

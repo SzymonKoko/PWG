@@ -804,6 +804,9 @@ namespace pwg
 
 	void ChunkManager::UpdateHeightCache()
 	{
+		// Synchronous readback of FinalHeight (design F8): waits for the GPU and the transfer.
+		PWG_SIM_EVENT(readbackEvent, debug::SimEventType::HEIGHT_READBACK_SYNC);
+		PWG_SIM_EVENT_SET(readbackEvent, resolution, m_worldSize);
 		auto heightMask = m_globalMasks.find("FinalHeight");
 		if (heightMask == m_globalMasks.end() || !heightMask->second || !heightMask->second->texture)
 		{
@@ -837,6 +840,10 @@ namespace pwg
 
 		HeightReadbackSlot& slot = m_heightReadbacks[m_nextHeightReadback];
 		if (slot.pending) return;
+		PWG_SIM_EVENT(queueEvent, debug::SimEventType::HEIGHT_READBACK_QUEUE);
+		PWG_SIM_EVENT_SET(queueEvent, resolution, m_worldSize);
+		slot.queuedFrame = UINT64_MAX;
+		PWG_SIM_EVENT_DO(queueEvent, slot.queuedFrame = queueEvent.Event().frameIndex);
 		const std::size_t byteSize = static_cast<std::size_t>(m_worldSize) * static_cast<std::size_t>(m_worldSize) * sizeof(float);
 		if (slot.buffer == 0) glGenBuffers(1, &slot.buffer);
 		glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.buffer);
@@ -863,6 +870,11 @@ namespace pwg
 			const GLenum result = glClientWaitSync(static_cast<GLsync>(slot.fence), 0, 0);
 			if (result != GL_ALREADY_SIGNALED && result != GL_CONDITION_SATISFIED) continue;
 
+			PWG_SIM_EVENT(publishEvent, debug::SimEventType::HEIGHT_READBACK_PUBLISH);
+			PWG_SIM_EVENT_DO(publishEvent,
+				publishEvent.Event().resolution = m_worldSize;
+				if (slot.queuedFrame != UINT64_MAX)
+					publishEvent.Event().latencyFrames = static_cast<int64_t>(publishEvent.Event().frameIndex - slot.queuedFrame));
 			std::vector<float> values(slot.byteSize / sizeof(float));
 			glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.buffer);
 			const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, slot.byteSize, GL_MAP_READ_BIT);
@@ -872,6 +884,8 @@ namespace pwg
 			glDeleteSync(static_cast<GLsync>(slot.fence));
 			slot.fence = nullptr;
 			slot.pending = false;
+			PWG_SIM_EVENT_SET(publishEvent, success, mapped != nullptr);
+			PWG_SIM_EVENT_END(publishEvent);
 			if (!mapped) return false;
 			PublishHeightCache(std::move(values));
 			return true;
@@ -940,8 +954,12 @@ namespace pwg
 	bool ChunkManager::RunUniversalGraph()
 	{
 		if (m_terrainComputePipeline->IsParticleErosionActive() || m_terrainComputePipeline->IsThermalErosionActive()) return false;
+		// CPU wall time of the whole run, including the synchronous height readback (design F8).
+		PWG_SIM_EVENT(runEvent, debug::SimEventType::GRAPH_RUN);
+		PWG_SIM_EVENT_SET(runEvent, resolution, m_worldSize);
 		CancelHydrology();
 		bool executed = m_terrainComputePipeline->ExecuteUniversalGraph(m_globalMasks);
+		PWG_SIM_EVENT_SET(runEvent, success, executed);
 		if (executed && !m_terrainComputePipeline->IsParticleErosionActive() && !m_terrainComputePipeline->IsThermalErosionActive())
 		{
 			m_globalMasks["BaseHeight"]->texture->CopyFrom(*m_globalMasks["FinalHeight"]->texture);

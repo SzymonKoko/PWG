@@ -1,4 +1,5 @@
 #include "drainageNetworkGenerator.h"
+#include "debug/debugView.h"
 
 #include <algorithm>
 #include <array>
@@ -66,6 +67,59 @@ namespace pwg
 			return std::lerp(std::lerp(values[Index(x0, y0, size)], values[Index(x1, y0, size)], fx),
 				std::lerp(values[Index(x0, y1, size)], values[Index(x1, y1, size)], fx), fy);
 		}
+
+		/**
+		* @brief Worker wall time per stage on steady_clock. Runs on the worker thread and writes only into the
+		* result it is given, so it needs no synchronisation and makes no GL calls. Compiled out with the
+		* Debug View instrumentation.
+		*/
+		class StageTimer
+		{
+		public:
+			using Clock = std::chrono::steady_clock;
+
+			explicit StageTimer(DrainageNetworkResult& result) : m_result(result)
+			{
+				if constexpr (debug::InstrumentationCompiled)
+				{
+					m_workerStart = Clock::now();
+					m_stageStart = m_workerStart;
+				}
+			}
+
+			void Resampled()
+			{
+				if constexpr (debug::InstrumentationCompiled)
+				{
+					m_result.resampleMs = Milliseconds(Clock::now() - m_workerStart);
+				}
+			}
+
+			/** @brief Called just before the next stage starts, so `stage` has finished. */
+			void Finished(int stage)
+			{
+				if constexpr (debug::InstrumentationCompiled)
+				{
+					const Clock::time_point now = Clock::now();
+					if (stage >= 1 && stage <= static_cast<int>(DrainageNetworkResult::StageCount))
+					{
+						m_result.stageMs[static_cast<size_t>(stage - 1)] = Milliseconds(now - m_stageStart);
+					}
+					m_result.workerMs = Milliseconds(now - m_workerStart);
+					m_stageStart = now;
+				}
+			}
+
+		private:
+			static double Milliseconds(Clock::duration duration)
+			{
+				return std::chrono::duration<double, std::milli>(duration).count();
+			}
+
+			DrainageNetworkResult& m_result;
+			Clock::time_point m_workerStart{};
+			Clock::time_point m_stageStart{};
+		};
 	}
 
 	bool DrainageNetworkResult::IsValid() const
@@ -112,7 +166,12 @@ namespace pwg
 
 	std::string DrainageNetworkGenerator::GetStage() const
 	{
-		switch (m_stage.load())
+		return GetStageName(m_stage.load());
+	}
+
+	const char* DrainageNetworkGenerator::GetStageName(int stage)
+	{
+		switch (stage)
 		{
 		case 1: return "Preparing heightmap";
 		case 2: return "Finding lakes and outlets";
@@ -129,6 +188,7 @@ namespace pwg
 		DrainageNetworkSettings settings, std::atomic<bool>& cancel, std::atomic<float>& progress, std::atomic<int>& stage)
 	{
 		DrainageNetworkResult result;
+		StageTimer timer(result);
 		result.size = size;
 		settings.riverAmount = std::clamp(settings.riverAmount, 0.0f, 1.0f);
 		settings.lakeAmount = std::clamp(settings.lakeAmount, 0.0f, 1.0f);
@@ -136,6 +196,7 @@ namespace pwg
 		const int analysisSize = std::min(size, 2049);
 		const size_t count = static_cast<size_t>(analysisSize) * analysisSize;
 		std::vector<float> terrain = Resample(height, size, analysisSize);
+		timer.Resampled();
 		if (cancel) { result.cancelled = true; return result; }
 
 		auto [minIt, maxIt] = std::minmax_element(terrain.begin(), terrain.end());
@@ -152,12 +213,14 @@ namespace pwg
 			result.velocity.assign(fullCount * 2, 0.0f);
 			result.carveDelta.assign(fullCount, 0.0f);
 			progress = 1.0f;
+			timer.Finished(1);
 			stage = 7;
 			return result;
 		}
 		const float heightRange = std::max(rawHeightRange, 0.001f);
 		const float epsilon = heightRange * 1.0e-7f;
 
+		timer.Finished(1);
 		stage = 2;
 		progress = 0.10f;
 		std::vector<float> filled = terrain;
@@ -199,6 +262,7 @@ namespace pwg
 			}
 		}
 
+		timer.Finished(2);
 		stage = 3;
 		progress = 0.34f;
 		std::vector<std::array<int, 2>> receivers(count, { -1, -1 });
@@ -264,6 +328,7 @@ namespace pwg
 			if ((y & 127) == 0 && cancel) { result.cancelled = true; return result; }
 		}
 
+		timer.Finished(3);
 		stage = 4;
 		progress = 0.48f;
 		std::vector<int> sorted(count);
@@ -282,6 +347,7 @@ namespace pwg
 			if ((n & 65535u) == 0u && cancel) { result.cancelled = true; return result; }
 		}
 
+		timer.Finished(4);
 		stage = 5;
 		progress = 0.62f;
 		const bool riversEnabled = settings.riverAmount > 0.001f;
@@ -430,6 +496,7 @@ namespace pwg
 			}
 		}
 
+		timer.Finished(5);
 		stage = 6;
 		progress = 0.80f;
 		const size_t fullCount = static_cast<size_t>(size) * size;
@@ -473,6 +540,7 @@ namespace pwg
 			}
 		}
 		progress = 1.0f;
+		timer.Finished(6);
 		stage = 7;
 		result.baseHeight = std::move(height);
 		return result;

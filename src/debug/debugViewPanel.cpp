@@ -384,3 +384,255 @@ void pwg::debug::DebugView::DrawRenderCounters()
 		ImGui::EndTable();
 	}
 }
+
+namespace
+{
+	constexpr uint32_t RecentSimEvents = 64;
+
+	/** @brief Opens the five-column table used for one-shot events. */
+	bool BeginSimTable(const char* id)
+	{
+		const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+		if (!ImGui::BeginTable(id, 5, flags))
+		{
+			return false;
+		}
+		ImGui::TableSetupColumn("event");
+		ImGui::TableSetupColumn("frame");
+		ImGui::TableSetupColumn("CPU ms");
+		ImGui::TableSetupColumn("GPU ms");
+		ImGui::TableSetupColumn("GPU timer");
+		ImGui::TableHeadersRow();
+		return true;
+	}
+
+	/** @brief One event row; an event that was not recorded shows "-" in every column. */
+	void SimRow(const char* label, const pwg::debug::SimEvent* event)
+	{
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn(); ImGui::TextUnformatted(label);
+		ImGui::TableNextColumn();
+		if (event)
+		{
+			ImGui::Text("%llu", static_cast<unsigned long long>(event->frameIndex));
+		}
+		else
+		{
+			ImGui::TextDisabled("-");
+		}
+		ImGui::TableNextColumn(); ValueCell(event ? event->cpuMs : pwg::debug::NotAvailable);
+		ImGui::TableNextColumn(); ValueCell(event ? event->gpuMs : pwg::debug::NotAvailable);
+		ImGui::TableNextColumn(); ImGui::TextUnformatted(event ? pwg::debug::GetGpuTimerKindName(event->gpuTimer) : "-");
+	}
+
+	/** @brief The event if it belongs to run `run`, otherwise nullptr (an older run's value is not shown as current). */
+	const pwg::debug::SimEvent* InRun(const pwg::debug::SimEvent* event, uint64_t run)
+	{
+		return event && event->runIndex == run ? event : nullptr;
+	}
+}
+
+void pwg::debug::DebugView::DrawSimulationTab()
+{
+	if constexpr (!InstrumentationCompiled)
+	{
+		ImGui::TextDisabled("Instrumentation compiled out (PWG_DEBUG_VIEW_INSTRUMENTATION=OFF). No simulation timing.");
+	}
+	else
+	{
+		DrawSimulationTables();
+	}
+}
+
+void pwg::debug::DebugView::DrawSimulationTables()
+{
+	const ImGuiTableFlags tableFlags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+
+	if (!IsEnabled())
+	{
+		ImGui::TextDisabled("Enable the Debug View in the Performance tab to record simulation timing.");
+	}
+	ImGui::Text("GPU events pending: %zu  |  ELAPSED fell back to timestamps: %llu  |  refused (pool full): %llu",
+		m_gpu.GetPendingEventCount(),
+		static_cast<unsigned long long>(m_gpu.GetEventFallbackCount()),
+		static_cast<unsigned long long>(m_gpu.GetEventRefusedCount()));
+	ImGui::SameLine();
+	if (ImGui::SmallButton("Clear"))
+	{
+		m_sim.Clear();
+	}
+	ImGui::TextDisabled("CPU ms: steady_clock wall time on the thread that did the work. GPU ms: timer query, read a few frames later.");
+	ImGui::TextDisabled("CPU and GPU times are different quantities and are never added.");
+
+	// --- Graph execution ---
+	ImGui::SeparatorText("Graph execution (last run)");
+	const uint64_t graphRun = m_sim.GetLastGraphRun();
+	if (graphRun == 0)
+	{
+		ImGui::TextDisabled("No graph run recorded.");
+	}
+	else
+	{
+		const SimEvent* execute = InRun(m_sim.GetLatest(SimEventType::GRAPH_EXECUTE), graphRun);
+		ImGui::Text("Run %llu", static_cast<unsigned long long>(graphRun));
+		if (execute)
+		{
+			ImGui::SameLine();
+			ImGui::Text("|  %d x %d  |  %s", execute->resolution, execute->resolution, execute->success ? "completed" : "returned early");
+		}
+		if (BeginSimTable("GraphTotals"))
+		{
+			SimRow("RunUniversalGraph (wall, with readback)", InRun(m_sim.GetLatest(SimEventType::GRAPH_RUN), graphRun));
+			SimRow("ExecuteUniversalGraph", execute);
+			SimRow("  clears + mask pass", InRun(m_sim.GetLatest(SimEventType::GRAPH_MASK_PASS), graphRun));
+			SimRow("  previews", InRun(m_sim.GetLatest(SimEventType::GRAPH_PREVIEWS), graphRun));
+			SimRow("height readback (sync)", InRun(m_sim.GetLatest(SimEventType::HEIGHT_READBACK_SYNC), graphRun));
+			ImGui::EndTable();
+		}
+		ImGui::TextDisabled("ExecuteUniversalGraph GPU ms is a TIMESTAMP span over the whole call; nodes use TIME_ELAPSED.");
+
+		const std::vector<SimEvent>& nodes = m_sim.GetLastGraphNodes();
+		if (ImGui::BeginTable("GraphNodes", 7, tableFlags))
+		{
+			ImGui::TableSetupColumn("#");
+			ImGui::TableSetupColumn("node id");
+			ImGui::TableSetupColumn("type");
+			ImGui::TableSetupColumn("output");
+			ImGui::TableSetupColumn("CPU ms (submit)");
+			ImGui::TableSetupColumn("GPU ms");
+			ImGui::TableSetupColumn("GPU timer");
+			ImGui::TableHeadersRow();
+			for (size_t i = 0; i < nodes.size(); ++i)
+			{
+				const SimEvent& node = nodes[i];
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn(); ImGui::Text("%zu", i + 1);
+				ImGui::TableNextColumn(); ImGui::Text("%d", node.nodeId);
+				ImGui::TableNextColumn();
+				if (node.nodeEnabled)
+				{
+					ImGui::TextUnformatted(node.nodeType.c_str());
+				}
+				else
+				{
+					ImGui::TextDisabled("%s (disabled)", node.nodeType.c_str());
+				}
+				ImGui::TableNextColumn(); ImGui::Text("%d", node.resolution);
+				ImGui::TableNextColumn(); ValueCell(node.cpuMs);
+				ImGui::TableNextColumn(); ValueCell(node.gpuMs);
+				ImGui::TableNextColumn(); ImGui::TextUnformatted(GetGpuTimerKindName(node.gpuTimer));
+			}
+			ImGui::EndTable();
+		}
+	}
+
+	// --- Hydraulic erosion ---
+	ImGui::SeparatorText("Hydraulic erosion");
+	const SimEvent* hydraulic = m_sim.GetLatest(SimEventType::HYDRAULIC_STEP);
+	ImGui::Text("Steps recorded: %llu", static_cast<unsigned long long>(m_sim.GetCount(SimEventType::HYDRAULIC_STEP)));
+	if (hydraulic)
+	{
+		ImGui::SameLine();
+		ImGui::Text("|  last step %lld (solver step %lld)  |  active particles %d%s%s",
+			static_cast<long long>(hydraulic->stepIndex), static_cast<long long>(hydraulic->solverStep),
+			hydraulic->activeParticles, hydraulic->refreshStep ? "  |  refresh" : "", hydraulic->talusStep ? "  |  talus" : "");
+	}
+	if (BeginSimTable("Hydraulic"))
+	{
+		SimRow("step (GPU: GpuParticleErosion::Step)", hydraulic);
+		SimRow("refresh (every 4th step)", m_sim.GetLatest(SimEventType::HYDRAULIC_REFRESH));
+		ImGui::EndTable();
+	}
+
+	// --- Thermal erosion ---
+	ImGui::SeparatorText("Thermal erosion");
+	const SimEvent* thermal = m_sim.GetLatest(SimEventType::THERMAL_STEP);
+	const SimEvent* check = m_sim.GetLatest(SimEventType::THERMAL_CHECK);
+	const SimEvent* stable = m_sim.GetLatest(SimEventType::THERMAL_STABLE);
+	ImGui::Text("Steps recorded: %llu", static_cast<unsigned long long>(m_sim.GetCount(SimEventType::THERMAL_STEP)));
+	if (thermal)
+	{
+		ImGui::SameLine();
+		ImGui::Text("|  last step %lld (solver step %lld)  |  %s%s",
+			static_cast<long long>(thermal->stepIndex), static_cast<long long>(thermal->solverStep),
+			thermal->stable ? "stable" : "not stable", thermal->refreshStep ? "  |  refresh" : "");
+	}
+	if (stable)
+	{
+		ImGui::Text("Became stable at solver step %lld (frame %llu)",
+			static_cast<long long>(stable->solverStep), static_cast<unsigned long long>(stable->frameIndex));
+	}
+	if (BeginSimTable("Thermal"))
+	{
+		SimRow("step (GPU: GpuThermalErosion::Step)", thermal);
+		SimRow("refresh (every 4th step)", m_sim.GetLatest(SimEventType::THERMAL_REFRESH));
+		SimRow("stability check (sync readback)", check);
+		ImGui::EndTable();
+	}
+	ImGui::TextDisabled("The check runs every 8th solver step and waits for the GPU. Its time is part of that step.");
+
+	// --- Hydrology ---
+	ImGui::SeparatorText("Hydrology (last run)");
+	const uint64_t hydrologyRun = m_sim.GetLastHydrologyRun();
+	if (hydrologyRun == 0)
+	{
+		ImGui::TextDisabled("No hydrology run recorded.");
+	}
+	else
+	{
+		ImGui::Text("Run %llu", static_cast<unsigned long long>(hydrologyRun));
+		const SimEvent* endToEnd = InRun(m_sim.GetLatest(SimEventType::HYDROLOGY_END_TO_END), hydrologyRun);
+		if (BeginSimTable("Hydrology"))
+		{
+			SimRow("height readback (sync, main thread)", InRun(m_sim.GetLatest(SimEventType::HYDROLOGY_READBACK), hydrologyRun));
+			for (const SimEvent& stageEvent : m_sim.GetLastHydrologyStages())
+			{
+				if (stageEvent.runIndex != hydrologyRun)
+				{
+					continue;
+				}
+				char label[96];
+				std::snprintf(label, sizeof(label), "  stage %d: %s", stageEvent.stage, stageEvent.label ? stageEvent.label : "");
+				SimRow(label, &stageEvent);
+			}
+			SimRow("worker total", InRun(m_sim.GetLatest(SimEventType::HYDROLOGY_WORKER), hydrologyRun));
+			SimRow("Start to result (main thread)", endToEnd);
+			SimRow("uploads + mask pass (main thread)", InRun(m_sim.GetLatest(SimEventType::HYDROLOGY_UPLOAD), hydrologyRun));
+			ImGui::EndTable();
+		}
+		if (endToEnd)
+		{
+			ImGui::TextDisabled("Start to result spans %lld frames. The result is polled once per frame, so its resolution is one frame.",
+				static_cast<long long>(endToEnd->latencyFrames));
+		}
+		ImGui::TextDisabled("Stage times are worker wall time (steady_clock on the worker thread).");
+	}
+
+	// --- Height readback ---
+	ImGui::SeparatorText("Height readback (latest)");
+	const SimEvent* publish = m_sim.GetLatest(SimEventType::HEIGHT_READBACK_PUBLISH);
+	if (BeginSimTable("HeightReadback"))
+	{
+		SimRow("UpdateHeightCache (sync)", m_sim.GetLatest(SimEventType::HEIGHT_READBACK_SYNC));
+		SimRow("QueueHeightCacheReadback (PBO)", m_sim.GetLatest(SimEventType::HEIGHT_READBACK_QUEUE));
+		SimRow("PollHeightCacheReadback (map + copy)", publish);
+		ImGui::EndTable();
+	}
+	if (publish && publish->latencyFrames >= 0)
+	{
+		ImGui::TextDisabled("Last async readback was published %lld frames after it was queued.", static_cast<long long>(publish->latencyFrames));
+	}
+
+	// --- Recent events ---
+	m_sim.CopyRecentCompleted(m_simScratch, RecentSimEvents);
+	if (!m_simScratch.empty() && ImGui::TreeNode("Recent events", "Recent complete events (%zu)", m_simScratch.size()))
+	{
+		for (auto it = m_simScratch.rbegin(); it != m_simScratch.rend(); ++it)
+		{
+			ImGui::Text("frame %llu  %s  run %llu  step %lld  CPU %.3f ms  GPU %.3f ms",
+				static_cast<unsigned long long>(it->frameIndex), GetSimEventName(it->type),
+				static_cast<unsigned long long>(it->runIndex), static_cast<long long>(it->stepIndex), it->cpuMs, it->gpuMs);
+		}
+		ImGui::TreePop();
+	}
+}

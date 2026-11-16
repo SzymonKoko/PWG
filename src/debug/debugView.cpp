@@ -73,6 +73,11 @@ void pwg::debug::DebugView::BeginFrame()
 			m_gpuInitialized = true;
 		}
 		m_gpu.BeginFrame(m_frameIndex, m_frameStats);
+		// One-shot GPU events are harvested whether the Debug View is enabled or not, so the pool drains.
+		m_gpuEventResults.clear();
+		m_gpu.HarvestEvents(m_gpuEventResults);
+		m_sim.ApplyGpuResults(m_gpuEventResults);
+		m_sim.SetFrameIndex(m_frameIndex);
 		m_cpu.BeginFrame(m_frameIndex);
 		m_render.BeginFrame(m_frameIndex, IsEnabled());
 	}
