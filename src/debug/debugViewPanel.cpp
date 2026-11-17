@@ -2,14 +2,25 @@
 #include "core/window/window.h"
 #include "imgui.h"
 
+#include <algorithm>
 #include <cfloat>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <string>
+#include <system_error>
 
 namespace
 {
 	constexpr uint32_t PlotFrames = 300;
+
+	/** @brief Path as UTF-8 for ImGui (path::string() uses the ANSI code page and can throw). */
+	std::string Utf8(const std::filesystem::path& path)
+	{
+		const std::u8string text = path.u8string();
+		return std::string(text.begin(), text.end());
+	}
 
 	/** @brief Writes a millisecond value, or "-" when it is not available. */
 	void ValueCell(double value)
@@ -47,6 +58,9 @@ namespace
 void pwg::debug::DebugView::DrawPerformanceTab()
 {
 	// --- Switches ---
+	// Settings are locked during a CSV recording: the metadata header describes the whole window.
+	const bool recording = m_recorder.IsActive();
+	ImGui::BeginDisabled(recording);
 	if constexpr (InstrumentationCompiled)
 	{
 		bool enabled = IsEnabled();
@@ -73,6 +87,7 @@ void pwg::debug::DebugView::DrawPerformanceTab()
 	{
 		SetBenchmarkRenderSize(renderSize[0], renderSize[1]);
 	}
+	ImGui::EndDisabled();
 	ImGui::EndDisabled();
 	ImGui::TextDisabled("Frame limit: %u FPS%s  |  VSync: %s",
 		m_window.GetFramerateLimit(),
@@ -128,9 +143,97 @@ void pwg::debug::DebugView::DrawPerformanceTab()
 		}
 	}
 
+	DrawExportSection();
+
 	if constexpr (InstrumentationCompiled)
 	{
 		DrawProfilerSection();
+	}
+}
+
+void pwg::debug::DebugView::DrawExportSection()
+{
+	ImGui::SeparatorText("CSV export");
+	const bool active = m_recorder.IsActive();
+
+	ImGui::BeginDisabled(active);
+	ImGui::SetNextItemWidth(260.0f);
+	ImGui::InputText("Output folder", m_exportRoot, sizeof(m_exportRoot));
+	ImGui::SetNextItemWidth(120.0f);
+	if (ImGui::InputInt("Frames (0 = until Stop)", &m_exportFrames, 100, 1000))
+	{
+		m_exportFrames = std::max(m_exportFrames, 0);
+	}
+	ImGui::EndDisabled();
+
+	std::error_code error;
+	const std::filesystem::path root = std::filesystem::absolute(std::filesystem::path(m_exportRoot), error);
+	ImGui::TextDisabled("Writes <folder>/<run id>/frames.csv, events.csv, summary.csv and run.yaml. Folder: %s",
+		error ? m_exportRoot : Utf8(root).c_str());
+
+	if (!active)
+	{
+		if (ImGui::Button("Start recording"))
+		{
+			StartRecording(RunInfo{}, std::filesystem::path(m_exportRoot), static_cast<uint64_t>(m_exportFrames));
+		}
+	}
+	else if (m_recorder.GetState() == CsvRecorder::State::RECORDING)
+	{
+		if (ImGui::Button("Stop and export"))
+		{
+			StopRecording();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Abort"))
+		{
+			AbortRecording();
+		}
+		ImGui::SameLine();
+		if (m_recorder.GetFrameCount() > 0)
+		{
+			ImGui::Text("Recording: %llu / %llu frames, %llu events",
+				static_cast<unsigned long long>(m_recorder.GetRecordedFrames()),
+				static_cast<unsigned long long>(m_recorder.GetFrameCount()),
+				static_cast<unsigned long long>(m_recorder.GetCapturedEvents()));
+		}
+		else
+		{
+			ImGui::Text("Recording: %llu frames, %llu events",
+				static_cast<unsigned long long>(m_recorder.GetRecordedFrames()),
+				static_cast<unsigned long long>(m_recorder.GetCapturedEvents()));
+		}
+	}
+	else
+	{
+		ImGui::Text("Waiting for the last GPU results of the window, then writing...");
+	}
+	ImGui::TextDisabled("Settings above are locked while recording. Files are written after the window, never inside it.");
+
+	if (m_recorder.HasResult())
+	{
+		const ExportResult& result = m_recorder.GetLastResult();
+		if (result.written)
+		{
+			ImGui::Text("Last export: %llu frames, %llu event rows, %llu summary rows (%.1f ms to write)",
+				static_cast<unsigned long long>(result.frames), static_cast<unsigned long long>(result.eventRows),
+				static_cast<unsigned long long>(result.summaryRows), result.writeMs);
+			const std::string folder = Utf8(result.folder);
+			ImGui::TextWrapped("%s", folder.c_str());
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Copy path"))
+			{
+				ImGui::SetClipboardText(folder.c_str());
+			}
+		}
+		else
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Last export failed: %s", result.error.c_str());
+		}
+		for (const std::string& warning : result.warnings)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "Warning: %s", warning.c_str());
+		}
 	}
 }
 
@@ -145,7 +248,10 @@ void pwg::debug::DebugView::DrawProfilerSection()
 	char ringLabel[16];
 	std::snprintf(ringLabel, sizeof(ringLabel), "%u", ringFrames);
 	ImGui::SetNextItemWidth(80.0f);
-	if (ImGui::BeginCombo("Ring frames (K)", ringLabel))
+	ImGui::BeginDisabled(m_recorder.IsActive());
+	const bool ringCombo = ImGui::BeginCombo("Ring frames (K)", ringLabel);
+	ImGui::EndDisabled();
+	if (ringCombo)
 	{
 		for (uint32_t option : ringOptions)
 		{
@@ -164,7 +270,9 @@ void pwg::debug::DebugView::DrawProfilerSection()
 		static_cast<unsigned long long>(m_gpu.GetDroppedCount()));
 	ImGui::TextDisabled("Counter bits: TIME_ELAPSED %d, TIMESTAMP %d. Results arrive K frames late and are never waited for.",
 		m_gpu.GetTimeElapsedBits(), m_gpu.GetTimestampBits());
+	ImGui::BeginDisabled(m_recorder.IsActive());
 	ImGui::Checkbox("Time each shadow cascade (TIMESTAMP pairs inside the shadow pass)", &m_detailedShadowTiming);
+	ImGui::EndDisabled();
 
 	// CPU ms is command submission of the last counted frame; GPU ms is the latest harvested result,
 	// K frames older. The two are different quantities and are never added.
@@ -457,10 +565,12 @@ void pwg::debug::DebugView::DrawSimulationTables()
 		static_cast<unsigned long long>(m_gpu.GetEventFallbackCount()),
 		static_cast<unsigned long long>(m_gpu.GetEventRefusedCount()));
 	ImGui::SameLine();
+	ImGui::BeginDisabled(m_recorder.IsActive());	// Clear would drop pending events of a CSV window.
 	if (ImGui::SmallButton("Clear"))
 	{
 		m_sim.Clear();
 	}
+	ImGui::EndDisabled();
 	ImGui::TextDisabled("CPU ms: steady_clock wall time on the thread that did the work. GPU ms: timer query, read a few frames later.");
 	ImGui::TextDisabled("CPU and GPU times are different quantities and are never added.");
 

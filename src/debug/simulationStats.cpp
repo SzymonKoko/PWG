@@ -55,6 +55,7 @@ pwg::debug::SimulationStats::SimulationStats()
 void pwg::debug::SimulationStats::Open(SimEvent& event, SimEventType type)
 {
 	event.type = type;
+	event.sequence = ++m_sequence;
 	event.frameIndex = m_frameIndex;
 	if (OpensGraphRun(type))
 	{
@@ -151,6 +152,10 @@ void pwg::debug::SimulationStats::ApplyGpuResults(const std::vector<GpuEventResu
 
 void pwg::debug::SimulationStats::Complete(SimEvent&& event)
 {
+	if (m_capture)
+	{
+		m_capture->push_back(event);
+	}
 	if (m_recent.size() < RecentEventCount)
 	{
 		m_recent.push_back(std::move(event));
@@ -240,6 +245,30 @@ void pwg::debug::SimulationStats::Clear()
 	m_lastHydrologyStages.clear();
 	m_recent.clear();
 	m_recentHead = 0;
+}
+
+size_t pwg::debug::SimulationStats::CountPending(uint64_t firstFrame, uint64_t lastFrame) const
+{
+	size_t count = 0;
+	for (const SimEvent& event : m_pending)
+	{
+		if (event.frameIndex >= firstFrame && event.frameIndex <= lastFrame)
+		{
+			++count;
+		}
+	}
+	return count;
+}
+
+void pwg::debug::SimulationStats::CopyPending(std::vector<SimEvent>& out, uint64_t firstFrame, uint64_t lastFrame) const
+{
+	for (const SimEvent& event : m_pending)
+	{
+		if (event.frameIndex >= firstFrame && event.frameIndex <= lastFrame)
+		{
+			out.push_back(event);
+		}
+	}
 }
 
 const pwg::debug::SimEvent* pwg::debug::SimulationStats::GetLatest(SimEventType type) const

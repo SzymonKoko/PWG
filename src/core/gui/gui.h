@@ -8,6 +8,11 @@
 #include <string>
 #include <vector>
 
+namespace pwg::debug
+{
+	class Metadata;
+}
+
 namespace pwg
 {
 	/**
@@ -93,6 +98,12 @@ namespace pwg
 		void AddRecentProject(const std::string& path);
 		void LoadRecentProjects();
 		void SaveRecentProjects();
+
+		/**
+		* @brief Scene part of the CSV metadata header (D-09): project file and its SHA-256, the simulation
+		* sidecar's SHA-256, unsaved changes, world size and fullscreen main view.
+		*/
+		void FillRunMetadata(debug::Metadata& metadata);
 		std::string RecentProjectsPath();
 		std::string OpenProjectDialog();
 		std::string SaveProjectDialog();

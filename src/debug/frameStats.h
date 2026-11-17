@@ -85,6 +85,7 @@ namespace pwg::debug
 	struct FrameRecord
 	{
 		uint64_t frameIndex{ 0 };
+		std::chrono::steady_clock::time_point beginTime{};					/**< steady_clock at frame begin (t_ms in frames.csv). */
 		double frameMs{ NotAvailable };										/**< Time between this frame's begin and the next frame's begin. */
 		std::array<double, FramePhaseCount> phaseMs{};						/**< CPU time per FramePhase. */
 		double gpuFrameMs{ NotAvailable };									/**< TIMESTAMP span over scene and ImGui rendering. */

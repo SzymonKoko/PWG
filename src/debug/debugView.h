@@ -4,12 +4,16 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
+#include <string>
 #include <utility>
 #include <vector>
 #include "debug/cpuProfiler.h"
+#include "debug/csvWriter.h"
 #include "debug/frameStats.h"
 #include "debug/gpuProfiler.h"
 #include "debug/renderStats.h"
+#include "debug/runMetadata.h"
 #include "debug/simulationStats.h"
 
 // Set by CMake (option PWG_DEBUG_VIEW_INSTRUMENTATION, default ON).
@@ -87,6 +91,29 @@ namespace pwg::debug
 		RenderStats& GetRenderStats() { return m_render; }
 		const FrameStats& GetFrameStats() const { return m_frameStats; }
 		SimulationStats& GetSimulationStats() { return m_sim; }
+		RunMetadata& GetRunMetadata() { return m_runMetadata; }
+		const CsvRecorder& GetRecorder() const { return m_recorder; }
+
+		/**
+		* @brief Full metadata header of a run starting now (design section 7.2): run identifiers, build,
+		* GL context and machine, Debug View and benchmark state, scene. Reads files for the SHA-256 values.
+		*/
+		Metadata CollectRunMetadata(const RunInfo& run, std::chrono::system_clock::time_point start) const;
+
+		/**
+		* @brief Starts a CSV measurement window with the next frame (D-09). The files go to
+		* `outputRoot / run.runId`; an empty run id becomes `<local time>_mNN`. `frameCount` 0 records until
+		* StopRecording. Returns false if a window is active or the folder exists.
+		*/
+		bool StartRecording(RunInfo run, const std::filesystem::path& outputRoot, uint64_t frameCount);
+
+		/** @brief Ends the window with the current frame; the files are written once its results are in. */
+		void StopRecording() { m_recorder.Stop(m_frameIndex); }
+
+		/** @brief Drops the window without writing. */
+		void AbortRecording() { m_recorder.Abort(); }
+
+		bool IsRecording() const { return m_recorder.IsActive(); }
 
 		/** @brief "Performance" tab of the Debug window (debugViewPanel.cpp). */
 		void DrawPerformanceTab();
@@ -107,6 +134,9 @@ namespace pwg::debug
 		/** @brief Tables of the Simulation tab (instrumented builds only). */
 		void DrawSimulationTables();
 
+		/** @brief CSV export part of the Performance tab (every build). */
+		void DrawExportSection();
+
 		static inline DebugView* s_instance{ nullptr };
 		static inline std::atomic<bool> s_enabled{ false };
 
@@ -116,7 +146,10 @@ namespace pwg::debug
 		RenderStats m_render;
 		FrameStats m_frameStats;
 		SimulationStats m_sim;
+		RunMetadata m_runMetadata;
+		CsvRecorder m_recorder{ m_frameStats, m_sim };	/**< Declared after the stats it reads. */
 		std::vector<GpuEventResult> m_gpuEventResults;	/**< Reused by BeginFrame. */
+		uint32_t m_manualExportCounter{ 0 };
 
 		uint64_t m_frameIndex{ 0 };
 		bool m_frameStarted{ false };
@@ -133,6 +166,8 @@ namespace pwg::debug
 
 		std::vector<float> m_plotScratch;		/**< Used by DrawPerformanceTab only. */
 		std::vector<SimEvent> m_simScratch;		/**< Used by DrawSimulationTab only. */
+		char m_exportRoot[260]{ "perf_exports" };	/**< Export folder of the Performance tab, relative to the working directory. */
+		int m_exportFrames{ 0 };					/**< Frames per window in the Performance tab, 0 = until Stop. */
 	};
 
 	/**

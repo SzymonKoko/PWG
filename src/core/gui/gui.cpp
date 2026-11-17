@@ -39,11 +39,20 @@ pwg::Gui::Gui(Window& window, std::shared_ptr<SceneManager> scene)
 	LoadRecentProjects();
 	m_welcomeTexture = std::make_shared<Texture>("../assets/images/welcome1.png", TextureType::ALBEDO);
 
+	if (debug::DebugView::HasInstance())
+	{
+		debug::DebugView::Get().GetRunMetadata().SetSceneProvider([this](debug::Metadata& metadata) { FillRunMetadata(metadata); });
+	}
+
 	PWG_INFO("ImGui initialized");
 }
 
 pwg::Gui::~Gui()
 {
+	if (debug::DebugView::HasInstance())
+	{
+		debug::DebugView::Get().GetRunMetadata().ClearSceneProvider();
+	}
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
@@ -1016,3 +1025,43 @@ std::string pwg::Gui::SaveProjectDialog()
 	return platform::SaveProjectDialog();
 }
 
+
+void pwg::Gui::FillRunMetadata(debug::Metadata& metadata)
+{
+	auto utf8 = [](const std::filesystem::path& path)
+	{
+		const std::u8string text = path.u8string();
+		return std::string(text.begin(), text.end());
+	};
+
+	if (!m_currentProjectPath.empty())
+	{
+		std::error_code error;
+		const std::filesystem::path project = std::filesystem::absolute(std::filesystem::path(m_currentProjectPath), error);
+		metadata.Set("project_path", utf8(error ? std::filesystem::path(m_currentProjectPath) : project));
+		// The hashes describe the files on disk; project_unsaved_changes says whether the editor state differs.
+		metadata.Set("project_sha256", debug::ComputeFileSha256(m_currentProjectPath));
+		std::filesystem::path sidecar(m_currentProjectPath);
+		sidecar.replace_extension(".pwgsim");
+		if (std::filesystem::exists(sidecar, error))
+		{
+			metadata.Set("pwgsim_sha256", debug::ComputeFileSha256(sidecar));
+		}
+	}
+	metadata.SetBool("project_unsaved_changes", m_isProjectDirty);
+
+	EditorScene* editor = m_scene ? m_scene->GetEditorScene() : nullptr;
+	if (!editor)
+	{
+		return;
+	}
+	metadata.SetBool("fullscreen_main_view", editor->IsMainViewFullscreen());
+	std::shared_ptr<Terrain> terrain = editor->GetTerrain();
+	std::shared_ptr<ChunkManager> chunks = terrain ? terrain->GetChunkManager() : nullptr;
+	if (chunks)
+	{
+		metadata.SetNumber("world_size", chunks->GetWorldSize());
+		metadata.SetNumber("chunk_count", chunks->GetChunkCount());
+		metadata.SetNumber("chunk_size", chunks->GetChunkSize());
+	}
+}

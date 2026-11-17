@@ -49,6 +49,7 @@ namespace pwg::debug
 	struct SimEvent
 	{
 		SimEventType type{ SimEventType::COUNT };
+		uint64_t sequence{ 0 };					/**< Order in which events were opened, from 1; never reset. */
 		uint64_t frameIndex{ 0 };				/**< Frame in which the event started. */
 		uint64_t runIndex{ 0 };					/**< Graph run (graph and readback events inside it) or hydrology run; 0 if none. */
 		int64_t stepIndex{ -1 };				/**< Pipeline step counter after the step (drives the refresh every 4th step). */
@@ -145,11 +146,25 @@ namespace pwg::debug
 		/** @brief Complete events since start; with the ring size it shows how many a consumer missed. */
 		uint64_t GetCompletedTotal() const { return m_completedTotal; }
 
+		/**
+		* @brief While set, every event that becomes complete is also appended to `sink` (CSV export, D-09).
+		* nullptr detaches. The sink must outlive the capture.
+		*/
+		void SetCapture(std::vector<SimEvent>* sink) { m_capture = sink; }
+
+		/** @brief Events waiting for a GPU result that started in frames [firstFrame, lastFrame]. */
+		size_t CountPending(uint64_t firstFrame, uint64_t lastFrame) const;
+
+		/** @brief Appends copies of the pending events that started in frames [firstFrame, lastFrame]. */
+		void CopyPending(std::vector<SimEvent>& out, uint64_t firstFrame, uint64_t lastFrame) const;
+
 	private:
 		void Complete(SimEvent&& event);
 		void UpdateViews(const SimEvent& event);
 
 		uint64_t m_frameIndex{ 0 };
+		uint64_t m_sequence{ 0 };
+		std::vector<SimEvent>* m_capture{ nullptr };
 		uint64_t m_graphRun{ 0 };
 		uint32_t m_graphDepth{ 0 };
 		uint64_t m_hydrologyRun{ 0 };

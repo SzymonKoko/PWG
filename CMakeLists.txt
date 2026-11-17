@@ -139,6 +139,8 @@ target_link_libraries(${PROJECT_NAME}
 		Comdlg32
 		Shell32
 		Ole32
+		PowrProf	# Debug View metadata: active power scheme (D-09)
+		Bcrypt		# Debug View metadata: SHA-256 of project files (D-09)
 )
 
 # Debug View measurement points (CPU scopes inside the frame, GPU timer queries).
@@ -149,6 +151,25 @@ if(PWG_DEBUG_VIEW_INSTRUMENTATION)
 else()
 	target_compile_definitions(${PROJECT_NAME} PRIVATE PWG_DEBUG_VIEW_INSTRUMENTATION=0)
 endif()
+
+# Debug View metadata (D-09): build configuration, and the git commit and dirty flag of the sources.
+# Commit and dirty flag are read at build time, not at configure time, so a commit or an edit after the
+# last configure is still reported correctly. They go into a generated header that only
+# src/debug/runMetadata.cpp includes, so a new commit recompiles that one file.
+target_compile_definitions(${PROJECT_NAME} PRIVATE PWG_BUILD_CONFIG=$<CONFIG>)
+find_package(Git QUIET)
+set(PWG_BUILD_INFO_DIR ${CMAKE_BINARY_DIR}/generated)
+add_custom_target(${PROJECT_NAME}_build_info
+	COMMAND ${CMAKE_COMMAND}
+		-DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+		-DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+		-DOUTPUT=${PWG_BUILD_INFO_DIR}/pwgBuildInfo.h
+		-P ${PROJECT_SOURCE_DIR}/cmake/pwgBuildInfo.cmake
+	BYPRODUCTS ${PWG_BUILD_INFO_DIR}/pwgBuildInfo.h
+	COMMENT "Reading PWG git commit and dirty flag"
+	VERBATIM)
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_build_info)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PWG_BUILD_INFO_DIR})
 
 # Configure output directories for game
 set_target_properties(${PROJECT_NAME} PROPERTIES
