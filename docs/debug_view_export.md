@@ -1,4 +1,4 @@
-# Debug View export formats (D-09 performance, D-07 screenshot)
+# Debug View export formats (D-09 performance, D-07 screenshot, D-08 masks)
 
 Format `pwg-debugview-csv`, `format_version` 1. Code: `src/debug/csvWriter.*`, `src/debug/runMetadata.*`.
 Design: thesis repository, `docs/plan/debug_view_design.md` sections 7.1 to 7.3.
@@ -199,3 +199,96 @@ The export runs in every build (with or without `PWG_DEBUG_VIEW_INSTRUMENTATION`
 Angles follow `FlyoverCamera`: `forward = (cos p · cos y, sin p, cos p · sin y)`, so `yaw_deg = atan2(forward.z, forward.x)` in (−180, 180] and `pitch_deg = asin(forward.y)`; `roll_deg` is the rotation of `up` towards `right = normalize(cross(forward, (0, 1, 0)))`, 0 for the editor camera. All three are derived from the matrices for every camera type. For the flyover camera they equal its yaw and pitch properties up to float rounding and modulo 360° for yaw.
 
 The compatibility rules above apply to the sidecar keys in the same way (new keys may be appended; renaming, removing or changing the meaning of a key increments `format_version`).
+
+## Mask and heightmap export (D-08)
+
+Format `pwg-mask`, `format_version` 1. Code: `src/debug/exporters.*` (mask part), Capture tab in `src/debug/debugViewPanel.cpp`, `DebugView::ExportMasks`.
+Design: thesis repository, `docs/plan/debug_view_design.md` section 7.4.
+
+### Exporting masks
+
+Debug window → Capture tab → Mask export.
+
+1. Set the output folder (shared with the screenshot part, default `captures`).
+2. Tick the masks in the list. It shows every entry of `ChunkManager::GetMasks()` (engine masks, the graph's temporary masks `node_<id>_<port>` and the 256 × 256 graph editor previews `preview_node_<id>_<port>`), sorted by name, with their size. `FinalHeight` is ticked by default. The filter field narrows the list; "Tick shown" ticks every mask the filter shows.
+3. Optionally type a tag (e.g. `after_thermal`) and switch the PNG preview off.
+4. Press "Export ticked masks". The export runs at once and blocks the frame (about 1 s per 3999 × 3999 mask with preview, see below). The table below the button shows size, min, max, the round-trip result and the times of each mask, or the error.
+
+The button is disabled while a CSV window is recorded: the readback and the file writes are synchronous and must not fall inside a measurement window (design principle 6). The export does not queue anything, so it never runs inside a later window either, and `StartRecording` needs no extra check for it.
+
+The runner (D-11) calls `DebugView::ExportMasks(ChunkManager&, MaskExportRequest{root, names, tag, run, writePreview})` between windows, with its run folder as `root` and its own `RunInfo`. It returns true only if every mask was written and its round trip was identical; `GetExporters().GetLastMaskExport()` holds one `MaskExportResult` per requested name (paths, size, min/max, SHA-256, source node, times, error). The call must come from the main thread with the main GL context current.
+
+The export runs in every build (with or without `PWG_DEBUG_VIEW_INSTRUMENTATION`, Debug View on or off). Nothing of it runs per frame: without a button press or an `ExportMasks` call it costs nothing outside the Capture tab drawing.
+
+### Files
+
+`<output folder>/masks/<name>[_<tag>].f32`, `.yaml` and `.png` (design 7.1 and 7.4). A run folder (D-11) uses the same `masks/` sub-folder.
+
+- `<name>`: the mask key with the same character rule as screenshots (ASCII letters, digits, `.`, `-` kept; any other run becomes one `-`), so `node_5_height` becomes `node-5-height`. The sidecar keeps the real key in `name`.
+- `<tag>`: optional, same rule (`after_thermal` becomes `after-thermal`).
+- If any of the three files with that stem exists, `-2`, `-3`, … is appended to the stem. Nothing is overwritten.
+
+### `<name>.f32` (raw data)
+
+- float32, IEEE 754, little-endian, no header. Size = `width × height × channels × 4` bytes (`byte_size`).
+- Row-major. The first row is texel row y = 0 of the GL texture (GL's bottom row, `row_order: bottom_to_top`); no flip. Value `(x, y, c)` is at index `(y · width + x) · channels + c`.
+- Multi-channel masks are interleaved in channel order (R, G, B, A). Masks stored as 8 or 16 bit on the GPU (e.g. `NormalMask`, `RGBA16F`) are converted to float32 by GL; `gl_internal_format` names the stored format.
+- Data: `glGetTextureImage(texture, 0, <RED|RG|RGB|RGBA>, GL_FLOAT)` into a `std::vector<float>`, with tight packing (`GL_PACK_ALIGNMENT` 4, no row length, skips or byte swap; the previous pack state and pixel pack buffer binding are restored), after `glMemoryBarrier` for image stores; written with one binary `write`.
+- Size and format are read from the GL texture (`glGetTextureLevelParameteriv`), not from the `Texture` object.
+- For `FinalHeight` the file is byte-identical to `Texture::ReadFloatData()` (checked in all three build configurations), so its FNV-1a equals the hashes of the D-03/D-07/D-09 checks.
+
+Reading in Python (D-12): `numpy.fromfile(path, dtype="<f4").reshape(height, width, channels)`, row 0 = GL row 0. `numpy.flipud` gives image orientation (top row first).
+
+Round trip (acceptance, design 7.4): after writing, the exporter reads the file back and compares it byte for byte with the exported buffer. A difference fails the export (`roundtrip_identical: true` is written only after the check).
+
+### `<name>.png` (preview)
+
+- 8 bit per channel. One channel: grayscale. Two channels: RGB with R, G = the channels and B = 0. Three or four channels: RGB (alpha dropped).
+- Each channel is scaled with its own minimum and maximum: `floor((v − min_c) · (255 / (max_c − min_c)) + 0.5)`, computed in double. For one channel `min_c`, `max_c` are `min`, `max`. A constant channel, and NaN or infinite values, give 0.
+- Flipped vertically: the first PNG row is texel row `height − 1`, so texel row 0 is the bottom row of the image.
+- Only for viewing and figures; comparisons use the `.f32` files.
+
+### Sidecar `<name>.yaml`
+
+Keys of design 7.4, in its order:
+
+| Key | Meaning |
+|---|---|
+| `format`, `format_version` | `pwg-mask`, 1 |
+| `name`, `file` | mask key in `ChunkManager::GetMasks()`; `.f32` file name |
+| `dtype`, `endianness` | `float32`, `little` |
+| `width`, `height`, `channels`, `row_order`, `byte_size` | layout above; `row_order` is `bottom_to_top` |
+| `min`, `max` | over all finite values of all channels of the exported data (9 significant digits, reads back as the same float32); null if there is none |
+| `source_node` | `{id, type, port}` of the graph node output that produced the mask, or nulls; see below |
+| `seeds` | `{<node id>: <seed>}` of every enabled node in the graph asset that has a `seed` parameter |
+| `generation_revision` | `ChunkManager::GetGenerationRevision()`: incremented by every graph run, erosion step and hydrology upload |
+| `simulation` | `hydraulic_steps`, `thermal_steps`: steps since the erosion state was last reset (graph run, reset or restore), from `TerrainComputePipeline`; `hydrology_generated`; `hydrology_running` (true means the worker was still running, so hydrology masks may be partial) |
+| `project_path`, `pwg_commit` | from the metadata header (null without a saved project) |
+
+Additions:
+
+| Key | Meaning |
+|---|---|
+| `sha256` | SHA-256 of the exported buffer, equal to the SHA-256 of the `.f32` file (DEC-13 Q6: the `.f32` stays out of git, its hash is kept in the sidecar) |
+| `roundtrip_identical` | result of the read-back comparison (always true in a written sidecar) |
+| `non_finite_count` | NaN and infinite values (not counted in min/max) |
+| `channel_min`, `channel_max` | per channel, used for the preview |
+| `gl_internal_format` | storage format on the GPU, e.g. `R32F`, `RG32F`, `RGBA16F` |
+| `aliases` | other keys of `GetMasks()` that share the same texture (e.g. `FinalHeight` and the erosion nodes' `node_<id>_height`) |
+| `tag`, `timestamp_local`, `engine_frame` | tag or null; export time; Debug View frame index |
+| `preview` | `file` (or null), `channels`, `normalization: per_channel_min_max`, `row_order: top_to_bottom` |
+| `timing` | `readback_ms` (`glGetTextureImage`), `raw_write_ms` (statistics, hash and write), `verify_ms` (read-back comparison), `png_write_ms` (scale, flip, encode, write); steady_clock |
+| `metadata` | the metadata header (D-09) at export time, run identifiers from the caller |
+
+`source_node` is resolved from the current graph asset:
+
+1. a temporary mask `node_<id>_<port>` names its node and output port;
+2. `FinalHeight` and the target of an `outputMask` node: the node and port linked into the output node's input (the last enabled output node in execution order, as `ExecuteUniversalGraph` copies them); after erosion steps this is still the node linked into `outputHeight`;
+3. otherwise a temporary mask that shares the texture, the last in execution order (e.g. `RiverChannelMask` → the `drainageNetwork` node, port `rivers`);
+4. otherwise null: engine masks no graph node writes (`BaseHeight`, `NormalMask`, `SlopeMask`, the legacy pipeline masks) and the graph editor previews.
+
+The compatibility rules above apply to the sidecar keys in the same way.
+
+### Measured cost (this laptop, 2026-11-17, functional check)
+
+FinalHeight, 3999 × 3999 × 1 (63 968 004 bytes), 5 exports per configuration, median ms (enabled / compiled in and disabled / compiled out): readback 18.1 / 19.0 / 19.0; raw write 113.3 / 106.9 / 103.8; read-back check 283.6 / 754.5 / 289.7; PNG 593.9 / 615.9 / 607.5; whole call including metadata collection 1028 / 1498 / 1027. The read-back check varied between runs (282 to 806 ms; cause not investigated); it is the same code in all configurations. These are functional numbers, not thesis data.

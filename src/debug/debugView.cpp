@@ -243,3 +243,20 @@ void pwg::debug::DebugView::CaptureScreenshot(const ScreenshotSource& source)
 	const Metadata metadata = CollectRunMetadata(request->run, time);
 	m_exporters.CaptureScreenshot(source, metadata, time, m_frameIndex);
 }
+
+bool pwg::debug::DebugView::ExportMasks(ChunkManager& chunks, const MaskExportRequest& request)
+{
+	if (m_recorder.IsActive())
+	{
+		PWG_WARN("Mask export refused: a CSV window is being recorded (the readback is synchronous)");
+		return false;
+	}
+	if (request.names.empty())
+	{
+		return false;
+	}
+	const std::chrono::system_clock::time_point time = std::chrono::system_clock::now();
+	const Metadata metadata = CollectRunMetadata(request.run, time);
+	const std::vector<MaskExportResult>& results = m_exporters.ExportMasks(chunks, request, metadata, time, m_frameIndex);
+	return std::all_of(results.begin(), results.end(), [](const MaskExportResult& result) { return result.written; });
+}

@@ -781,7 +781,7 @@ void pwg::EditorScene::Draw()
         }
         if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Capture"))
         {
-            debug::DebugView::Get().DrawCaptureTab();
+            debug::DebugView::Get().DrawCaptureTab(m_terrain ? m_terrain->GetChunkManager().get() : nullptr);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();

@@ -94,6 +94,11 @@ namespace pwg
 		void MarkThermalErosionRestored(std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& masks, bool restored);
 		void ApplyUniversalGraphSimulationSettings();
 
+		/** @brief Read only, for the mask export sidecar (D-08): steps since the erosion state was last reset. */
+		unsigned int GetParticleStepCount() const { return m_particleStepCount; }
+		unsigned int GetThermalStepCount() const { return m_thermalStepCount; }
+		bool IsHydrologyGenerated() const { return m_hydrologyGenerated; }
+
 		TerrainPassContext& GetPassContext();
 
 		void BuildGraph();

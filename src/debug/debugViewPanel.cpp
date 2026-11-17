@@ -1,6 +1,8 @@
+#include <glad/glad.h>
 #include "debugView.h"
 #include "core/window/window.h"
 #include "imgui.h"
+#include "terrain/chunk/chunkManager.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -759,16 +761,177 @@ namespace
 	}
 }
 
-void pwg::debug::DebugView::DrawCaptureTab()
+void pwg::debug::DebugView::DrawCaptureTab(ChunkManager* chunks)
 {
 	ImGui::SetNextItemWidth(260.0f);
 	ImGui::InputText("Output folder##capture", m_captureRoot, sizeof(m_captureRoot));
 	std::error_code error;
 	const std::filesystem::path root = std::filesystem::absolute(PathFromUtf8(m_captureRoot), error);
-	ImGui::TextDisabled("Screenshots go to <folder>/%s/. Folder: %s", ScreenshotFolderName,
-		error ? m_captureRoot : Utf8(root).c_str());
+	ImGui::TextDisabled("Screenshots go to <folder>/%s/, masks to <folder>/%s/. Folder: %s", ScreenshotFolderName,
+		MaskFolderName, error ? m_captureRoot : Utf8(root).c_str());
 
 	DrawScreenshotSection();
+	DrawMaskSection(chunks);
+}
+
+namespace
+{
+	std::string LowerAscii(std::string text)
+	{
+		std::transform(text.begin(), text.end(), text.begin(),
+			[](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+		return text;
+	}
+}
+
+void pwg::debug::DebugView::DrawMaskSection(ChunkManager* chunks)
+{
+	ImGui::SeparatorText("Mask export");
+	if (!chunks)
+	{
+		ImGui::TextDisabled("No terrain is loaded.");
+		return;
+	}
+	const bool recording = m_recorder.IsActive();
+	auto& masks = chunks->GetMasks();
+
+	std::vector<std::string> names;
+	names.reserve(masks.size());
+	for (const auto& [name, mask] : masks)
+	{
+		if (mask && mask->texture)
+		{
+			names.push_back(name);
+		}
+	}
+	std::sort(names.begin(), names.end());
+	// Masks can disappear (project reload, graph change); forget ticks that no longer match a mask.
+	std::erase_if(m_maskSelection, [&](const std::string& name) { return !std::binary_search(names.begin(), names.end(), name); });
+
+	ImGui::SetNextItemWidth(200.0f);
+	ImGui::InputText("Filter##masks", m_maskFilter, sizeof(m_maskFilter));
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(200.0f);
+	ImGui::InputText("Tag (optional)##masks", m_maskTag, sizeof(m_maskTag));
+	ImGui::SameLine();
+	ImGui::Checkbox("PNG preview", &m_maskPreview);
+
+	const std::string filter = LowerAscii(m_maskFilter);
+	std::vector<const std::string*> shown;
+	for (const std::string& name : names)
+	{
+		if (filter.empty() || LowerAscii(name).find(filter) != std::string::npos)
+		{
+			shown.push_back(&name);
+		}
+	}
+	if (ImGui::SmallButton("Tick shown"))
+	{
+		for (const std::string* name : shown)
+		{
+			if (std::find(m_maskSelection.begin(), m_maskSelection.end(), *name) == m_maskSelection.end())
+			{
+				m_maskSelection.push_back(*name);
+			}
+		}
+	}
+	ImGui::SameLine();
+	if (ImGui::SmallButton("Untick all"))
+	{
+		m_maskSelection.clear();
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("%zu masks, %zu shown, %zu ticked", names.size(), shown.size(), m_maskSelection.size());
+
+	if (ImGui::BeginChild("##maskList", ImVec2(0.0f, 180.0f), ImGuiChildFlags_Borders))
+	{
+		for (const std::string* name : shown)
+		{
+			const auto selected = std::find(m_maskSelection.begin(), m_maskSelection.end(), *name);
+			bool ticked = selected != m_maskSelection.end();
+			if (ImGui::Checkbox(name->c_str(), &ticked))
+			{
+				if (ticked)
+				{
+					m_maskSelection.push_back(*name);
+				}
+				else
+				{
+					m_maskSelection.erase(selected);
+				}
+			}
+			const std::shared_ptr<Texture>& texture = masks.at(*name)->texture;
+			ImGui::SameLine();
+			ImGui::TextDisabled("%dx%d", texture->GetWidth(), texture->GetHeight());
+		}
+	}
+	ImGui::EndChild();
+
+	ImGui::BeginDisabled(recording || m_maskSelection.empty());
+	char label[64];
+	std::snprintf(label, sizeof(label), "Export ticked masks (%zu)", m_maskSelection.size());
+	if (ImGui::Button(label))
+	{
+		MaskExportRequest request;
+		request.root = PathFromUtf8(m_captureRoot);
+		request.names = m_maskSelection;
+		std::sort(request.names.begin(), request.names.end());
+		request.tag = m_maskTag;
+		request.writePreview = m_maskPreview;
+		ExportMasks(*chunks, request);
+	}
+	ImGui::EndDisabled();
+	if (recording)
+	{
+		ImGui::SameLine();
+		ImGui::TextDisabled("Not available while a CSV window is recorded (synchronous readback).");
+	}
+	ImGui::TextDisabled("Writes <name>[_<tag>].f32 (raw float32, GL row 0 first), a .yaml sidecar and an 8-bit .png "
+		"preview, then reads the .f32 back and compares it byte for byte. Runs at once and blocks the frame.");
+
+	if (m_exporters.HasMaskExportResult())
+	{
+		const std::vector<MaskExportResult>& results = m_exporters.GetLastMaskExport();
+		const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+		if (ImGui::BeginTable("##maskResults", 6, flags))
+		{
+			ImGui::TableSetupColumn("Mask");
+			ImGui::TableSetupColumn("Size");
+			ImGui::TableSetupColumn("Min");
+			ImGui::TableSetupColumn("Max");
+			ImGui::TableSetupColumn("Round trip");
+			ImGui::TableSetupColumn("ms (read / raw / verify / png)");
+			ImGui::TableHeadersRow();
+			for (const MaskExportResult& result : results)
+			{
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn(); ImGui::TextUnformatted(result.name.c_str());
+				if (!result.error.empty())
+				{
+					ImGui::TableNextColumn();
+					ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "failed: %s", result.error.c_str());
+					continue;
+				}
+				ImGui::TableNextColumn(); ImGui::Text("%dx%dx%d", result.width, result.height, result.channels);
+				ImGui::TableNextColumn(); ImGui::Text("%.6g", static_cast<double>(result.min));
+				ImGui::TableNextColumn(); ImGui::Text("%.6g", static_cast<double>(result.max));
+				ImGui::TableNextColumn(); ImGui::TextUnformatted(result.roundTripIdentical ? "identical" : "DIFFERS");
+				ImGui::TableNextColumn(); ImGui::Text("%.1f / %.1f / %.1f / %.1f", result.readbackMs, result.rawWriteMs,
+					result.verifyMs, result.previewMs);
+			}
+			ImGui::EndTable();
+		}
+		if (!results.empty() && results.front().written)
+		{
+			const std::string folder = Utf8(results.front().raw.parent_path());
+			ImGui::TextWrapped("%s", folder.c_str());
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Copy path##masks"))
+			{
+				ImGui::SetClipboardText(folder.c_str());
+			}
+		}
+	}
 }
 
 void pwg::debug::DebugView::DrawScreenshotSection()

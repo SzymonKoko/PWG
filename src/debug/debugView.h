@@ -25,6 +25,7 @@
 namespace pwg
 {
 	class Window;
+	class ChunkManager;
 }
 
 namespace pwg::debug
@@ -128,7 +129,15 @@ namespace pwg::debug
 		*/
 		void CaptureScreenshot(const ScreenshotSource& source);
 
-		/** @brief Read access (pending request, last result). Requests go through RequestScreenshot. */
+		/**
+		* @brief Exports masks of `chunks` now (D-08, design 7.4): `<root>/masks/<name>[_<tag>].f32` + `.yaml`
+		* sidecar + `.png` preview. Synchronous readback and file writes, so it is refused while a CSV window is
+		* recorded (design principle 6). Main GL context only. Returns true if every requested mask was written
+		* and its round trip was identical; per-mask results: GetExporters().GetLastMaskExport().
+		*/
+		bool ExportMasks(ChunkManager& chunks, const MaskExportRequest& request);
+
+		/** @brief Read access (pending request, last result). Requests go through RequestScreenshot / ExportMasks. */
 		const Exporters& GetExporters() const { return m_exporters; }
 
 		/** @brief "Performance" tab of the Debug window (debugViewPanel.cpp). */
@@ -140,8 +149,11 @@ namespace pwg::debug
 		/** @brief "Simulation" tab of the Debug window: graph, erosion, hydrology and readback timing (debugViewPanel.cpp). */
 		void DrawSimulationTab();
 
-		/** @brief "Capture" tab of the Debug window: screenshot (D-07); mask export follows in D-08 (debugViewPanel.cpp). */
-		void DrawCaptureTab();
+		/**
+		* @brief "Capture" tab of the Debug window: screenshot (D-07) and mask export (D-08) (debugViewPanel.cpp).
+		* `chunks` provides the masks; null hides the mask list.
+		*/
+		void DrawCaptureTab(ChunkManager* chunks);
 
 	private:
 		/** @brief GPU query and CPU scope part of the Performance tab (instrumented builds only). */
@@ -158,6 +170,9 @@ namespace pwg::debug
 
 		/** @brief Screenshot part of the Capture tab (every build). */
 		void DrawScreenshotSection();
+
+		/** @brief Mask export part of the Capture tab (every build). */
+		void DrawMaskSection(ChunkManager* chunks);
 
 		static inline DebugView* s_instance{ nullptr };
 		static inline std::atomic<bool> s_enabled{ false };
@@ -193,6 +208,10 @@ namespace pwg::debug
 		int m_exportFrames{ 0 };					/**< Frames per window in the Performance tab, 0 = until Stop. */
 		char m_captureRoot[260]{ "captures" };		/**< Capture root of the Capture tab, relative to the working directory. */
 		char m_screenshotTag[64]{};					/**< Optional tag of the next screenshot. */
+		std::vector<std::string> m_maskSelection{ "FinalHeight" };	/**< Masks ticked in the Capture tab. */
+		char m_maskFilter[64]{};					/**< Name filter of the mask list. */
+		char m_maskTag[64]{};						/**< Optional tag of the next mask export. */
+		bool m_maskPreview{ true };					/**< Write the PNG preview. */
 	};
 
 	/**

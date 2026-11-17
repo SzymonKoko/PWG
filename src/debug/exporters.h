@@ -12,6 +12,11 @@
 #include <glm/glm.hpp>
 #include "debug/runMetadata.h"
 
+namespace pwg
+{
+	class ChunkManager;
+}
+
 namespace pwg::debug
 {
 	// ---------------------------------------------------------------------------------------------
@@ -20,6 +25,7 @@ namespace pwg::debug
 
 	/** @brief Sub-folders of a capture root (design 7.1: a run folder holds `screenshots/` and `masks/`). */
 	inline constexpr const char* ScreenshotFolderName = "screenshots";
+	inline constexpr const char* MaskFolderName = "masks";
 
 	/**
 	* @brief File name part from free text: ASCII letters, digits, '.' and '-' are kept, every other character
@@ -115,6 +121,59 @@ namespace pwg::debug
 		std::string error;
 	};
 
+	// ---------------------------------------------------------------------------------------------
+	// Mask and heightmap export (D-08, design 7.4)
+	// ---------------------------------------------------------------------------------------------
+
+	/** @brief Masks to export now, from ChunkManager::GetMasks(). */
+	struct MaskExportRequest
+	{
+		std::filesystem::path root;					/**< Capture or run root; the files go to `<root>/masks/`. */
+		std::vector<std::string> names;				/**< Keys of ChunkManager::GetMasks(), exported in this order. */
+		std::string tag;							/**< Optional `_<tag>` after the mask name (e.g. a pipeline stage). */
+		RunInfo run;								/**< Run identifiers for the metadata (the runner passes its own). */
+		bool writePreview{ true };					/**< Write the 8-bit PNG preview. */
+	};
+
+	/** @brief Graph node and output port that produced a mask (null in the sidecar when not known). */
+	struct MaskSourceNode
+	{
+		bool known{ false };
+		int id{ 0 };
+		std::string type;
+		std::string port;
+	};
+
+	struct MaskExportResult
+	{
+		bool written{ false };						/**< Raw file, sidecar and (if asked) preview written, round trip identical. */
+		std::string name;							/**< Mask key in ChunkManager::GetMasks(). */
+		std::filesystem::path raw;					/**< `<stem>.f32` */
+		std::filesystem::path sidecar;				/**< `<stem>.yaml` */
+		std::filesystem::path png;					/**< `<stem>.png`, empty if no preview was written. */
+		int width{ 0 };
+		int height{ 0 };
+		int channels{ 0 };
+		std::string glInternalFormat;				/**< e.g. R32F, as stored on the GPU. */
+		uint64_t byteSize{ 0 };
+		float min{ 0.0f };							/**< Over all finite values of all channels. */
+		float max{ 0.0f };
+		std::vector<float> channelMin;				/**< Per channel (multi-channel masks; also filled for one channel). */
+		std::vector<float> channelMax;
+		uint64_t nonFinite{ 0 };					/**< NaN or infinite values (excluded from min/max). */
+		std::string sha256;							/**< SHA-256 of the exported buffer (= of the .f32 file). */
+		bool roundTripIdentical{ false };			/**< The .f32 read back equals the buffer byte for byte. */
+		MaskSourceNode source;
+		std::vector<std::string> aliases;			/**< Other keys of GetMasks() that share this texture. */
+		uint64_t generationRevision{ 0 };
+		uint64_t engineFrame{ 0 };
+		double readbackMs{ 0.0 };					/**< glGetTextureImage, synchronous. */
+		double rawWriteMs{ 0.0 };					/**< Statistics, hash and the one binary write of the .f32. */
+		double verifyMs{ 0.0 };						/**< Reading the .f32 back and comparing. */
+		double previewMs{ 0.0 };					/**< Normalise, flip and PNG encode/write. */
+		std::string error;
+	};
+
 	/**
 	* @brief Capture exporters of the Debug View. Owned by DebugView; the Capture tab and the experiment
 	* runner (D-11) use them through DebugView.
@@ -123,13 +182,29 @@ namespace pwg::debug
 	* the post-process pass and before ImGui renders, so the image holds the scene only. The readback is
 	* synchronous; DebugView refuses requests while a CSV window is recorded (design principle 6).
 	*
-	* D-08 adds the mask export (raw + sidecar + PNG preview) to this class, next to the screenshot part.
+	* Mask export (D-08): runs at once when called (no queue), on the main GL context. Each mask is read with
+	* glGetTextureImage as float32, written as raw `.f32`, read back and compared
+	* byte for byte, then described in a YAML sidecar and previewed as an 8-bit PNG. Also synchronous, so
+	* DebugView refuses it while a CSV window is recorded.
 	*/
 	class Exporters
 	{
 	public:
 		static constexpr const char* ScreenshotFormatName = "pwg-screenshot";
 		static constexpr int ScreenshotFormatVersion = 1;
+		static constexpr const char* MaskFormatName = "pwg-mask";
+		static constexpr int MaskFormatVersion = 1;
+
+		/**
+		* @brief Exports the masks named in `request` from `chunks` (design 7.4). Main GL context. `metadata` is
+		* the run header for the export time `time`. Returns one result per requested name (also for failures);
+		* the same list is kept as GetLastMaskExport().
+		*/
+		const std::vector<MaskExportResult>& ExportMasks(ChunkManager& chunks, const MaskExportRequest& request,
+			const Metadata& metadata, std::chrono::system_clock::time_point time, uint64_t engineFrame);
+
+		bool HasMaskExportResult() const { return m_hasMaskResult; }
+		const std::vector<MaskExportResult>& GetLastMaskExport() const { return m_lastMaskExport; }
 
 		/** @brief Queues a screenshot. Returns false if one is already pending. */
 		bool RequestScreenshot(ScreenshotRequest request);
@@ -153,6 +228,15 @@ namespace pwg::debug
 		ScreenshotResult m_lastScreenshot;
 		bool m_hasScreenshotResult{ false };
 		std::vector<uint8_t> m_pixelScratch;		/**< Reused readback buffer. */
+
+		/** @brief Exports one mask; called by ExportMasks. */
+		MaskExportResult ExportMask(ChunkManager& chunks, const std::string& name, const MaskExportRequest& request,
+			const Metadata& metadata, std::chrono::system_clock::time_point time, uint64_t engineFrame);
+
+		std::vector<MaskExportResult> m_lastMaskExport;
+		bool m_hasMaskResult{ false };
+		std::vector<float> m_maskScratch;			/**< Reused mask readback buffer. */
+		std::vector<uint8_t> m_maskVerifyScratch;	/**< Reused buffer for the .f32 read-back. */
 	};
 } // namespace pwg::debug
 
