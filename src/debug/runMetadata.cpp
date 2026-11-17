@@ -17,6 +17,7 @@
 #include "core/logger/logger.h"
 #include "pwgBuildInfo.h"	// Generated at build time by cmake/pwgBuildInfo.cmake.
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -384,6 +385,71 @@ void pwg::debug::RunMetadata::AppendSceneInfo(Metadata& out) const
 
 // --- Free functions ---
 
+namespace
+{
+	/** @brief SHA-256 with BCrypt; Update may be called any number of times before Finish. */
+	class Sha256
+	{
+	public:
+		Sha256()
+		{
+			if (BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(&m_algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0)))
+			{
+				m_ok = BCRYPT_SUCCESS(BCryptCreateHash(m_algorithm, &m_hash, nullptr, 0, nullptr, 0, 0));
+			}
+		}
+		~Sha256()
+		{
+			if (m_hash)
+			{
+				BCryptDestroyHash(m_hash);
+			}
+			if (m_algorithm)
+			{
+				BCryptCloseAlgorithmProvider(m_algorithm, 0);
+			}
+		}
+		Sha256(const Sha256&) = delete;
+		Sha256& operator=(const Sha256&) = delete;
+
+		void Update(const void* data, size_t size)
+		{
+			const UCHAR* bytes = static_cast<const UCHAR*>(data);
+			while (m_ok && size > 0)
+			{
+				const ULONG chunk = static_cast<ULONG>(std::min<size_t>(size, 1u << 30));
+				m_ok = BCRYPT_SUCCESS(BCryptHashData(m_hash, const_cast<PUCHAR>(bytes), chunk, 0));
+				bytes += chunk;
+				size -= chunk;
+			}
+		}
+
+		/** @brief Lower-case hex digest, or an empty string after any failure. */
+		std::string Finish()
+		{
+			std::array<UCHAR, 32> digest{};
+			if (!m_ok || !BCRYPT_SUCCESS(BCryptFinishHash(m_hash, digest.data(), static_cast<ULONG>(digest.size()), 0)))
+			{
+				return {};
+			}
+			static const char hex[] = "0123456789abcdef";
+			std::string result;
+			result.reserve(64);
+			for (UCHAR byte : digest)
+			{
+				result.push_back(hex[byte >> 4]);
+				result.push_back(hex[byte & 0x0f]);
+			}
+			return result;
+		}
+
+	private:
+		BCRYPT_ALG_HANDLE m_algorithm{ nullptr };
+		BCRYPT_HASH_HANDLE m_hash{ nullptr };
+		bool m_ok{ false };
+	};
+}
+
 std::string pwg::debug::ComputeFileSha256(const std::filesystem::path& path)
 {
 	std::ifstream file(path, std::ios::binary);
@@ -392,41 +458,29 @@ std::string pwg::debug::ComputeFileSha256(const std::filesystem::path& path)
 		return {};
 	}
 
-	BCRYPT_ALG_HANDLE algorithm = nullptr;
-	if (!BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0)))
+	Sha256 hash;
+	std::vector<char> buffer(1 << 20);
+	while (file)
+	{
+		file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+		const std::streamsize read = file.gcount();
+		if (read > 0)
+		{
+			hash.Update(buffer.data(), static_cast<size_t>(read));
+		}
+	}
+	if (file.bad())
 	{
 		return {};
 	}
-	BCRYPT_HASH_HANDLE hash = nullptr;
-	std::string result;
-	if (BCRYPT_SUCCESS(BCryptCreateHash(algorithm, &hash, nullptr, 0, nullptr, 0, 0)))
-	{
-		std::vector<char> buffer(1 << 20);
-		bool ok = true;
-		while (ok && file)
-		{
-			file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-			const std::streamsize read = file.gcount();
-			if (read > 0)
-			{
-				ok = BCRYPT_SUCCESS(BCryptHashData(hash, reinterpret_cast<PUCHAR>(buffer.data()), static_cast<ULONG>(read), 0));
-			}
-		}
-		std::array<UCHAR, 32> digest{};
-		if (ok && !file.bad() && BCRYPT_SUCCESS(BCryptFinishHash(hash, digest.data(), static_cast<ULONG>(digest.size()), 0)))
-		{
-			static const char hex[] = "0123456789abcdef";
-			result.reserve(64);
-			for (UCHAR byte : digest)
-			{
-				result.push_back(hex[byte >> 4]);
-				result.push_back(hex[byte & 0x0f]);
-			}
-		}
-		BCryptDestroyHash(hash);
-	}
-	BCryptCloseAlgorithmProvider(algorithm, 0);
-	return result;
+	return hash.Finish();
+}
+
+std::string pwg::debug::ComputeSha256(const void* data, size_t size)
+{
+	Sha256 hash;
+	hash.Update(data, size);
+	return hash.Finish();
 }
 
 std::string pwg::debug::FormatIsoTime(std::chrono::system_clock::time_point time, bool utc)
@@ -460,31 +514,31 @@ void pwg::debug::WriteMetadataComments(std::ostream& out, const Metadata& metada
 	}
 }
 
+void pwg::debug::EmitMetadataYaml(YAML::Emitter& emitter, const Metadata& values)
+{
+	emitter << YAML::BeginMap;
+	for (const Metadata::Entry& entry : values.GetEntries())
+	{
+		emitter << YAML::Key << entry.key << YAML::Value;
+		switch (entry.kind)
+		{
+		case Metadata::Kind::EMPTY: emitter << YAML::Null; break;
+		case Metadata::Kind::STRING: emitter << YAML::DoubleQuoted << entry.value; break;
+		default: emitter << entry.value; break;
+		}
+	}
+	emitter << YAML::EndMap;
+}
+
 bool pwg::debug::WriteRunYaml(const std::filesystem::path& path, const Metadata& metadata, const Metadata& result,
 	const std::vector<std::string>& files)
 {
-	auto emitMap = [](YAML::Emitter& emitter, const Metadata& values)
-	{
-		emitter << YAML::BeginMap;
-		for (const Metadata::Entry& entry : values.GetEntries())
-		{
-			emitter << YAML::Key << entry.key << YAML::Value;
-			switch (entry.kind)
-			{
-			case Metadata::Kind::EMPTY: emitter << YAML::Null; break;
-			case Metadata::Kind::STRING: emitter << YAML::DoubleQuoted << entry.value; break;
-			default: emitter << entry.value; break;
-			}
-		}
-		emitter << YAML::EndMap;
-	};
-
 	YAML::Emitter emitter;
 	emitter << YAML::BeginMap;
 	emitter << YAML::Key << "metadata" << YAML::Value;
-	emitMap(emitter, metadata);
+	EmitMetadataYaml(emitter, metadata);
 	emitter << YAML::Key << "result" << YAML::Value;
-	emitMap(emitter, result);
+	EmitMetadataYaml(emitter, result);
 	emitter << YAML::Key << "files" << YAML::Value << YAML::BeginSeq;
 	for (const std::string& file : files)
 	{

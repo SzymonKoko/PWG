@@ -196,6 +196,12 @@ bool pwg::debug::DebugView::StartRecording(RunInfo run, const std::filesystem::p
 	{
 		return false;
 	}
+	if (m_exporters.HasPendingScreenshot())
+	{
+		// The screenshot is read in the next frame, which would be the first frame of the window (principle 6).
+		PWG_WARN("CSV export: recording not started, a screenshot is pending; start it after the screenshot is written");
+		return false;
+	}
 
 	const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 	std::error_code error;
@@ -214,4 +220,26 @@ bool pwg::debug::DebugView::StartRecording(RunInfo run, const std::filesystem::p
 
 	Metadata metadata = CollectRunMetadata(run, start);
 	return m_recorder.Start(run, std::move(metadata), outputRoot / run.runId, m_frameIndex, frameCount);
+}
+
+bool pwg::debug::DebugView::RequestScreenshot(ScreenshotRequest request)
+{
+	if (m_recorder.IsActive())
+	{
+		PWG_WARN("Screenshot refused: a CSV window is being recorded (the readback is synchronous)");
+		return false;
+	}
+	return m_exporters.RequestScreenshot(std::move(request));
+}
+
+void pwg::debug::DebugView::CaptureScreenshot(const ScreenshotSource& source)
+{
+	const ScreenshotRequest* request = m_exporters.GetPendingScreenshot();
+	if (!request)
+	{
+		return;
+	}
+	const std::chrono::system_clock::time_point time = std::chrono::system_clock::now();
+	const Metadata metadata = CollectRunMetadata(request->run, time);
+	m_exporters.CaptureScreenshot(source, metadata, time, m_frameIndex);
 }

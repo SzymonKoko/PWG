@@ -746,3 +746,79 @@ void pwg::debug::DebugView::DrawSimulationTables()
 		ImGui::TreePop();
 	}
 }
+
+// --- Capture tab (D-07 screenshot; D-08 adds the mask export) ---
+
+namespace
+{
+	/** @brief Path from UTF-8 text typed into ImGui (path(std::string) would use the ANSI code page). */
+	std::filesystem::path PathFromUtf8(const char* text)
+	{
+		const std::string value(text);
+		return std::filesystem::path(std::u8string(value.begin(), value.end()));
+	}
+}
+
+void pwg::debug::DebugView::DrawCaptureTab()
+{
+	ImGui::SetNextItemWidth(260.0f);
+	ImGui::InputText("Output folder##capture", m_captureRoot, sizeof(m_captureRoot));
+	std::error_code error;
+	const std::filesystem::path root = std::filesystem::absolute(PathFromUtf8(m_captureRoot), error);
+	ImGui::TextDisabled("Screenshots go to <folder>/%s/. Folder: %s", ScreenshotFolderName,
+		error ? m_captureRoot : Utf8(root).c_str());
+
+	DrawScreenshotSection();
+}
+
+void pwg::debug::DebugView::DrawScreenshotSection()
+{
+	ImGui::SeparatorText("Screenshot");
+	const bool recording = m_recorder.IsActive();
+	const bool pending = m_exporters.HasPendingScreenshot();
+
+	ImGui::SetNextItemWidth(200.0f);
+	ImGui::InputText("Tag (optional)", m_screenshotTag, sizeof(m_screenshotTag));
+
+	ImGui::BeginDisabled(recording || pending);
+	if (ImGui::Button("Screenshot"))
+	{
+		ScreenshotRequest request;
+		request.root = PathFromUtf8(m_captureRoot);
+		request.tag = m_screenshotTag;
+		RequestScreenshot(std::move(request));
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	if (recording)
+	{
+		ImGui::TextDisabled("Not available while a CSV window is recorded (synchronous readback).");
+	}
+	else if (pending)
+	{
+		ImGui::TextUnformatted("Taken at the next frame...");
+	}
+	ImGui::TextDisabled("Saves the Main View after post-processing, without UI, at the current render size "
+		"(benchmark mode: the fixed render size). Writes <project>_<camera>_<time>[_<tag>].png and a .yaml sidecar.");
+
+	if (m_exporters.HasScreenshotResult())
+	{
+		const ScreenshotResult& result = m_exporters.GetLastScreenshot();
+		if (result.written)
+		{
+			ImGui::Text("Last screenshot: %dx%d, readback %.2f ms, PNG %.2f ms", result.width, result.height,
+				result.readbackMs, result.writeMs);
+			const std::string file = Utf8(result.png);
+			ImGui::TextWrapped("%s", file.c_str());
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Copy path##screenshot"))
+			{
+				ImGui::SetClipboardText(file.c_str());
+			}
+		}
+		else
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Last screenshot failed: %s", result.error.c_str());
+		}
+	}
+}

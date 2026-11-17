@@ -10,6 +10,7 @@
 #include <vector>
 #include "debug/cpuProfiler.h"
 #include "debug/csvWriter.h"
+#include "debug/exporters.h"
 #include "debug/frameStats.h"
 #include "debug/gpuProfiler.h"
 #include "debug/renderStats.h"
@@ -115,6 +116,21 @@ namespace pwg::debug
 
 		bool IsRecording() const { return m_recorder.IsActive(); }
 
+		/**
+		* @brief Queues a screenshot of the scene for the next frame (D-07). Refused while a CSV window is
+		* recorded, because the readback is synchronous (design principle 6), or while another one is pending.
+		*/
+		bool RequestScreenshot(ScreenshotRequest request);
+
+		/**
+		* @brief Takes the pending screenshot. Called by EditorScene::Draw after post-processing, before ImGui
+		* renders. Adds the run metadata of the capture time to the sidecar.
+		*/
+		void CaptureScreenshot(const ScreenshotSource& source);
+
+		/** @brief Read access (pending request, last result). Requests go through RequestScreenshot. */
+		const Exporters& GetExporters() const { return m_exporters; }
+
 		/** @brief "Performance" tab of the Debug window (debugViewPanel.cpp). */
 		void DrawPerformanceTab();
 
@@ -123,6 +139,9 @@ namespace pwg::debug
 
 		/** @brief "Simulation" tab of the Debug window: graph, erosion, hydrology and readback timing (debugViewPanel.cpp). */
 		void DrawSimulationTab();
+
+		/** @brief "Capture" tab of the Debug window: screenshot (D-07); mask export follows in D-08 (debugViewPanel.cpp). */
+		void DrawCaptureTab();
 
 	private:
 		/** @brief GPU query and CPU scope part of the Performance tab (instrumented builds only). */
@@ -137,6 +156,9 @@ namespace pwg::debug
 		/** @brief CSV export part of the Performance tab (every build). */
 		void DrawExportSection();
 
+		/** @brief Screenshot part of the Capture tab (every build). */
+		void DrawScreenshotSection();
+
 		static inline DebugView* s_instance{ nullptr };
 		static inline std::atomic<bool> s_enabled{ false };
 
@@ -148,6 +170,7 @@ namespace pwg::debug
 		SimulationStats m_sim;
 		RunMetadata m_runMetadata;
 		CsvRecorder m_recorder{ m_frameStats, m_sim };	/**< Declared after the stats it reads. */
+		Exporters m_exporters;
 		std::vector<GpuEventResult> m_gpuEventResults;	/**< Reused by BeginFrame. */
 		uint32_t m_manualExportCounter{ 0 };
 
@@ -168,6 +191,8 @@ namespace pwg::debug
 		std::vector<SimEvent> m_simScratch;		/**< Used by DrawSimulationTab only. */
 		char m_exportRoot[260]{ "perf_exports" };	/**< Export folder of the Performance tab, relative to the working directory. */
 		int m_exportFrames{ 0 };					/**< Frames per window in the Performance tab, 0 = until Stop. */
+		char m_captureRoot[260]{ "captures" };		/**< Capture root of the Capture tab, relative to the working directory. */
+		char m_screenshotTag[64]{};					/**< Optional tag of the next screenshot. */
 	};
 
 	/**

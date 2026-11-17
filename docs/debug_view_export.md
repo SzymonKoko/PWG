@@ -1,4 +1,4 @@
-# Debug View performance export (D-09)
+# Debug View export formats (D-09 performance, D-07 screenshot)
 
 Format `pwg-debugview-csv`, `format_version` 1. Code: `src/debug/csvWriter.*`, `src/debug/runMetadata.*`.
 Design: thesis repository, `docs/plan/debug_view_design.md` sections 7.1 to 7.3.
@@ -142,3 +142,60 @@ files: [frames.csv, events.csv, summary.csv]
 - New frames.csv columns are appended at the end, new metadata keys are appended to the key list, and new event names, metrics, units and sources may appear in events.csv. None of these changes `format_version`.
 - Renaming or removing a column, key or event name, or changing a unit or the meaning of a value, increments `format_version`.
 - D-04 (memory) adds `memory_snapshot` rows to events.csv (`metric` = `bytes`, `unit` = `B`, `source` = `own_accounting`, `os_process`, `driver_nvx`), through `EventRow`, and may append memory columns to frames.csv. Both are additions under these rules.
+
+## Screenshot export (D-07)
+
+Format `pwg-screenshot`, `format_version` 1. Code: `src/debug/exporters.*` (screenshot part), Capture tab in `src/debug/debugViewPanel.cpp`, capture point in `EditorScene::Draw`.
+Design: thesis repository, `docs/plan/debug_view_design.md` section 7.5.
+
+### Taking a screenshot
+
+Debug window → Capture tab.
+
+1. Set the output folder (default `captures`, relative to the working directory, `build/` when PWG is started as documented) and, if wanted, a tag.
+2. Press Screenshot. The image is taken in the next frame, right after the post-process pass and before ImGui renders, so it holds the 3D scene only (no UI, no gizmos).
+3. The tab shows the file path, the size and the readback and PNG write times of the last screenshot.
+
+The button is disabled while a CSV window is recorded: the readback is synchronous and must not fall inside a measurement window (design principle 6). For the same reason `StartRecording` is refused while a screenshot is still pending. The runner (D-11) requests screenshots between windows through `DebugView::RequestScreenshot(ScreenshotRequest)` with its run folder as root and its own `RunInfo`.
+
+The export runs in every build (with or without `PWG_DEBUG_VIEW_INSTRUMENTATION`, Debug View on or off).
+
+### Files
+
+`<output folder>/screenshots/<project>_<camera>_<yyyyMMdd-HHmmss>[_<tag>].png` and a `.yaml` sidecar with the same name. For a run folder (D-11) the same `screenshots/` sub-folder is used (design 7.1).
+
+- `<project>`: stem of the open project file, `untitled` without one.
+- `<camera>`: `editor`, `flyover` or `player` (active camera).
+- `<yyyyMMdd-HHmmss>`: local time of the capture.
+- `<tag>`: optional label (Capture tab or runner, e.g. `pathframe0450`).
+- In the name parts only ASCII letters, digits, `.` and `-` are kept; any other run of characters (including `_`, the field separator) becomes one `-`.
+- If a file with the same name exists (two screenshots in the same second), `-2`, `-3`, … is added after the time, before the tag. Nothing is overwritten.
+
+### PNG
+
+- Source: the LDR colour texture of the Main View framebuffer (`EditorScene::m_frameBuffer`, `GL_RGBA8`) after `PostProcessor::Render`.
+- Size: the current scene render size, which is the Main View size or, in benchmark mode, the fixed render size.
+- Pixels: read with `glGetTextureImage` as RGBA8, flipped vertically, so the first PNG row is the top of the image as shown on screen. 8 bits per channel, 4 channels, alpha 255.
+- Colour: the values as displayed. `postprocess.frag` applies tone mapping and gamma 1/2.2; `GL_FRAMEBUFFER_SRGB` is off and the texture is not sRGB, so no conversion happens between the framebuffer and the screen. No colour profile chunk is written.
+
+### Sidecar `<name>.yaml`
+
+| Key | Meaning |
+|---|---|
+| `format`, `format_version` | `pwg-screenshot`, 1 |
+| `file`, `tag` | PNG file name; tag or null |
+| `timestamp_local` | capture time (same instant as the file name and `metadata.timestamp_local`) |
+| `engine_frame` | Debug View frame index of the captured frame |
+| `width`, `height`, `channels`, `pixel_format`, `row_order` | image layout (`rgba8`, `top_to_bottom`) |
+| `source`, `color_encoding` | `main_view_post_processed`, `display_gamma_2.2` |
+| `pixels_sha256` | SHA-256 of the RGBA rows as written to the PNG, top row first. Used for per-pixel comparisons (design 6, step 1) without depending on the PNG encoder. |
+| `debug_mode`, `wireframe` | terrain debug view (Viewport tab): `none` or the selected entry name; wireframe switch |
+| `camera` | pose of the camera that rendered the frame, below |
+| `timing.readback_ms`, `timing.png_write_ms` | readback; flip, hash and PNG encode and write (steady_clock) |
+| `metadata` | the metadata header of section "Metadata header" (D-09) at capture time, run identifiers from the caller (manual: empty `run_id`, variant `manual`) |
+
+`camera`: `type`; `position`, `forward`, `up` (world space, from the inverse view matrix, so `position` is the eye the frame was rendered from); `yaw_deg`, `pitch_deg`, `roll_deg`; `fov_deg` (vertical), `near`, `far`, `aspect`; `view_matrix` and `projection_matrix` (16 values, column-major as in GL). Floats are written with 9 significant digits, enough to read back the same float32.
+
+Angles follow `FlyoverCamera`: `forward = (cos p · cos y, sin p, cos p · sin y)`, so `yaw_deg = atan2(forward.z, forward.x)` in (−180, 180] and `pitch_deg = asin(forward.y)`; `roll_deg` is the rotation of `up` towards `right = normalize(cross(forward, (0, 1, 0)))`, 0 for the editor camera. All three are derived from the matrices for every camera type. For the flyover camera they equal its yaw and pitch properties up to float rounding and modulo 360° for yaw.
+
+The compatibility rules above apply to the sidecar keys in the same way (new keys may be appended; renaming, removing or changing the meaning of a key increments `format_version`).

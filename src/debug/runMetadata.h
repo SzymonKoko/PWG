@@ -10,6 +10,11 @@
 #include <utility>
 #include <vector>
 
+namespace YAML
+{
+	class Emitter;
+}
+
 namespace pwg::debug
 {
 	/**
@@ -127,6 +132,9 @@ namespace pwg::debug
 	/** @brief Lower-case hex SHA-256 of a file, or an empty string if it cannot be read. */
 	std::string ComputeFileSha256(const std::filesystem::path& path);
 
+	/** @brief Lower-case hex SHA-256 of a memory buffer, or an empty string on failure. */
+	std::string ComputeSha256(const void* data, size_t size);
+
 	/** @brief Local or UTC time as ISO 8601 with seconds, e.g. 2027-03-02T14:05:11 (UTC gets a trailing Z). */
 	std::string FormatIsoTime(std::chrono::system_clock::time_point time, bool utc);
 
@@ -135,6 +143,12 @@ namespace pwg::debug
 	* Line breaks inside values are replaced by spaces, so each key stays on one comment line.
 	*/
 	void WriteMetadataComments(std::ostream& out, const Metadata& metadata, const char* file);
+
+	/**
+	* @brief Emits the metadata as a YAML block map (strings double-quoted, numbers and booleans plain, empty
+	* values as null). Used by run.yaml and by the capture sidecars (exporters.h).
+	*/
+	void EmitMetadataYaml(YAML::Emitter& emitter, const Metadata& values);
 
 	/**
 	* @brief Writes run.yaml: the metadata map, the `result` map and the files of the run.

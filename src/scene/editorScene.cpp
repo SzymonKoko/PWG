@@ -22,6 +22,47 @@
 
 namespace
 {
+	/** @brief Frame description for a Debug View screenshot (D-07): colour texture, camera pose, debug view. */
+	pwg::debug::ScreenshotSource MakeScreenshotSource(pwg::CameraManager& cameras, pwg::Terrain& terrain,
+		unsigned int texture, int width, int height)
+	{
+		pwg::debug::ScreenshotSource source;
+		source.texture = texture;
+		source.width = width;
+		source.height = height;
+
+		std::shared_ptr<pwg::ICamera> camera = cameras.GetActiveCamera();
+		const pwg::CameraProperties* properties = nullptr;
+		const char* name = "camera";
+		switch (cameras.GetActiveCameraType())
+		{
+		case pwg::CameraType::EDITOR: name = "editor"; properties = &cameras.GetEditorCamera()->GetCameraProperties(); break;
+		case pwg::CameraType::FLYOVER: name = "flyover"; properties = &cameras.GetFlyoverCamera()->GetCameraProperties(); break;
+		case pwg::CameraType::PLAYER: name = "player"; properties = &cameras.GetPlayerCamera()->GetCameraProperties(); break;
+		}
+		if (camera && properties)
+		{
+			source.camera = pwg::debug::MakeCameraPose(name, camera->GetViewMatrix(), camera->GetProjectionMatrix(),
+				properties->fov, properties->nearPlane, properties->farPlane, properties->aspectRatio);
+		}
+		else
+		{
+			source.camera.camera = name;
+		}
+
+		if (std::shared_ptr<pwg::TerrainDebug> debug = terrain.GetTerrainDebug())
+		{
+			source.wireframe = debug->GetDebugSettings().wireframe;
+			const std::vector<pwg::DebugEntry>& entries = debug->GetEntries();
+			const int selected = debug->GetDebugMode();
+			if (debug->GetStatus() && selected >= 0 && static_cast<size_t>(selected) < entries.size())
+			{
+				source.debugMode = entries[static_cast<size_t>(selected)].name;
+			}
+		}
+		return source;
+	}
+
 	std::string NormalizePath(const std::string& path)
 	{
 		return std::filesystem::path(path).generic_string();
@@ -657,6 +698,14 @@ void pwg::EditorScene::Draw()
     }
     m_frameBuffer->Unbind();
 
+    // D-07: a requested screenshot is read here, after post-processing and before ImGui renders, so it holds
+    // the scene only. Requests are refused during CSV recordings, so no measured frame contains the readback.
+    if (debug::DebugView::HasInstance() && debug::DebugView::Get().GetExporters().HasPendingScreenshot())
+    {
+        debug::DebugView::Get().CaptureScreenshot(
+            MakeScreenshotSource(*m_cameraManager, *m_terrain, m_frameBuffer->GetTextureID(), width, height));
+    }
+
     ImVec2 imageSize = windowSize;
     if (benchmarkMode && width > 0 && height > 0 && windowSize.x > 0.0f && windowSize.y > 0.0f)
     {
@@ -728,6 +777,11 @@ void pwg::EditorScene::Draw()
         if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Simulation"))
         {
             debug::DebugView::Get().DrawSimulationTab();
+            ImGui::EndTabItem();
+        }
+        if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Capture"))
+        {
+            debug::DebugView::Get().DrawCaptureTab();
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
