@@ -96,7 +96,10 @@ namespace pwg
 		m_cameraPosition = camera->GetCameraPosition();
 		m_cameraView = camera->GetViewMatrix();
 		m_cameraProjection = camera->GetProjectionMatrix();
-		UpdateFrustum(camera);
+		if (!m_cullingFrozen)
+		{
+			UpdateFrustum(camera);
+		}
 
 		if (m_needRegenerate)
 		{
@@ -125,6 +128,14 @@ namespace pwg
 
 	}
 
+	void ChunkManager::SetLodEnabled(bool enabled) { m_lodManager->SetEnabled(enabled); }
+	bool ChunkManager::IsLodEnabled() const { return m_lodManager->IsEnabled(); }
+	bool ChunkManager::SetLodScale(float scale) { return m_lodManager->SetScale(scale); }
+	float ChunkManager::GetLodScale() const { return m_lodManager->GetScale(); }
+	bool ChunkManager::SetLodDistances(const LODManager::Thresholds& distances) { return m_lodManager->SetDistances(distances); }
+	const LODManager::Thresholds& ChunkManager::GetLodDistances() const { return m_lodManager->GetDistances(); }
+	void ChunkManager::ResetLodDistances() { m_lodManager->ResetDistances(); }
+
 	void ChunkManager::UpdateFrustum(std::shared_ptr<ICamera> camera)
 	{
 		glm::mat4 view = camera->GetViewMatrix();
@@ -151,7 +162,7 @@ namespace pwg
 
 	bool ChunkManager::IsChunkVisible(const TerrainChunk& chunk, float worldHalfSize) const
 	{
-		if (!m_frustumValid)
+		if (!m_cullingEnabled || !m_frustumValid)
 		{
 			return true;
 		}
@@ -252,6 +263,12 @@ namespace pwg
 		m_terrainMaterial->SetUniformInt("u_debugMode", static_cast<int>(entry.mode));
 		m_terrainMaterial->SetUniformInt("u_debugEnabled", m_terrainDebug->GetStatus());
 		m_terrainMaterial->SetUniformTexture("u_debugTexture", tex);
+		// Debug View overlays (D-05): x = flags (bit 0 LOD tint, bit 1 chunk borders; 0 = off), y = LOD of the
+		// chunk being drawn (set per chunk in DrawTerrainChunks while the tint is on), z = chunk edge length.
+		m_terrainMaterial->SetUniformVec3("u_chunkDebug", glm::vec3(
+			static_cast<float>((m_lodTint ? 1 : 0) | (m_chunkBorders ? 2 : 0)),
+			0.0f,
+			static_cast<float>(m_terrainSettings.chunkSize - 1)));
 		m_terrainMaterial->Apply();
 	}
 
@@ -265,6 +282,9 @@ namespace pwg
 		}
 
 		static_assert(MAX_LOD == static_cast<int>(debug::TerrainLodCount), "Debug View counts TerrainLodCount LOD levels");
+		const bool tintChunks = m_lodTint;
+		const float chunkEdge = static_cast<float>(m_terrainSettings.chunkSize - 1);
+		const float overlayFlags = static_cast<float>((m_lodTint ? 1 : 0) | (m_chunkBorders ? 2 : 0));
 		PWG_RENDER_COUNT(SetChunkCount(static_cast<uint32_t>(m_chunkCount * m_chunkCount)));
 		for (int i = 0; i < m_chunkCount; i++)
 		{
@@ -289,6 +309,10 @@ namespace pwg
 				shader->SetUniformMat4("u_model", modelMatrix);
 				shader->SetUniformVec2("u_uvOffset", uvOffset);
 				shader->SetUniformVec2("u_uvScale", uvScale);
+				if (tintChunks)
+				{
+					shader->SetUniformVec3("u_chunkDebug", glm::vec3(overlayFlags, static_cast<float>(chunk.lod), chunkEdge));
+				}
 				mesh->Draw();
 			}
 		}
@@ -653,7 +677,9 @@ namespace pwg
 		{
 			m_terrainComputePipeline->GetUniversalGraphAsset() = savedUniversalGraph;
 		}
+		const LODManager::Settings lodSettings = m_lodManager->GetSettings();		// D-05: the LOD controls survive the rebuild
 		m_lodManager = std::make_unique<LODManager>(m_terrainSettings.chunkSize);
+		m_lodManager->SetSettings(lodSettings);
 		m_lodManager->GenerateLODMeshes();
 		m_globalMasks = m_terrainComputePipeline->CreateMasks();
 		m_proceduralAssetsInitialized = false;

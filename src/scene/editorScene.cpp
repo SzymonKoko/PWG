@@ -771,7 +771,7 @@ void pwg::EditorScene::Draw()
         }
         if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Render"))
         {
-            debug::DebugView::Get().DrawRenderTab();
+            debug::DebugView::Get().DrawRenderTab(m_terrain ? m_terrain->GetChunkManager().get() : nullptr);
             ImGui::EndTabItem();
         }
         if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Simulation"))

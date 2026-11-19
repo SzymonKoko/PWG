@@ -111,6 +111,37 @@ namespace pwg
 
 		TerrainChunk& GetChunk(int x, int y);
 
+		// ---- Chunk and LOD controls (Debug View, D-05). Defaults reproduce the fixed behaviour. ----
+		// The same setters serve the Render tab and the experiment runner (lod.enabled, lod.scale,
+		// lod.distances, culling.enabled). They keep their values when ConfigureTerrain rebuilds the LOD meshes.
+
+		/** @brief false forces LOD0 on every chunk (main and shadow pass). Takes effect with the next Update. */
+		void SetLodEnabled(bool enabled);
+		bool IsLodEnabled() const;
+		/** @brief Multiplies every LOD distance. Finite, in (0, LODManager::MaxScale]; false if rejected. */
+		bool SetLodScale(float scale);
+		float GetLodScale() const;
+		/** @brief Switch distances LOD0..LOD3 in world units, not decreasing; false if rejected. */
+		bool SetLodDistances(const LODManager::Thresholds& distances);
+		const LODManager::Thresholds& GetLodDistances() const;
+		void ResetLodDistances();
+
+		/** @brief Frustum culling of terrain chunks in the main pass. false draws every chunk. The shadow pass never culls. */
+		void SetCullingEnabled(bool enabled) { m_cullingEnabled = enabled; }
+		bool IsCullingEnabled() const { return m_cullingEnabled; }
+		/**
+		* @brief Freezes the frustum used by the culling test at the last one computed, so the camera can move
+		* away and the chunks that were culled stay culled. LOD selection keeps following the camera.
+		*/
+		void SetCullingFrozen(bool frozen) { m_cullingFrozen = frozen; }
+		bool IsCullingFrozen() const { return m_cullingFrozen; }
+
+		/** @brief Overlays in the main terrain pass, off by default. Tint colours the chunks by LOD level, borders draw the chunk edges. */
+		void SetLodTintEnabled(bool enabled) { m_lodTint = enabled; }
+		bool IsLodTintEnabled() const { return m_lodTint; }
+		void SetChunkBordersEnabled(bool enabled) { m_chunkBorders = enabled; }
+		bool AreChunkBordersEnabled() const { return m_chunkBorders; }
+
 		std::shared_ptr<TerrainComputePipeline> GetTerrainComputePipeline();
 		std::unordered_map<std::string, std::shared_ptr<TerrainMask>>& GetMasks();
 	private:
@@ -158,6 +189,10 @@ namespace pwg
 
 		glm::vec4 m_frustumPlanes[6]{};
 		bool m_frustumValid{ false };
+		bool m_cullingEnabled{ true };
+		bool m_cullingFrozen{ false };
+		bool m_lodTint{ false };
+		bool m_chunkBorders{ false };
 
 		bool IsChunkVisible(const TerrainChunk& chunk, float worldHalfSize) const;
 		void UpdateFrustum(std::shared_ptr<ICamera> camera);

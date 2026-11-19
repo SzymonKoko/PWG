@@ -143,8 +143,11 @@ namespace pwg::debug
 		/** @brief "Performance" tab of the Debug window (debugViewPanel.cpp). */
 		void DrawPerformanceTab();
 
-		/** @brief "Render" tab of the Debug window: render counters (debugViewPanel.cpp). */
-		void DrawRenderTab();
+		/**
+		* @brief "Render" tab of the Debug window: chunk and LOD controls (D-05, every build) and render counters
+		* (debugViewPanel.cpp). `chunks` provides the controls; null hides them.
+		*/
+		void DrawRenderTab(ChunkManager* chunks);
 
 		/** @brief "Simulation" tab of the Debug window: graph, erosion, hydrology and readback timing (debugViewPanel.cpp). */
 		void DrawSimulationTab();
@@ -158,6 +161,9 @@ namespace pwg::debug
 	private:
 		/** @brief GPU query and CPU scope part of the Performance tab (instrumented builds only). */
 		void DrawProfilerSection();
+
+		/** @brief Chunk and LOD controls of the Render tab (every build). */
+		void DrawChunkLodSection(ChunkManager* chunks);
 
 		/** @brief Counter tables of the Render tab (instrumented builds only). */
 		void DrawRenderCounters();

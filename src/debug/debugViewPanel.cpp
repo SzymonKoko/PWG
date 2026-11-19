@@ -352,8 +352,129 @@ void pwg::debug::DebugView::DrawProfilerSection()
 	}
 }
 
-void pwg::debug::DebugView::DrawRenderTab()
+void pwg::debug::DebugView::DrawChunkLodSection(ChunkManager* chunks)
 {
+	if (chunks == nullptr)
+	{
+		ImGui::TextDisabled("No terrain, no chunk and LOD controls.");
+		return;
+	}
+
+	// --- LOD ---
+	ImGui::SeparatorText("LOD");
+	bool lodEnabled = chunks->IsLodEnabled();
+	if (ImGui::Checkbox("LOD enabled", &lodEnabled))
+	{
+		chunks->SetLodEnabled(lodEnabled);
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("(off: every chunk uses LOD0)");
+	if (!lodEnabled)
+	{
+		ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f),
+			"All chunks at full detail, also in the shadow passes. A large grid may stall the GPU (note in LODDistances.h).");
+	}
+
+	float scale = chunks->GetLodScale();
+	if (ImGui::SliderFloat("Distance scale", &scale, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_Logarithmic))
+	{
+		chunks->SetLodScale(scale);	// rejected values keep the old scale
+	}
+	const float appliedScale = chunks->GetLodScale();
+
+	LODManager::Thresholds distances = chunks->GetLodDistances();
+	bool distancesChanged = false;
+	if (ImGui::BeginTable("LodDistances", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+	{
+		ImGui::TableSetupColumn("level");
+		ImGui::TableSetupColumn("up to distance (world units)");
+		ImGui::TableSetupColumn("x scale");
+		ImGui::TableHeadersRow();
+		for (size_t level = 0; level < distances.size(); ++level)
+		{
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn(); ImGui::Text("LOD%zu", level);
+			ImGui::TableNextColumn();
+			ImGui::SetNextItemWidth(120.0f);
+			const float minimum = level == 0 ? 0.0f : distances[level - 1];
+			char id[16];
+			std::snprintf(id, sizeof(id), "##lod%zu", level);
+			if (ImGui::DragFloat(id, &distances[level], 1.0f, minimum, 100000.0f, "%.1f"))
+			{
+				distances[level] = std::max(distances[level], minimum);
+				distancesChanged = true;
+			}
+			ImGui::TableNextColumn(); ImGui::Text("%.1f", distances[level] * appliedScale);
+		}
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn(); ImGui::TextUnformatted("LOD4");
+		ImGui::TableNextColumn(); ImGui::TextDisabled("beyond LOD3");
+		ImGui::TableNextColumn(); ImGui::TextDisabled("-");
+		ImGui::EndTable();
+	}
+	if (distancesChanged)
+	{
+		// A drag below a later threshold raises the later ones, so the list stays non-decreasing.
+		for (size_t level = 1; level < distances.size(); ++level)
+		{
+			distances[level] = std::max(distances[level], distances[level - 1]);
+		}
+		chunks->SetLodDistances(distances);
+	}
+	if (ImGui::Button("Reset LOD settings"))
+	{
+		chunks->SetLodEnabled(true);
+		chunks->SetLodScale(1.0f);
+		chunks->ResetLodDistances();
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("Distances are measured on the XZ plane from the camera to the chunk centre.");
+
+	// --- Culling ---
+	ImGui::SeparatorText("Frustum culling (terrain chunks, main pass)");
+	int cullingMode = chunks->IsCullingFrozen() ? 2 : (chunks->IsCullingEnabled() ? 0 : 1);
+	bool cullingChanged = ImGui::RadioButton("On", &cullingMode, 0);
+	ImGui::SameLine();
+	cullingChanged |= ImGui::RadioButton("Off", &cullingMode, 1);
+	ImGui::SameLine();
+	cullingChanged |= ImGui::RadioButton("Freeze", &cullingMode, 2);
+	if (cullingChanged)
+	{
+		chunks->SetCullingEnabled(cullingMode != 1);
+		chunks->SetCullingFrozen(cullingMode == 2);
+	}
+	ImGui::TextDisabled("Freeze keeps the frustum of the last frame, so the camera can leave it. The shadow pass never culls.");
+
+	// --- Overlays ---
+	ImGui::SeparatorText("Overlays");
+	bool tint = chunks->IsLodTintEnabled();
+	if (ImGui::Checkbox("LOD tint", &tint))
+	{
+		chunks->SetLodTintEnabled(tint);
+	}
+	ImGui::SameLine();
+	static const ImVec4 lodColors[5] = {		// same colours as terrain.frag
+		ImVec4(0.90f, 0.15f, 0.15f, 1.0f), ImVec4(0.95f, 0.60f, 0.10f, 1.0f), ImVec4(0.90f, 0.90f, 0.15f, 1.0f),
+		ImVec4(0.20f, 0.75f, 0.30f, 1.0f), ImVec4(0.20f, 0.45f, 0.95f, 1.0f) };
+	for (int level = 0; level < 5; ++level)
+	{
+		ImGui::TextColored(lodColors[level], "LOD%d", level);
+		if (level < 4)
+		{
+			ImGui::SameLine();
+		}
+	}
+	bool borders = chunks->AreChunkBordersEnabled();
+	if (ImGui::Checkbox("Chunk borders", &borders))
+	{
+		chunks->SetChunkBordersEnabled(borders);
+	}
+	ImGui::TextDisabled("Overlays are drawn in the lit terrain only (not in the terrain debug modes), and appear in screenshots.");
+}
+
+void pwg::debug::DebugView::DrawRenderTab(ChunkManager* chunks)
+{
+	DrawChunkLodSection(chunks);
 	if constexpr (!InstrumentationCompiled)
 	{
 		ImGui::TextDisabled("Instrumentation compiled out (PWG_DEBUG_VIEW_INSTRUMENTATION=OFF). No render counters.");

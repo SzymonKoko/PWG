@@ -7,6 +7,8 @@ namespace pwg
 {
 	struct LODDistances
 	{
+		// These are the default distances. The live values are in LODManager::Settings
+		// (runtime-settable from the Debug View, D-05) and start from these.
 		// Distances are tuned so only the few chunks closest to the camera use the
 		// highest detail meshes. Previously these thresholds were so large that
 		// flying into the terrain promoted hundreds of chunks to LOD0 in a single

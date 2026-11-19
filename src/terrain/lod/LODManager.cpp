@@ -1,5 +1,6 @@
 #include "LODManager.h"
 #include "glm/glm.hpp"
+#include <cmath>
 
 namespace pwg
 {
@@ -18,19 +19,28 @@ namespace pwg
 	}
 	void LODManager::SelectLOD(TerrainChunk& chunk, float distance)
 	{
-		if (distance <= m_lodDistances.lod0.second)
+		if (!m_settings.enabled)
+		{
+			chunk.lod = m_lodDistances.lod0.first;
+			return;
+		}
+
+		// With the default scale of 1 the products are exactly the unscaled distances.
+		const float scale = m_settings.scale;
+		const Thresholds& d = m_settings.distances;
+		if (distance <= d[0] * scale)
 		{
 			chunk.lod = m_lodDistances.lod0.first;
 		}
-		else if (distance <= m_lodDistances.lod1.second)
+		else if (distance <= d[1] * scale)
 		{
 			chunk.lod = m_lodDistances.lod1.first;
 		}
-		else if (distance <= m_lodDistances.lod2.second)
+		else if (distance <= d[2] * scale)
 		{
 			chunk.lod = m_lodDistances.lod2.first;
 		}
-		else if (distance <= m_lodDistances.lod3.second)
+		else if (distance <= d[3] * scale)
 		{
 			chunk.lod = m_lodDistances.lod3.first;
 		}
@@ -39,6 +49,29 @@ namespace pwg
 			chunk.lod = m_lodDistances.lod4.first;
 		}
 		
+	}
+	bool LODManager::SetScale(float scale)
+	{
+		if (!std::isfinite(scale) || scale <= 0.0f || scale > MaxScale)
+		{
+			return false;
+		}
+		m_settings.scale = scale;
+		return true;
+	}
+	bool LODManager::SetDistances(const Thresholds& distances)
+	{
+		float previous = 0.0f;
+		for (float value : distances)
+		{
+			if (!std::isfinite(value) || value < previous)
+			{
+				return false;
+			}
+			previous = value;
+		}
+		m_settings.distances = distances;
+		return true;
 	}
 	std::shared_ptr<Mesh> LODManager::GetMesh(int lod)
 	{

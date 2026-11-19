@@ -25,6 +25,8 @@ uniform int u_worldSize;
 uniform bool u_renderWaterOverlay;
 uniform bool u_useWaterRefraction;
 uniform vec2 u_viewportSize;
+// Debug View chunk overlays (D-05). x: 0 = off, bit 0 = LOD tint, bit 1 = chunk borders; y: LOD of this chunk; z: chunk edge length in world units.
+uniform vec3 u_chunkDebug;
 
 uniform sampler2DArray u_TexturesAlbedo;
 uniform sampler2DArray u_TexturesNormal;
@@ -509,5 +511,26 @@ void main()
 
     float fogAmount = 1.0 - exp(-cameraDistance * max(u_fogDensity, 0.0));
     litColor = mix(litColor, u_skyTint, clamp(fogAmount, 0.0, 0.85));
+
+    if (u_chunkDebug.x > 0.5)
+    {
+        int overlayFlags = int(u_chunkDebug.x + 0.5);
+        if ((overlayFlags & 1) != 0)
+        {
+            // Same colours as the legend in the Render tab (debugViewPanel.cpp).
+            const vec3 lodColors[5] = vec3[5](
+                vec3(0.90, 0.15, 0.15), vec3(0.95, 0.60, 0.10), vec3(0.90, 0.90, 0.15), vec3(0.20, 0.75, 0.30), vec3(0.20, 0.45, 0.95));
+            litColor = mix(litColor, lodColors[clamp(int(u_chunkDebug.y + 0.5), 0, 4)], 0.55);
+        }
+        if ((overlayFlags & 2) != 0)
+        {
+            // Distance to the nearest chunk edge in world units, drawn about 2 pixels wide at any distance.
+            vec2 local = mod(f_Pos.xz + halfSize, u_chunkDebug.z);
+            vec2 edge = min(local, u_chunkDebug.z - local);
+            float edgeDistance = min(edge.x, edge.y);
+            float line = 1.0 - smoothstep(0.5, 1.5, edgeDistance / max(fwidth(edgeDistance), 0.000001));
+            litColor = mix(litColor, vec3(1.0), line);
+        }
+    }
     FragColor = vec4(litColor, 1.0);
 }
