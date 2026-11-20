@@ -89,6 +89,9 @@ namespace pwg::debug
 
 		SimulationStats();
 
+		/** @brief Next event sequence number, for rows that other producers (the runner's stepping window) add to events.csv. */
+		uint64_t ReserveSequence() { return ++m_sequence; }
+
 		/** @brief Frame index used for new events. Called by DebugView at frame begin. */
 		void SetFrameIndex(uint64_t frameIndex) { m_frameIndex = frameIndex; }
 

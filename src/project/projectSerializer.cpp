@@ -1193,6 +1193,23 @@ namespace pwg
 		return true;
 	}
 
+	bool ProjectSerializer::LoadGraph(const std::string& path, TerrainGraphAsset& asset)
+	{
+		YAML::Node root = YAML::LoadFile(path);
+		if (!root["project"] || root["project"]["type"].as<std::string>("") != "PWG" || !root["terrainGraphV2"])
+		{
+			return false;
+		}
+		TerrainGraphAsset loaded;
+		ReadUniversalTerrainGraph(root["terrainGraphV2"], loaded);
+		if (loaded.nodes.empty())
+		{
+			return false;
+		}
+		asset = std::move(loaded);
+		return true;
+	}
+
 	bool ProjectSerializer::Load(EditorScene& scene, const std::string& path)
 	{
 		YAML::Node root = YAML::LoadFile(path);

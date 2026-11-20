@@ -762,7 +762,7 @@ void pwg::EditorScene::Draw()
             PWG_SHADOW_CASCADE(cascade);
             m_shadowMap->BeginCascade(cascade, environmentLighting, activeCamera);
             m_terrain->DrawShadowMap(m_terrainShadowShader, m_shadowMap->GetLightSpaceMatrix(cascade));
-            if (m_vegetationSystem)
+            if (m_vegetationSystem && m_vegetationEnabled)
             {
                 m_vegetationSystem->DrawShadow(m_shadowMap->GetLightSpaceMatrix(cascade));
             }
@@ -797,7 +797,7 @@ void pwg::EditorScene::Draw()
         PWG_RENDER_PASS(debug::GpuPass::TERRAIN, "Render::Terrain");
         m_renderer.DrawAll();
     }
-    if (m_vegetationSystem)
+    if (m_vegetationSystem && m_vegetationEnabled)
     {
         PWG_RENDER_PASS(debug::GpuPass::VEGETATION, "Render::Vegetation");
         m_vegetationSystem->Draw(m_renderer, m_terrain);
@@ -896,6 +896,11 @@ void pwg::EditorScene::Draw()
         if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Simulation"))
         {
             debug::DebugView::Get().DrawSimulationTab();
+            ImGui::EndTabItem();
+        }
+        if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Experiment"))
+        {
+            debug::DebugView::Get().DrawExperimentTab();
             ImGui::EndTabItem();
         }
         if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Capture"))

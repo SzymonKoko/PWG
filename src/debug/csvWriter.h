@@ -48,6 +48,8 @@ namespace pwg::debug
 		uint64_t eventRows{ 0 };
 		uint64_t summaryRows{ 0 };
 		double writeMs{ NotAvailable };
+		uint64_t gpuDropped{ 0 };				/**< Sum of gpu_dropped over the window (0 when instrumentation is compiled out). */
+		double maxSleepMs{ 0.0 };				/**< Largest cpu_sleep_ms of the window; the runner checks it in benchmark mode. */
 		std::vector<std::string> warnings;
 		std::string error;
 	};
@@ -98,7 +100,8 @@ namespace pwg::debug
 
 		/**
 		* @brief Starts a window that begins with frame `currentFrame + 1`. `frameCount` 0 records until Stop.
-		* The files go to `folder`, which must not exist yet. Returns false if a window is already active.
+		* The files go to `folder`; it may exist (the runner puts masks and screenshots there first) but must not
+		* hold frames.csv, events.csv, summary.csv or run.yaml. Returns false if a window is already active.
 		*/
 		bool Start(const RunInfo& run, Metadata metadata, std::filesystem::path folder, uint64_t currentFrame, uint64_t frameCount);
 
@@ -107,6 +110,12 @@ namespace pwg::debug
 
 		/** @brief Drops the window without writing anything. */
 		void Abort();
+
+		/**
+		* @brief Adds a row of another producer (the runner's `stepping_window`) to events.csv. Only while a window
+		* records, and only for a frame inside it; returns false otherwise.
+		*/
+		bool AddEventRow(EventRow row);
 
 		/**
 		* @brief Frame hook, called by DebugView at the end of BeginFrame of `frameIndex`, after the GPU
@@ -153,6 +162,7 @@ namespace pwg::debug
 		bool m_eventLimitReached{ false };
 		std::vector<FrameRecord> m_frames;
 		std::vector<SimEvent> m_events;
+		std::vector<EventRow> m_extraRows;		/**< Rows added through AddEventRow. */
 
 		ExportResult m_lastResult;
 		bool m_hasResult{ false };

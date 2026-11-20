@@ -92,6 +92,7 @@ namespace pwg::debug
 		std::array<double, GpuPassCount> gpuPassMs{};						/**< TIME_ELAPSED per pass, NotAvailable if not timed. */
 		std::array<double, GpuSpanCount> gpuSpanMs{};						/**< TIMESTAMP span per GpuSpan, NotAvailable if not timed. */
 		uint32_t gpuDropped{ 0 };											/**< GPU samples of this frame that were not ready when their slot was reused. */
+		int64_t pathFrame{ -1 };											/**< Camera path frame applied in this frame (D-10), -1 if no path played. frames.csv: empty. */
 
 		// Render counters (section 5.5). Valid only if countersValid is true; otherwise they are "not available", not 0.
 		bool countersValid{ false };										/**< Counting was on for the whole frame. */

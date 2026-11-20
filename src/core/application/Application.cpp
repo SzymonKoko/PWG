@@ -1,8 +1,10 @@
 #include <glad/glad.h>
 #include "Application.h"
+#include "imgui.h"
 
 
-pwg::Application::Application()
+pwg::Application::Application(ApplicationOptions options)
+    : m_options(std::move(options))
 {
     Logger::Init();
 
@@ -20,6 +22,8 @@ pwg::Application::Application()
 
     m_scene = std::make_shared<SceneManager>(m_window->GetWindow(), *m_mouseInput, *m_keyboardInput, m_resourceManager, *m_renderer);
     m_gui = std::make_unique<Gui>(*m_window, m_scene);
+    m_runner = std::make_unique<debug::ExperimentRunner>(debug::ExperimentHost{ *m_window, *m_gui, *m_scene });
+    m_debugView->SetExperimentRunner(m_runner.get());
 
     m_window->SetFramerateLimit(120);
     m_window->EnableVSync(false);
@@ -29,6 +33,7 @@ pwg::Application::Application()
 
 pwg::Application::~Application()
 {
+    m_runner.reset();
     m_debugView->Shutdown();
     m_resourceManager->UnloadAll();
     glfwTerminate();
@@ -74,5 +79,43 @@ void pwg::Application::Run()
             std::this_thread::sleep_for(std::chrono::duration<double>(frameLimit - m_window->GetDeltaTime()));
         }
         m_debugView->EndFrame();
+        TickExperiment();
     }
+}
+
+void pwg::Application::TickExperiment()
+{
+    ++m_frames;
+    if (!m_options.experimentConfig.empty() && !m_experimentStarted && m_frames >= 1)
+    {
+        // The GL context and the editor scene exist after the first frame (design 8.1).
+        m_experimentStarted = true;
+        std::string error;
+        if (!m_runner->Start(std::filesystem::path(m_options.experimentConfig), std::filesystem::path(m_options.outputFolder),
+            m_options.exitWhenDone, error))
+        {
+            PWG_ERROR("Experiment not started: {}", error);
+            m_experimentRejected = true;
+            if (m_options.exitWhenDone)
+            {
+                m_gui->ForceClose();
+            }
+        }
+    }
+    // F9 aborts a run, also in the fullscreen main view where the Experiment tab is hidden. ImGui queues the key events,
+    // so a short press is not lost between two frames.
+    if (m_runner->IsRunning() && ImGui::IsKeyPressed(ImGuiKey_F9, false))
+    {
+        m_runner->Abort();
+    }
+    m_runner->Tick();
+}
+
+int pwg::Application::GetExitCode() const
+{
+    if (m_experimentRejected)
+    {
+        return 1;
+    }
+    return m_experimentStarted ? m_runner->GetExitCode() : 0;
 }

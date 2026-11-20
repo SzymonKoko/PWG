@@ -97,6 +97,11 @@ void pwg::debug::DebugView::BeginFrame()
 
 void pwg::debug::DebugView::EndFrame()
 {
+	// D-11: the camera path frame applied in this frame (-1 without a playback), for the path_frame column.
+	if (FrameRecord* record = m_frameStats.Find(m_frameIndex))
+	{
+		record->pathFrame = m_cameraPath.GetAppliedFrame();
+	}
 	if constexpr (InstrumentationCompiled)
 	{
 		m_gpu.EndFrame();
@@ -174,7 +179,7 @@ pwg::debug::Metadata pwg::debug::DebugView::CollectRunMetadata(const RunInfo& ru
 		metadata.SetEmpty("gpu_ring_frames");
 	}
 	metadata.SetBool("detailed_shadow_timing", m_detailedShadowTiming);
-	metadata.SetBool("wallclock_bracket", false);
+	metadata.SetBool("wallclock_bracket", m_wallclockBracket);
 	metadata.SetNumber("drain_timeout_frames", CsvRecorder::DefaultDrainTimeoutFrames);
 
 	m_runMetadata.AppendSceneInfo(metadata);

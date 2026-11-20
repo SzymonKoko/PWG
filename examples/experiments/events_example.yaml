@@ -1,0 +1,35 @@
+# Example experiment config for the Debug View runner (D-11): fixed-step erosion and hydrology, with the CSV window
+# around the prepare phase, so events.csv holds graph, step and hydrology events and the runner's stepping windows.
+# A functional example, not an experiment of the thesis.
+#
+# Run it from build/bin/Release:
+#   PWG.exe --experiment ../../../examples/experiments/events_example.yaml --exit-when-done
+format: pwg-experiment
+format_version: 1
+experiment_id: EX-events
+description: "Example: graph, fixed-step erosion and hydrology timing, three repetitions"
+project: runner-test.pwg
+output: ../../build/experiment-runs/EX-events
+
+benchmark:
+  enabled: true
+  render_size: [640, 360]
+  wallclock_bracket: false                # true: glFinish before and after each stepping window
+
+prepare:
+  - run_graph: true
+    name: graph
+  - hydraulic: { steps: 20, per_frame: 5 }   # fixed-step mode: 5 steps per frame, the dt-driven path stays paused
+    name: hydraulic
+  - thermal: { steps: 48, per_frame: 16 }    # or { until: stable, max_steps: 20000 }
+    name: thermal
+  - hydrology: generate                      # waits for the worker result
+    name: hydrology
+
+record: prepare                           # the CSV window covers the prepare entries (default with measure.frames: measure)
+repetitions: 3
+cooldown_s: 0
+
+captures:
+  - after: prepare
+    masks: [FinalHeight, WaterMask]

@@ -45,6 +45,27 @@ namespace pwg
 		*/
 		void Render();
 
+		// ---- Experiment runner access (D-11). The runner reuses the editor's own project and window paths. ----
+
+		/**
+		* @brief Opens a project file exactly like File > Open Recent (editor state, layout, clean flag). The runner passes
+		* `addToRecent` false, so its scratch copies do not end up in the user's recent project list.
+		*/
+		bool OpenProjectFromPath(const std::string& path, bool addToRecent = true);
+
+		/**
+		* @brief Writes the project and its simulation sidecar to `path`, like Save As, but keeps the current project
+		* path and the unsaved-changes flag: the runner's "save" action never touches the project that was loaded.
+		* The window layout in the copy is the one of the loaded project, not the current ImGui layout.
+		*/
+		bool SaveProjectCopy(const std::string& path);
+
+		/** @brief The same switch as F10: fullscreen window and fullscreen main view. No effect without an editor scene. */
+		void SetMainViewFullscreen(bool fullscreen);
+
+		/** @brief Closes the application without the unsaved-changes question (runner `--exit-when-done`). */
+		void ForceClose();
+
 	private:
 
 		pwg::Window& m_window;						/**< Reference to the main application window used by the GUI */
@@ -88,7 +109,6 @@ namespace pwg
 		void ApplyProjectLayout();
 		bool NewProject();
 		bool OpenProject();
-		bool OpenProjectFromPath(const std::string& path);
 		bool SaveProject();
 		bool SaveProjectAs();
 		void RequestProjectAction(PendingProjectAction action, const std::string& path = {});

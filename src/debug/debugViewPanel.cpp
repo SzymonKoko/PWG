@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include "debugView.h"
+#include "experimentRunner.h"
 #include "core/window/window.h"
 #include "imgui.h"
 #include "terrain/chunk/chunkManager.h"
@@ -879,6 +880,93 @@ namespace
 	{
 		const std::string value(text);
 		return std::filesystem::path(std::u8string(value.begin(), value.end()));
+	}
+}
+
+void pwg::debug::DebugView::DrawExperimentTab()
+{
+	if (!m_runner)
+	{
+		ImGui::TextDisabled("The experiment runner is not available.");
+		return;
+	}
+	const ExperimentRunner::Status status = m_runner->GetStatus();
+	const bool running = status.state == ExperimentRunner::State::RUNNING;
+
+	ImGui::TextWrapped("Runs a YAML experiment config (design section 8): load the project, apply the parameters, prepare, "
+		"warm up, measure and export, once for every variant and repetition. During a run the editor is driven by the runner; "
+		"in the fullscreen main view this panel is hidden, and F9 aborts the run.");
+	ImGui::BeginDisabled(running);
+	ImGui::SetNextItemWidth(-150.0f);
+	ImGui::InputText("Config file##experiment", m_experimentConfig, sizeof(m_experimentConfig));
+	ImGui::SetNextItemWidth(-150.0f);
+	ImGui::InputText("Output (optional)##experiment", m_experimentOut, sizeof(m_experimentOut));
+	if (ImGui::Button("Start"))
+	{
+		std::string error;
+		if (m_experimentConfig[0] == '\0')
+		{
+			m_experimentMessage = "Enter the path of a config file.";
+		}
+		else if (m_runner->Start(PathFromUtf8(m_experimentConfig), PathFromUtf8(m_experimentOut), false, error))
+		{
+			m_experimentMessage.clear();
+		}
+		else
+		{
+			m_experimentMessage = error;
+		}
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	ImGui::BeginDisabled(!running);
+	if (ImGui::Button("Abort"))
+	{
+		m_runner->Abort();
+	}
+	ImGui::EndDisabled();
+	if (!m_experimentMessage.empty())
+	{
+		ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.40f, 1.0f), "%s", m_experimentMessage.c_str());
+	}
+
+	ImGui::SeparatorText("State");
+	const char* stateName = "idle";
+	switch (status.state)
+	{
+	case ExperimentRunner::State::RUNNING: stateName = "running"; break;
+	case ExperimentRunner::State::DONE: stateName = "done"; break;
+	case ExperimentRunner::State::ABORTED: stateName = "aborted"; break;
+	case ExperimentRunner::State::REJECTED: stateName = "config rejected"; break;
+	default: break;
+	}
+	ImGui::Text("State: %s", stateName);
+	if (!status.experimentId.empty())
+	{
+		ImGui::Text("Experiment: %s", status.experimentId.c_str());
+		ImGui::Text("Units: %d of %d, %d with problems", running ? status.unit : status.unitsTotal, status.unitsTotal, status.unitsFailed);
+	}
+	if (running)
+	{
+		ImGui::Text("Variant: %s, repetition %d", status.variant.c_str(), status.repetition);
+		if (status.phaseFrames > 0)
+		{
+			ImGui::Text("Phase: %s, frame %llu of %llu", status.phase.c_str(),
+				static_cast<unsigned long long>(status.phaseFrame), static_cast<unsigned long long>(status.phaseFrames));
+		}
+		else
+		{
+			ImGui::Text("Phase: %s, frame %llu", status.phase.c_str(), static_cast<unsigned long long>(status.phaseFrame));
+		}
+		ImGui::Text("Run folder: %s", Utf8(status.unitFolder).c_str());
+	}
+	else if (!status.outputFolder.empty())
+	{
+		ImGui::Text("Output folder: %s", Utf8(status.outputFolder).c_str());
+	}
+	if (!status.message.empty())
+	{
+		ImGui::TextWrapped("%s", status.message.c_str());
 	}
 }
 

@@ -13,7 +13,7 @@ Debug window → Performance tab → CSV export.
 
 Abort drops the window. Closing the application during a recording drops it too.
 
-The experiment runner (D-11) uses the same code through `DebugView::StartRecording(RunInfo, root, frames)` and `StopRecording()`.
+The experiment runner (D-11, `debug_view_runner.md`) uses the same code through `DebugView::StartRecording(RunInfo, root, frames)` and `StopRecording()`.
 
 The export runs in every build. With `PWG_DEBUG_VIEW_INSTRUMENTATION=OFF`, or with the Debug View switched off, frames.csv holds the frame timing (`frame_ms`, `cpu_*_ms`, `t_ms`) and the GPU and counter columns are empty; events.csv has no rows.
 
@@ -49,7 +49,7 @@ Each CSV starts with `# file: <name>`, then these keys in this order. The key li
 | `ac_power`, `battery_percent`, `power_scheme`, `power_scheme_guid` | `GetSystemPowerStatus`, `PowerGetActiveScheme` + `PowerReadFriendlyName`; read at Start |
 | `steady_clock_period_ns` | `std::chrono::steady_clock::period` |
 | `debug_view_enabled`, `benchmark`, `render_width`, `render_height`, `frame_limit`, `swap_interval` | Debug View state at Start. `render_*` only in benchmark mode; otherwise the render size follows the Main View window. |
-| `gpu_ring_frames`, `detailed_shadow_timing`, `wallclock_bracket`, `drain_timeout_frames` | profiler settings (`wallclock_bracket` is always false until D-11) |
+| `gpu_ring_frames`, `detailed_shadow_timing`, `wallclock_bracket`, `drain_timeout_frames` | profiler settings (`wallclock_bracket` is true only when a runner config sets `benchmark.wallclock_bracket`, see `debug_view_runner.md`) |
 | `project_path`, `project_sha256`, `pwgsim_sha256`, `project_unsaved_changes` | open project file and `.pwgsim` sidecar on disk. With unsaved changes the hashes describe the saved files, not the editor state. |
 | `world_size`, `chunk_count`, `chunk_size`, `fullscreen_main_view` | `ChunkManager`, `EditorScene` |
 | `camera_path`, `camera_path_sha256` | set while a camera path is played (D-10): file of the path (`(recorded, not saved)` for a new recording) and SHA-256 of its content; empty otherwise |
@@ -62,7 +62,7 @@ Each CSV starts with `# file: <name>`, then these keys in this order. The key li
 | `run_id`, `variant`, `repetition` | | identifiers |
 | `frame` | | frame in the window, from 0 |
 | `engine_frame` | | engine frame index (matches `engine_frame` in events.csv) |
-| `path_frame` | | camera path frame, still empty: D-10 provides it (`CameraPath::GetAppliedFrame()`), the runner (D-11) writes it |
+| `path_frame` | | camera path frame whose pose was applied in this frame (`CameraPath::GetAppliedFrame()`, read at the end of the frame, D-11), empty while no path plays. An existing column that was empty until D-11 is now filled; `format_version` stays 1 |
 | `t_ms` | ms | frame begin minus the begin of frame 0 (steady_clock) |
 | `frame_ms` | ms | begin to next begin (includes swap and limiter sleep) |
 | `cpu_update_ms`, `cpu_render_ms`, `cpu_swap_ms`, `cpu_sleep_ms` | ms | CPU phases (design 5.1) |
@@ -106,7 +106,7 @@ Only events that started inside the window are written. Event names are those of
 | `hydrology_total` | `hydrology_worker`; `hydrology_end_to_end` is Start to result on the main thread |
 | `hydrology_main_read`, `hydrology_main_upload` | `hydrology_readback`, `hydrology_upload` |
 | `memory_snapshot` | D-04 (not yet produced) |
-| `stepping_window` | D-11 (not yet produced) |
+| `stepping_window` | produced by the runner (D-11) for fixed-step hydraulic and thermal stepping: `metric` `steps` (unit `1`, source `runner`) and `wall_ms` (unit `ms`, source `steady_clock`), `detail` = `kind=hydraulic\|thermal;per_frame=<n>;frames=<n>;glfinish=<bool>`. One pair of rows per `hydraulic` or `thermal` prepare entry, only when the window records the prepare phase (`record: prepare`) |
 
 ## summary.csv
 
@@ -135,6 +135,8 @@ files: [frames.csv, events.csv, summary.csv]
 ```
 
 `csv_write_ms` is the time spent writing the three CSV files (after the window).
+
+A run folder written by the experiment runner (D-11) has one more top-level map, `experiment`, appended after `files`: `status` (`complete`, `failed` or `aborted`), `failures`, `warnings`, `inputs` (everything that defines the run: config hash, project, variant, parameters, benchmark settings, prepare entries, camera path and its hash, frame counts; identical for repeated runs of the same config and variant) and `results` (prepare entry log, captures with the SHA-256 of every mask buffer and screenshot, the window summary). See `debug_view_runner.md`.
 
 ## Compatibility rules
 
@@ -348,7 +350,7 @@ Text, `\n` line ends, no time stamps and no file names, so two dumps of the same
 
 ### Interface for the runner (D-11)
 
-`DebugView::GetCameraPath()`: `Load(file, error)`, `StartPlayback({stepSeconds, matrixDumpFile}, error)`, `IsPlaying()`, `GetAppliedFrame()` (path frame of the pose applied in the current frame, −1 if none), `GetFrameCount()`, `GetFile()`, `GetSha256()`, `StopPlayback()`. While a path plays, `DebugView::CollectRunMetadata` sets `camera_path` and `camera_path_sha256`. The runner is expected to measure a fixed number of path frames and to copy the path file to the run folder's `paths/` (design 7.1). The `path_frame` column of frames.csv is not filled by D-10.
+`DebugView::GetCameraPath()`: `Load(file, error)`, `StartPlayback({stepSeconds, matrixDumpFile}, error)`, `IsPlaying()`, `GetAppliedFrame()` (path frame of the pose applied in the current frame, −1 if none), `GetFrameCount()`, `GetFile()`, `GetSha256()`, `StopPlayback()`. While a path plays, `DebugView::CollectRunMetadata` sets `camera_path` and `camera_path_sha256`. The runner measures a fixed number of path frames and copies the path file to the run folder's `paths/` (design 7.1); it plays the copy. The `path_frame` column of frames.csv is filled by `DebugView::EndFrame` from `GetAppliedFrame()` (D-11).
 
 ### Measured cost (this laptop, 2026-11-20, functional check)
 

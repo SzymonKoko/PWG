@@ -786,7 +786,7 @@ bool pwg::Gui::OpenProject()
 	return OpenProjectFromPath(path);
 }
 
-bool pwg::Gui::OpenProjectFromPath(const std::string& path)
+bool pwg::Gui::OpenProjectFromPath(const std::string& path, bool addToRecent)
 {
 	EditorScene* editor = m_scene->GetEditorScene();
 	if (!editor || path.empty())
@@ -800,7 +800,10 @@ bool pwg::Gui::OpenProjectFromPath(const std::string& path)
 		{
 			m_currentProjectPath = path;
 			m_projectStatus = "Opened: " + std::filesystem::path(path).filename().string();
-			AddRecentProject(path);
+			if (addToRecent)
+			{
+				AddRecentProject(path);
+			}
 			ApplyProjectLayout();
 			m_dockLayoutInitialized = !editor->GetProjectLayoutIni().empty();
 			MarkProjectClean();
@@ -816,6 +819,43 @@ bool pwg::Gui::OpenProjectFromPath(const std::string& path)
 
 	m_projectStatus = "Open failed: invalid PWG project";
 	return false;
+}
+
+bool pwg::Gui::SaveProjectCopy(const std::string& path)
+{
+	EditorScene* editor = m_scene->GetEditorScene();
+	if (!editor || path.empty())
+	{
+		return false;
+	}
+	try
+	{
+		// The window layout is not read from ImGui here: the copy keeps the layout of the loaded project, so two saves of
+		// the same state give the same file whatever the panels did in between.
+		return ProjectSerializer::Save(*editor, path);
+	}
+	catch (const std::exception& e)
+	{
+		PWG_ERROR("Save copy failed: {}", e.what());
+		return false;
+	}
+}
+
+void pwg::Gui::SetMainViewFullscreen(bool fullscreen)
+{
+	EditorScene* editor = m_scene->GetEditorScene();
+	if (!editor)
+	{
+		return;
+	}
+	m_window.SetFullscreen(fullscreen);
+	editor->SetMainViewFullscreen(m_window.IsFullscreen());
+}
+
+void pwg::Gui::ForceClose()
+{
+	m_allowWindowClose = true;
+	glfwSetWindowShouldClose(m_window.GetWindow(), GLFW_TRUE);
 }
 
 bool pwg::Gui::SaveProject()

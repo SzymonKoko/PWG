@@ -1,0 +1,344 @@
+project:
+  type: PWG
+  version: 1
+terrain:
+  chunkCount: 9
+  chunkSize: 65
+hydraulic:
+  showWaterSurface: true
+  showErosionParticles: false
+  particleSimulationSpeed: 1
+  waterRefractionEnabled: true
+  minVisibleWaterDepth: 0.0250000004
+  riverAmount: 0.5
+  lakeAmount: 0.5
+  hydrologySeed: 1337
+thermal:
+  simulationSpeed: 1
+terrainMaterials:
+  - name: pbr_grass2
+    role: Grass
+    folder: ../assets/textures/pbr/pbr_grass2
+    albedo: ../assets/textures/pbr/pbr_grass2/Grass002_2K-JPG_Color.jpg
+    normal: ../assets/textures/pbr/pbr_grass2/Grass002_2K-JPG_NormalGL.jpg
+    roughness: ../assets/textures/pbr/pbr_grass2/Grass002_2K-JPG_Roughness.jpg
+    ao: ../assets/textures/pbr/pbr_grass2/Grass002_2K-JPG_AmbientOcclusion.jpg
+    height: ../assets/textures/pbr/pbr_grass2/Grass002_2K-JPG_Displacement.jpg
+    tiling: 1
+    normalStrength: 1
+    roughnessScale: 2
+    heightStrength: 1
+    amount: 0.180000007
+    minHeight: 0
+    maxHeight: 1
+    minSlope: 0
+    maxSlope: 90
+    blendSoftness: 0.349999994
+  - name: Rock060_2K-JPG
+    role: Rock
+    folder: ../assets/textures/pbr/pbr_stone2
+    albedo: ../assets/textures/pbr/pbr_stone2/Rock060_2K-JPG_Color.jpg
+    normal: ../assets/textures/pbr/pbr_stone2/Rock060_2K-JPG_NormalGL.jpg
+    roughness: ../assets/textures/pbr/pbr_stone2/Rock060_2K-JPG_Roughness.jpg
+    ao: ../assets/textures/pbr/pbr_stone2/Rock060_2K-JPG_AmbientOcclusion.jpg
+    height: ../assets/textures/pbr/pbr_stone2/Rock060_2K-JPG_Displacement.jpg
+    tiling: 1
+    normalStrength: 0.740999997
+    roughnessScale: 2
+    heightStrength: 1.39300001
+    amount: 1
+    minHeight: 0.25
+    maxHeight: 1
+    minSlope: 0
+    maxSlope: 90
+    blendSoftness: 0.147
+  - name: Ground079S_2K-JPG
+    role: Sediment
+    folder: ../assets/textures/pbr/pbr_sediment
+    albedo: ../assets/textures/pbr/pbr_sediment/Ground079S_2K-JPG_Color.jpg
+    normal: ../assets/textures/pbr/pbr_sediment/Ground079S_2K-JPG_NormalGL.jpg
+    roughness: ../assets/textures/pbr/pbr_sediment/Ground079S_2K-JPG_Roughness.jpg
+    ao: ../assets/textures/pbr/pbr_sediment/Ground079S_2K-JPG_AmbientOcclusion.jpg
+    height: ../assets/textures/pbr/pbr_sediment/Ground079S_2K-JPG_Displacement.jpg
+    tiling: 1
+    normalStrength: 1
+    roughnessScale: 1
+    heightStrength: 1
+    amount: 1
+    minHeight: 0
+    maxHeight: 1
+    minSlope: 0
+    maxSlope: 90
+    blendSoftness: 0.0799999982
+  - name: Snow014_2K-JPG
+    role: Snow
+    folder: ../assets/textures/pbr/Snow014_2K-JPG
+    albedo: ../assets/textures/pbr/Snow014_2K-JPG/Snow014_2K-JPG_Color.jpg
+    normal: ../assets/textures/pbr/Snow014_2K-JPG/Snow014_2K-JPG_NormalGL.jpg
+    roughness: ../assets/textures/pbr/Snow014_2K-JPG/Snow014_2K-JPG_Roughness.jpg
+    ao: ../assets/textures/pbr/Snow014_2K-JPG/Snow014_2K-JPG_AmbientOcclusion.jpg
+    height: ../assets/textures/pbr/Snow014_2K-JPG/Snow014_2K-JPG_Displacement.jpg
+    tiling: 1.35000002
+    normalStrength: 0.349999994
+    roughnessScale: 0.81099999
+    heightStrength: 0.349999994
+    amount: 0.289999992
+    minHeight: 0.699999988
+    maxHeight: 1
+    minSlope: 0
+    maxSlope: 90
+    blendSoftness: 0.100000001
+environment:
+  skybox:
+    name: miramar
+    folder: ../assets/textures/skybox
+    faces:
+      - ../assets/textures/skybox/miramar_rt.tga
+      - ../assets/textures/skybox/miramar_lf.tga
+      - ../assets/textures/skybox/miramar_up.tga
+      - ../assets/textures/skybox/miramar_dn.tga
+      - ../assets/textures/skybox/miramar_bk.tga
+      - ../assets/textures/skybox/miramar_ft.tga
+    rotations:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+    flipHorizontal:
+      - false
+      - false
+      - false
+      - false
+      - false
+      - false
+    flipVertical:
+      - false
+      - false
+      - false
+      - false
+      - false
+      - false
+  settings:
+    timeOfDay: 11.1999998
+    latitude: -5.30000019
+    animateTime: false
+    timeScale: 0.0500000007
+    sunAngularSize: 0.689999998
+    sunColor:
+      x: 0.686274529
+      y: 0.632449031
+      z: 0.524798155
+    sunIlluminance: 5.78000021
+    skyTint:
+      x: 0.579999983
+      y: 0.680000007
+      z: 0.819999993
+    atmosphereDensity: 1
+    haze: 0.349999994
+    groundAlbedo:
+      x: 0.300000012
+      y: 0.270000011
+      z: 0.219999999
+    useSkyboxBlend: false
+    skyboxBlend: 0.349999994
+    exposure: 1
+    whitePoint: 11.1999998
+    bloomStrength: 0.0799999982
+    fogDensity: 0
+    bloomEnabled: true
+    fxaaEnabled: true
+    shadowsEnabled: true
+    shadowResolution: 2048
+    shadowDistance: 2500
+    shadowStrength: 0.550000012
+    shadowBias: 0.00150000001
+    shadowNormalBias: 0.00600000005
+    skyAmbient: 0.0900000036
+    groundAmbient: 0.0250000004
+    normalStrength: 0.649999976
+    snowHeight: 1800
+    snowSoftness: 850
+    wetnessStrength: 0.649999976
+    waterAlpha: 0.720000029
+    waterShallowColor:
+      x: 0.0799999982
+      y: 0.379999995
+      z: 0.419999987
+    waterDeepColor:
+      x: 0.0120000001
+      y: 0.0549999997
+      z: 0.0900000036
+    waterNormalStrength: 0.519999981
+    waterWaveScale: 1
+    waterWaveSpeed: 1
+    waterRefractionStrength: 7
+    waterAbsorption: 0.219999999
+    waterFoamWidth: 1.10000002
+    waterFoamIntensity: 0.319999993
+    waterRoughness: 0.159999996
+terrainGraph:
+  ElevationPass:
+    Noise Type: 0
+    Seed: 1
+    Frequency: 0.5
+    Scale: 100
+  MountainMaskPass:
+    Mininimum Threshold: 0.400000006
+    Maximum Threshold: 0.699999988
+  MountainHeightPass:
+    Noise Type: 0
+    Frequency: 0.00999999978
+    Amplitude: 0.00999999978
+    Scale: 100
+    Seed: 1
+    Fractal Type: 0
+    Octaves: 1
+    Lacunarity: 2
+    Persistance: 0.5
+    Ridge Strength: 0
+    Falloff Enabled: true
+    Falloff Strength: 1
+  FinalMaskPass: ~
+  FinalHeightPass:
+    Amplitude: 1
+  NormalMaskPass: ~
+  SlopeMaskPass: ~
+terrainGraphV2:
+  schemaVersion: 5
+  useUniversalGraph: true
+  pan: { x: 40, y: 40 }
+  zoom: 0.8
+  nextNodeId: 10
+  nextLinkId: 5
+  nodes:
+    - id: 1
+      typeId: noiseHeight
+      displayName: Base Noise
+      enabled: true
+      position: { x: 0, y: 0 }
+      parameters:
+        - { id: seed, int: 42 }
+        - { id: octaves, int: 5 }
+    - id: 2
+      typeId: particleErosion
+      displayName: Particle Erosion
+      enabled: true
+      position: { x: 300, y: 0 }
+      parameters:
+        - { id: amount, float: 0.35, min: 0, max: 1 }
+        - { id: seed, int: 1337 }
+    - id: 3
+      typeId: thermalErosion
+      displayName: Thermal Erosion
+      enabled: true
+      position: { x: 600, y: 0 }
+      parameters:
+        - { id: amount, float: 0.35, min: 0, max: 1 }
+    - id: 4
+      typeId: outputHeight
+      displayName: Output Height
+      enabled: true
+      position: { x: 900, y: 0 }
+    - id: 5
+      typeId: drainageNetwork
+      displayName: Drainage
+      enabled: true
+      position: { x: 0, y: 220 }
+    - id: 6
+      typeId: grassAsset
+      displayName: Grass
+      enabled: true
+      position: { x: 300, y: 220 }
+    - id: 7
+      typeId: treeAssetA
+      displayName: Tree A
+      enabled: true
+      position: { x: 600, y: 220 }
+    - id: 8
+      typeId: treeAssetB
+      displayName: Tree B
+      enabled: false
+      position: { x: 900, y: 220 }
+    - id: 9
+      typeId: fitRange
+      displayName: Height Amplitude
+      enabled: true
+      position: { x: 150, y: 120 }
+      parameters:
+        - { id: inMin, float: 0, min: -20000, max: 20000 }
+        - { id: inMax, float: 1, min: -20000, max: 20000 }
+        - { id: outMin, float: 0, min: -20000, max: 20000 }
+        - { id: outMax, float: 300, min: -20000, max: 20000 }
+  links:
+    - { id: 1, fromNodeId: 1, fromPortId: height, toNodeId: 9, toPortId: value }
+    - { id: 4, fromNodeId: 9, fromPortId: result, toNodeId: 2, toPortId: height }
+    - { id: 2, fromNodeId: 2, fromPortId: height, toNodeId: 3, toPortId: height }
+    - { id: 3, fromNodeId: 3, fromPortId: height, toNodeId: 4, toPortId: height }
+camera:
+  activeType: 0
+  position:
+    x: 67.9276123
+    y: 1001.92688
+    z: -23.233757
+  settings:
+    editor:
+      common:
+        fov: 60
+        nearPlane: 0.00999999978
+        farPlane: 20000
+      orbitSensitivity: 0.100000001
+      panSpeed: 0.000500000024
+      zoomSpeed: 50
+      minZoom: 60
+      maxZoom: 12147
+    flyover:
+      common:
+        fov: 60
+        nearPlane: 0.00999999978
+        farPlane: 20000
+      sensitivity: 0.100000001
+      acceleration: 220
+      flightDrag: 0.800000012
+      braking: 3.5
+      maxSpeed: 260
+      boostMultiplier: 3
+      lookSmoothing: 12
+      gimbalStrengthDegrees: 4
+      gimbalSmoothing: 6
+    player:
+      common:
+        fov: 60
+        nearPlane: 0.00999999978
+        farPlane: 20000
+      sensitivity: 0.100000001
+      acceleration: 75
+      maxGroundSpeed: 42
+      groundDamping: 12
+      airDamping: 1.20000005
+      gravity: 95
+      jumpSpeed: 32
+      eyeHeight: 6
+      groundSnapDistance: 2.5
+      headBobEnabled: true
+      headBobHeight: 0.159999996
+      headBobSide: 0.100000001
+      headBobStrideLength: 6
+      headBobRollDegrees: 0.349999994
+      headBobResponse: 12
+editorUi:
+  showMainView: true
+  showTerrainControls: false
+  showTerrainGraph: true
+  showWorld: true
+  showOutliner: true
+  showDebugWindow: true
+  showMaterialLibrary: true
+  showCameraSettings: false
+  imguiLayout: "[Window][Main View]\nPos=430,63\nSize=1040,992\nCollapsed=0\nDockId=0x00000003,0\nLastUsed=20261119\n\n[Window][Outliner]\nPos=8,63\nSize=420,992\nCollapsed=0\nDockId=0x00000001,0\nLastUsed=20261119\n\n[Window][Terrain Graph]\nViewportPos=2174,40\nViewportId=0x19C93A12\nSize=1549,1045\nCollapsed=0\nLastUsed=20261119\n\n[Window][Material Library]\nPos=1472,63\nSize=440,992\nCollapsed=0\nDockId=0x00000004,0\nLastUsed=20261119\n\n[Window][Vegetation Library]\nPos=1472,63\nSize=440,992\nCollapsed=0\nDockId=0x00000004,1\nLastUsed=20261119\n\n[Window][World]\nPos=1472,63\nSize=440,992\nCollapsed=0\nDockId=0x00000004,2\nLastUsed=20261119\n\n[Window][Debug]\nPos=8,63\nSize=420,992\nCollapsed=0\nDockId=0x00000001,1\nLastUsed=20261119\n\n[Window][PWG Editor]\nPos=0,0\nSize=1920,1061\nCollapsed=0\nLastUsed=20261119\n\n[Window][Welcome]\nPos=0,0\nSize=1920,1061\nCollapsed=0\nLastUsed=20261119\n\n[Window][Debug##Default]\nPos=60,60\nSize=400,400\nCollapsed=0\nLastUsed=20261119\n\n[Window][Camera Settings]\nPos=60,60\nSize=159,239\nCollapsed=0\nLastUsed=20261119\n\n[Window][PBR Material Browser]\nPos=600,250\nSize=720,560\nCollapsed=0\nLastUsed=20261119\n\n[Table][0x35870BAB,4]\nRefScale=13\nColumn 0  Weight=1.0000 ID=0x4637146C\nColumn 1  Width=70 ID=0x1E8D9A78\nColumn 2  Width=65 ID=0x635C89A1\nColumn 3  Width=70 ID=0x26563918\nLastUsed=20261119\n\n[Docking][Data]\nDockSpace     ID=0x09936E68 Window=0x1A28F784 Pos=16,94 Size=1904,992 Split=X\n  DockNode    ID=0x00000001 Parent=0x09936E68 SizeRef=420,1061 Selected=0x1E7E18E3\n  DockNode    ID=0x00000002 Parent=0x09936E68 SizeRef=1482,1061 Split=X\n    DockNode  ID=0x00000003 Parent=0x00000002 SizeRef=1040,1061 CentralNode=1 Selected=0x2A6F3D9B\n    DockNode  ID=0x00000004 Parent=0x00000002 SizeRef=440,1061 Selected=0x39CB70EB\n\n"
+  terrainGraphView:
+    pan:
+      x: 40
+      y: 42
+    zoom: 1

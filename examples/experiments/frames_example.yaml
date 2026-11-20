@@ -1,0 +1,55 @@
+# Example experiment config for the Debug View runner (D-11): load the project, apply parameters, prepare, warm up,
+# measure, export, repeat. It shows the runner on a small world. It is a functional example, not an experiment of
+# the thesis; its numbers say nothing about the engine.
+#
+# Run it from build/bin/Release:
+#   PWG.exe --experiment ../../../examples/experiments/frames_example.yaml --exit-when-done
+# Output: build/experiment-runs/EX-frames/<run id>/ (see docs/debug_view_runner.md).
+format: pwg-experiment
+format_version: 1
+experiment_id: EX-frames
+description: "Example: LOD on and off along a camera path, two repetitions"
+project: runner-test.pwg                  # relative to this file
+output: ../../build/experiment-runs/EX-frames
+# expect_renderer: "RTX 3060"             # stop before measuring if GL_RENDERER does not contain this text
+
+debug_view: true                          # false: Debug View compiled in but switched off (overhead check)
+
+benchmark:
+  enabled: true                           # no frame limit, no VSync, fixed render size
+  render_size: [1280, 720]
+  fullscreen_main_view: false             # true: fullscreen window during warm-up and measurement (design 5.4)
+  gpu_ring_frames: 4
+  wallclock_bracket: false
+  max_gpu_dropped: 0                      # more dropped GPU samples marks the run as failed
+
+manual:                                   # values the program cannot read; copied to run.yaml and the CSV headers
+  acer_mode: "example"
+  nvidia_driver: "example"
+  driver_vsync_override: "example"
+
+params:                                   # applied to every variant
+  vegetation.enabled: false               # vegetation moves with elapsed time; off keeps the screenshot hashes comparable
+
+prepare:                                  # once per run, before warm-up
+  - run_graph: true
+    name: graph
+
+camera:
+  path: paths/orbit_example.pwgpath.yaml  # copied to <run>/paths/ and played from there
+  dt: 0.0166666667                        # 1/60 s per path frame
+
+warmup: { frames: 60 }                    # frames played and not recorded
+measure: { frames: 120 }                  # path frames recorded in frames.csv (the path has 121)
+repetitions: 2
+order: interleaved                        # repetition 1 of every variant, then repetition 2
+cooldown_s: 1
+
+variants:
+  matrix:
+    lod.enabled: [true, false]
+
+captures:                                 # outside the measurement window
+  - after: graph
+    masks: [FinalHeight]
+    screenshot: { path_frame: 0, tag: start }

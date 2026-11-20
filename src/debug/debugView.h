@@ -31,6 +31,8 @@ namespace pwg
 
 namespace pwg::debug
 {
+	class ExperimentRunner;
+
 	/** @brief True if CPU scopes and GPU queries are compiled in. */
 	constexpr bool InstrumentationCompiled = PWG_DEBUG_VIEW_INSTRUMENTATION != 0;
 
@@ -84,6 +86,13 @@ namespace pwg::debug
 		/** @brief Ring size K of the GPU query ring, applied at the next frame begin. */
 		void SetGpuRingFrames(uint32_t frames) { m_requestedRingFrames = frames; }
 
+		/**
+		* @brief The runner's "wall-clock bracket" option (design 5.2): glFinish before and after a stepping window.
+		* Set by the runner; recorded in the metadata as `wallclock_bracket`.
+		*/
+		void SetWallclockBracket(bool enabled) { m_wallclockBracket = enabled; }
+		bool IsWallclockBracket() const { return m_wallclockBracket; }
+
 		/** @brief Detailed option: one TIMESTAMP span per shadow cascade inside the shadow pass timer. Off by default. */
 		void SetDetailedShadowTiming(bool enabled) { m_detailedShadowTiming = enabled; }
 		bool IsDetailedShadowTiming() const { return m_detailedShadowTiming; }
@@ -116,6 +125,17 @@ namespace pwg::debug
 		/** @brief Drops the window without writing. */
 		void AbortRecording() { m_recorder.Abort(); }
 
+		/**
+		* @brief Adds a row of the runner (`stepping_window`) to the events.csv of the window being recorded. The row takes
+		* the next event sequence number and the current frame; false if no window records.
+		*/
+		bool AddRecordedEvent(EventRow row)
+		{
+			row.sequence = m_sim.ReserveSequence();
+			row.engineFrame = m_frameIndex;
+			return m_recorder.AddEventRow(std::move(row));
+		}
+
 		bool IsRecording() const { return m_recorder.IsActive(); }
 
 		/**
@@ -138,6 +158,9 @@ namespace pwg::debug
 		*/
 		bool ExportMasks(ChunkManager& chunks, const MaskExportRequest& request);
 
+		/** @brief Drops a pending screenshot request (the runner does it when a run ends early). */
+		void CancelScreenshot() { m_exporters.CancelScreenshot(); }
+
 		/** @brief Read access (pending request, last result). Requests go through RequestScreenshot / ExportMasks. */
 		const Exporters& GetExporters() const { return m_exporters; }
 
@@ -159,6 +182,16 @@ namespace pwg::debug
 
 		/** @brief "Simulation" tab of the Debug window: graph, erosion, hydrology and readback timing (debugViewPanel.cpp). */
 		void DrawSimulationTab();
+
+		/**
+		* @brief Experiment runner (D-11, design 8). Application creates it and registers it here; the Experiment tab
+		* and the runner's metadata use it through this pointer. Null until registered.
+		*/
+		void SetExperimentRunner(ExperimentRunner* runner) { m_runner = runner; }
+		ExperimentRunner* GetExperimentRunner() const { return m_runner; }
+
+		/** @brief "Experiment" tab of the Debug window: load a config, start, abort, progress (debugViewPanel.cpp). */
+		void DrawExperimentTab();
 
 		/**
 		* @brief "Capture" tab of the Debug window: screenshot (D-07) and mask export (D-08) (debugViewPanel.cpp).
@@ -212,6 +245,8 @@ namespace pwg::debug
 		bool m_gpuInitialized{ false };
 		uint32_t m_requestedRingFrames{ GpuProfiler::DefaultRingFrames };
 		bool m_detailedShadowTiming{ false };
+		bool m_wallclockBracket{ false };
+		ExperimentRunner* m_runner{ nullptr };
 		Clock::time_point m_frameBegin{};
 
 		bool m_benchmark{ false };
@@ -224,6 +259,9 @@ namespace pwg::debug
 		std::vector<SimEvent> m_simScratch;		/**< Used by DrawSimulationTab only. */
 		char m_exportRoot[260]{ "perf_exports" };	/**< Export folder of the Performance tab, relative to the working directory. */
 		int m_exportFrames{ 0 };					/**< Frames per window in the Performance tab, 0 = until Stop. */
+		char m_experimentConfig[260]{};				/**< Config file of the Experiment tab. */
+		char m_experimentOut[260]{};				/**< Optional output folder of the Experiment tab (empty: the config's `output`). */
+		std::string m_experimentMessage;			/**< Result of the last Start press. */
 		char m_captureRoot[260]{ "captures" };		/**< Capture root of the Capture tab, relative to the working directory. */
 		char m_screenshotTag[64]{};					/**< Optional tag of the next screenshot. */
 		std::vector<std::string> m_maskSelection{ "FinalHeight" };	/**< Masks ticked in the Capture tab. */

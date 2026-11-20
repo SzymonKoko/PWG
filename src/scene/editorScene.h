@@ -99,6 +99,13 @@ namespace pwg
 		void SetMainViewFullscreen(bool fullscreen);
 		bool IsMainViewFullscreen() const;
 
+		/**
+		* @brief Vegetation on/off for the experiment runner (`vegetation.enabled`, design 8.3): false skips the vegetation
+		* draw and its shadow draw. Runtime state only, default true, not saved in a project.
+		*/
+		void SetVegetationEnabled(bool enabled) { m_vegetationEnabled = enabled; }
+		bool IsVegetationEnabled() const { return m_vegetationEnabled; }
+
 	private:
 
 		/**
@@ -164,6 +171,7 @@ namespace pwg
 		bool m_terrainGraphInputCaptured{ false };
 		bool m_dirty{ false };
 		bool m_viewportInputCaptured{ false };
+		bool m_vegetationEnabled{ true };						/**< Runner switch `vegetation.enabled` (D-11). */
 
 		// Flyover projection values changed by a camera path playback, restored when it ends (D-10).
 		bool m_pathProjectionApplied{ false };

@@ -418,10 +418,14 @@ bool pwg::debug::CsvRecorder::Start(const RunInfo& run, Metadata metadata, std::
 		return false;
 	}
 	std::error_code error;
-	if (std::filesystem::exists(folder, error))
+	for (const char* name : { "frames.csv", "events.csv", "summary.csv", "run.yaml" })
 	{
-		PWG_ERROR("CSV export: output folder {} exists already", PathText(folder));
-		return false;
+		// The folder may exist: the runner exports masks and screenshots into it before the window starts.
+		if (std::filesystem::exists(folder / name, error))
+		{
+			PWG_ERROR("CSV export: {} exists already in {}", name, PathText(folder));
+			return false;
+		}
 	}
 
 	Reset();
@@ -456,6 +460,16 @@ void pwg::debug::CsvRecorder::Stop(uint64_t currentFrame)
 	}
 }
 
+bool pwg::debug::CsvRecorder::AddEventRow(EventRow row)
+{
+	if (m_state != State::RECORDING || row.engineFrame < m_firstFrame || row.engineFrame > m_lastFrame)
+	{
+		return false;
+	}
+	m_extraRows.push_back(std::move(row));
+	return true;
+}
+
 void pwg::debug::CsvRecorder::Abort()
 {
 	if (m_state == State::IDLE)
@@ -484,6 +498,7 @@ void pwg::debug::CsvRecorder::Reset()
 	// Release the memory of a long window.
 	std::vector<FrameRecord>().swap(m_frames);
 	std::vector<SimEvent>().swap(m_events);
+	m_extraRows.clear();
 }
 
 void pwg::debug::CsvRecorder::Advance(uint64_t frameIndex, uint32_t lagFrames)
@@ -596,6 +611,18 @@ pwg::debug::ExportResult pwg::debug::CsvRecorder::Write(uint64_t frameIndex)
 		}
 		AppendSimEventRows(event, order, eventRows);
 	}
+	if (!m_extraRows.empty())
+	{
+		// Rows of other producers (the runner) take their place by sequence number; rows of one event stay together.
+		for (const EventRow& row : m_extraRows)
+		{
+			if (row.engineFrame >= m_firstFrame && row.engineFrame <= m_lastFrame)
+			{
+				eventRows.push_back(row);
+			}
+		}
+		std::stable_sort(eventRows.begin(), eventRows.end(), [](const EventRow& a, const EventRow& b) { return a.sequence < b.sequence; });
+	}
 
 	// --- Warnings ---
 	uint64_t gpuDropped = 0;
@@ -622,6 +649,16 @@ pwg::debug::ExportResult pwg::debug::CsvRecorder::Write(uint64_t frameIndex)
 	if (gpuDropped > 0)
 	{
 		result.warnings.push_back(std::to_string(gpuDropped) + " GPU samples were dropped; repeat with more ring frames (K)");
+	}
+
+	result.gpuDropped = InstrumentationCompiled ? gpuDropped : 0;
+	for (const FrameRecord& record : m_frames)
+	{
+		const double sleepMs = record.phaseMs[static_cast<size_t>(FramePhase::SLEEP)];
+		if (!std::isnan(sleepMs) && sleepMs > result.maxSleepMs)
+		{
+			result.maxSleepMs = sleepMs;
+		}
 	}
 
 	std::error_code error;
@@ -659,7 +696,11 @@ pwg::debug::ExportResult pwg::debug::CsvRecorder::Write(uint64_t frameIndex)
 			line = prefix;
 			line += ',' + std::to_string(record.frameIndex - m_firstFrame);
 			line += ',' + std::to_string(record.frameIndex);
-			line += ',';	// path_frame: camera path playback (D-10)
+			line += ',';
+			if (record.pathFrame >= 0)
+			{
+				line += std::to_string(record.pathFrame);	// camera path frame applied in this frame (D-10); empty without a path
+			}
 			line += ',' + FormatValue(beginMs - firstBegin, ValueKind::MS);
 			for (const FrameColumn& column : FrameColumns)
 			{
