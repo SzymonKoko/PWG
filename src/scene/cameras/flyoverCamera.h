@@ -38,6 +38,27 @@ namespace pwg
 		CameraProperties& GetCameraProperties() { return m_cameraProperties; }
 		FlyoverCameraProperties& GetProperties() { return m_flyoverProperties; }
 
+		/** @brief Largest absolute pitch the camera can reach (the mouse clamp and SetPose), in degrees. */
+		static constexpr float MaxPitchDegrees = 89.0f;
+
+		/** @brief Yaw in degrees (the smoothed value that the view matrix uses; not wrapped). */
+		float GetYaw() const { return m_flyoverProperties.yaw; }
+		/** @brief Pitch in degrees. */
+		float GetPitch() const { return m_flyoverProperties.pitch; }
+		/** @brief Gimbal roll in radians. */
+		float GetRoll() const { return m_gimbalRoll; }
+
+		/**
+		* @brief Sets the whole pose at once and rebuilds the matrices (camera path playback, D-10).
+		*
+		* Yaw and pitch are set together with their targets, so look smoothing has nothing left to catch up on, and
+		* velocity and mouse turn are cleared, so the camera does not move on after the pose is set. Pitch is
+		* clamped to +-MaxPitchDegrees, the range the mouse can reach; every pitch in it, including 0, is valid.
+		* Update must not be called in the same frame: it would integrate input and dt on top of the pose.
+		* The matrices use the aspect ratio, fov and clip planes the camera has at the time of the call.
+		*/
+		void SetPose(const glm::vec3& position, float yawDegrees, float pitchDegrees, float rollRadians);
+
 	protected:
 		void HandleKeyboardInput(KeyboardInput& keyboardInput, float dt) override;
 		void HandleMouseInput(MouseInput& mouseInput, float dt) override;

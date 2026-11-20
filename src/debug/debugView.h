@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "debug/cameraPath.h"
 #include "debug/cpuProfiler.h"
 #include "debug/csvWriter.h"
 #include "debug/exporters.h"
@@ -140,6 +141,13 @@ namespace pwg::debug
 		/** @brief Read access (pending request, last result). Requests go through RequestScreenshot / ExportMasks. */
 		const Exporters& GetExporters() const { return m_exporters; }
 
+		/**
+		* @brief Flyover camera path (D-10, design 7.6): record, play back, save, load. EditorScene::Update drives the
+		* camera from it. The runner (D-11) loads a path and starts the playback through it. Works in every build.
+		*/
+		CameraPath& GetCameraPath() { return m_cameraPath; }
+		const CameraPath& GetCameraPath() const { return m_cameraPath; }
+
 		/** @brief "Performance" tab of the Debug window (debugViewPanel.cpp). */
 		void DrawPerformanceTab();
 
@@ -180,6 +188,9 @@ namespace pwg::debug
 		/** @brief Mask export part of the Capture tab (every build). */
 		void DrawMaskSection(ChunkManager* chunks);
 
+		/** @brief Camera path part of the Capture tab (every build). */
+		void DrawCameraPathSection();
+
 		static inline DebugView* s_instance{ nullptr };
 		static inline std::atomic<bool> s_enabled{ false };
 
@@ -192,6 +203,7 @@ namespace pwg::debug
 		RunMetadata m_runMetadata;
 		CsvRecorder m_recorder{ m_frameStats, m_sim };	/**< Declared after the stats it reads. */
 		Exporters m_exporters;
+		CameraPath m_cameraPath;
 		std::vector<GpuEventResult> m_gpuEventResults;	/**< Reused by BeginFrame. */
 		uint32_t m_manualExportCounter{ 0 };
 
@@ -218,6 +230,12 @@ namespace pwg::debug
 		char m_maskFilter[64]{};					/**< Name filter of the mask list. */
 		char m_maskTag[64]{};						/**< Optional tag of the next mask export. */
 		bool m_maskPreview{ true };					/**< Write the PNG preview. */
+		char m_pathName[64]{ "flyover_path" };		/**< Name of the camera path file in the Capture tab. */
+		int m_pathStepsPerSecond{ 60 };				/**< Playback step as path frames per second (step = 1 / value). */
+		bool m_pathMatrixDump{ false };				/**< Write the matrix dump of the next playback. */
+		bool m_pathOverwrite{ false };				/**< Allow Save to replace an existing file. */
+		std::string m_pathMessage;					/**< Result of the last Save / Load / Play press. */
+		bool m_pathMessageIsError{ false };
 	};
 
 	/**

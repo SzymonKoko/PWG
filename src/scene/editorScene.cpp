@@ -521,8 +521,12 @@ void pwg::EditorScene::Update(const float& dt)
 {
     HandleKeyboardInputs();
 
+    // D-10: while a camera path plays, it sets the flyover camera's pose and the camera update is skipped
+    // (FlyoverCamera::Update would integrate input and dt on top of it). The mouse stays free for the UI.
+    const bool cameraPathPlaying = UpdateCameraPathPlayback();
+
     auto cameraType = m_cameraManager->GetActiveCameraType();
-    if (cameraType == CameraType::EDITOR)
+    if (cameraType == CameraType::EDITOR || cameraPathPlaying)
     {
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
@@ -531,7 +535,11 @@ void pwg::EditorScene::Update(const float& dt)
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    if (m_terrainGraphInputCaptured || m_viewportInputCaptured)
+    if (cameraPathPlaying)
+    {
+        m_mouseInput.ResetScrollOffset();
+    }
+    else if (m_terrainGraphInputCaptured || m_viewportInputCaptured)
     {
         m_mouseInput.ResetScrollOffset();
     }
@@ -539,6 +547,7 @@ void pwg::EditorScene::Update(const float& dt)
     {
         m_cameraManager->Update(dt);
     }
+    RecordCameraPathSample();
     auto activeCamera = m_cameraManager->GetActiveCamera();
     if (activeCamera)
     {
@@ -557,6 +566,109 @@ void pwg::EditorScene::Update(const float& dt)
     }
     m_environment->Update(dt);
 
+}
+
+bool pwg::EditorScene::UpdateCameraPathPlayback()
+{
+    const bool hasView = debug::DebugView::HasInstance();
+    debug::CameraPath* path = hasView ? &debug::DebugView::Get().GetCameraPath() : nullptr;
+    const bool playing = path && path->IsPlaying();
+    if (!playing && !m_pathProjectionApplied)
+    {
+        return false;   // The usual case: no path playback, nothing to restore.
+    }
+    auto flyover = m_cameraManager->GetFlyoverCamera();
+
+    auto restoreProjection = [&]()
+    {
+        if (m_pathProjectionApplied)
+        {
+            CameraProperties& properties = flyover->GetCameraProperties();
+            properties.fov = m_pathSavedFov;
+            properties.nearPlane = m_pathSavedNear;
+            properties.farPlane = m_pathSavedFar;
+            m_pathProjectionApplied = false;
+        }
+    };
+
+    if (!playing)
+    {
+        restoreProjection();
+        return false;
+    }
+
+    if (m_cameraManager->GetActiveCameraType() != CameraType::FLYOVER)
+    {
+        if (path->GetAppliedFrame() < 0)
+        {
+            // The playback was just started from the Capture tab: it always plays on the flyover camera.
+            m_cameraManager->SetCamera(CameraType::FLYOVER);
+        }
+        else
+        {
+            // The author switched to another camera during the playback (F1, F3): that ends it.
+            path->StopPlayback();
+            restoreProjection();
+            return false;
+        }
+    }
+
+    debug::CameraPathPose pose;
+    if (!path->TickPlayback(pose))
+    {
+        restoreProjection();
+        return false;
+    }
+
+    CameraProperties& properties = flyover->GetCameraProperties();
+    if (!m_pathProjectionApplied)
+    {
+        m_pathSavedFov = properties.fov;
+        m_pathSavedNear = properties.nearPlane;
+        m_pathSavedFar = properties.farPlane;
+        m_pathProjectionApplied = true;
+    }
+    const debug::CameraPathProjection& projection = path->GetProjection();
+    properties.fov = projection.fovDeg;
+    properties.nearPlane = projection.nearPlane;
+    properties.farPlane = projection.farPlane;
+    flyover->SetPose(pose.position, pose.yawDeg, pose.pitchDeg, pose.rollRad);
+    return true;
+}
+
+void pwg::EditorScene::RecordCameraPathSample()
+{
+    if (!debug::DebugView::HasInstance())
+    {
+        return;
+    }
+    debug::CameraPath& path = debug::DebugView::Get().GetCameraPath();
+    if (!path.IsRecording())
+    {
+        return;
+    }
+    if (m_cameraManager->GetActiveCameraType() != CameraType::FLYOVER)
+    {
+        // Leaving the flyover camera ends a recording that has keys; before the first key it keeps waiting.
+        if (path.GetKeyCount() > 0)
+        {
+            path.StopRecording();
+        }
+        return;
+    }
+
+    auto flyover = m_cameraManager->GetFlyoverCamera();
+    if (path.GetKeyCount() == 0)
+    {
+        const CameraProperties& properties = flyover->GetCameraProperties();
+        path.SetProjection({ properties.fov, properties.nearPlane, properties.farPlane });
+    }
+    debug::CameraPathPose pose;
+    pose.position = flyover->GetCameraPosition();
+    pose.yawDeg = flyover->GetYaw();
+    pose.pitchDeg = flyover->GetPitch();
+    pose.rollRad = flyover->GetRoll();
+    path.AddSample(pose, debug::CameraPath::Clock::now());
 }
 
 void pwg::EditorScene::Draw()
@@ -630,6 +742,13 @@ void pwg::EditorScene::Draw()
     if (activeCamera)
     {
         activeCamera->SetAspectRatio(m_aspectRatio);
+    }
+
+    // D-10: matrix dump of a camera path playback, taken with the matrices the frame is rendered with.
+    if (activeCamera && debug::DebugView::HasInstance() && debug::DebugView::Get().GetCameraPath().IsPlaying())
+    {
+        debug::DebugView::Get().GetCameraPath().NoteRenderedMatrices(
+            activeCamera->GetViewMatrix(), activeCamera->GetProjectionMatrix(), width, height);
     }
 
     bool shadowsEnabled = environmentLighting.shadowsEnabled && environmentLighting.sunIntensity > 0.001f;

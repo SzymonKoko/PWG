@@ -178,6 +178,21 @@ pwg::debug::Metadata pwg::debug::DebugView::CollectRunMetadata(const RunInfo& ru
 	metadata.SetNumber("drain_timeout_frames", CsvRecorder::DefaultDrainTimeoutFrames);
 
 	m_runMetadata.AppendSceneInfo(metadata);
+	if (m_cameraPath.IsPlaying())
+	{
+		// Design 7.2: the path that is played. A new recording that was never saved has no file name.
+		const std::filesystem::path& file = m_cameraPath.GetFile();
+		if (file.empty())
+		{
+			metadata.Set("camera_path", "(recorded, not saved)");
+		}
+		else
+		{
+			const std::u8string name = file.u8string();
+			metadata.Set("camera_path", std::string(name.begin(), name.end()));
+		}
+		metadata.Set("camera_path_sha256", m_cameraPath.GetSha256());
+	}
 
 	for (const auto& [name, value] : run.params)
 	{

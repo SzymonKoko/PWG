@@ -105,6 +105,17 @@ namespace pwg
 		 * @brief Handles keyboard input for the scene.
 		 */
 		void HandleKeyboardInputs();
+
+		/**
+		 * @brief Camera path playback (D-10): while a path plays, sets the flyover camera to the pose of the next
+		 * path frame. Returns true if the path drove the camera this frame, so the camera update is skipped.
+		 * Does nothing while the path is idle or recording.
+		 */
+		bool UpdateCameraPathPlayback();
+
+		/** @brief Camera path recording (D-10): stores the flyover camera's pose of this frame as a key. */
+		void RecordCameraPathSample();
+
 		void DrawOutliner();
 		void DrawWorldWindow();
 		void DrawCameraSettings();
@@ -153,6 +164,12 @@ namespace pwg
 		bool m_terrainGraphInputCaptured{ false };
 		bool m_dirty{ false };
 		bool m_viewportInputCaptured{ false };
+
+		// Flyover projection values changed by a camera path playback, restored when it ends (D-10).
+		bool m_pathProjectionApplied{ false };
+		float m_pathSavedFov{ 0.0f };
+		float m_pathSavedNear{ 0.0f };
+		float m_pathSavedFar{ 0.0f };
 	};
 } // namespace pwg
 

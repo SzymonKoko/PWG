@@ -893,6 +893,7 @@ void pwg::debug::DebugView::DrawCaptureTab(ChunkManager* chunks)
 
 	DrawScreenshotSection();
 	DrawMaskSection(chunks);
+	DrawCameraPathSection();
 }
 
 namespace
@@ -1105,4 +1106,182 @@ void pwg::debug::DebugView::DrawScreenshotSection()
 			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Last screenshot failed: %s", result.error.c_str());
 		}
 	}
+}
+
+namespace
+{
+	/** @brief File name part of a camera path: ASCII letters, digits, '.', '-' and '_' are kept, others become '-'. */
+	std::string PathFileStem(const char* text)
+	{
+		std::string stem;
+		for (const char* c = text; *c != '\0'; ++c)
+		{
+			const unsigned char ch = static_cast<unsigned char>(*c);
+			stem += (std::isalnum(ch) || ch == '.' || ch == '-' || ch == '_') ? static_cast<char>(ch) : '-';
+		}
+		return stem.empty() ? std::string("flyover_path") : stem;
+	}
+}
+
+void pwg::debug::DebugView::DrawCameraPathSection()
+{
+	ImGui::SeparatorText("Camera path (flyover camera)");
+	const bool recording = m_cameraPath.IsRecording();
+	const bool playing = m_cameraPath.IsPlaying();
+	const bool idle = !recording && !playing;
+
+	const std::filesystem::path folder = PathFromUtf8(m_captureRoot) / CameraPath::FolderName;
+	const std::string stem = PathFileStem(m_pathName);
+	const std::filesystem::path file = folder / (stem + CameraPath::FileExtension);
+
+	ImGui::BeginDisabled(!idle);
+	ImGui::SetNextItemWidth(200.0f);
+	ImGui::InputText("Name##path", m_pathName, sizeof(m_pathName));
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(110.0f);
+	ImGui::InputInt("Steps per second##path", &m_pathStepsPerSecond, 0, 0);
+	m_pathStepsPerSecond = std::clamp(m_pathStepsPerSecond, 1, 1000);
+	ImGui::SameLine();
+	ImGui::Checkbox("Matrix dump##path", &m_pathMatrixDump);
+	ImGui::EndDisabled();
+	ImGui::TextDisabled("File: %s", Utf8(file).c_str());
+
+	// Record / stop
+	if (recording)
+	{
+		if (ImGui::Button("Stop recording##path"))
+		{
+			m_cameraPath.StopRecording();
+			m_pathMessage.clear();
+		}
+	}
+	else
+	{
+		ImGui::BeginDisabled(!idle);
+		if (ImGui::Button("Record##path"))
+		{
+			m_cameraPath.StartRecording();
+			m_pathMessage.clear();
+		}
+		ImGui::EndDisabled();
+	}
+	ImGui::SameLine();
+
+	// Play / stop
+	if (playing)
+	{
+		if (ImGui::Button("Stop playback##path"))
+		{
+			m_cameraPath.StopPlayback();
+		}
+	}
+	else
+	{
+		ImGui::BeginDisabled(!idle || !m_cameraPath.HasPath());
+		if (ImGui::Button("Play##path"))
+		{
+			CameraPathPlayback options;
+			options.stepSeconds = 1.0 / static_cast<double>(m_pathStepsPerSecond);
+			if (m_pathMatrixDump)
+			{
+				const std::string dumpStem = UniqueStem(folder, stem + "_" + FormatFileTimestamp(std::chrono::system_clock::now()),
+					std::string::npos, { ".matrices.txt" });
+				options.matrixDumpFile = folder / (dumpStem + ".matrices.txt");
+			}
+			std::string error;
+			m_pathMessageIsError = !m_cameraPath.StartPlayback(options, error);
+			m_pathMessage = m_pathMessageIsError ? "Play: " + error : std::string();
+		}
+		ImGui::EndDisabled();
+	}
+	ImGui::SameLine();
+
+	ImGui::BeginDisabled(!idle || m_cameraPath.GetKeyCount() == 0);
+	if (ImGui::Button("Save##path"))
+	{
+		std::string error;
+		m_pathMessageIsError = !m_cameraPath.Save(file, m_pathOverwrite, error);
+		m_pathMessage = m_pathMessageIsError ? "Save: " + error : "Saved " + Utf8(file);
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	ImGui::BeginDisabled(!idle);
+	ImGui::Checkbox("Overwrite##path", &m_pathOverwrite);
+	ImGui::SameLine();
+	if (ImGui::Button("Load##path"))
+	{
+		std::string error;
+		m_pathMessageIsError = !m_cameraPath.Load(file, error);
+		m_pathMessage = m_pathMessageIsError ? "Load: " + error : "Loaded " + Utf8(file);
+	}
+	ImGui::EndDisabled();
+
+	// Status
+	if (recording)
+	{
+		if (m_cameraPath.GetKeyCount() == 0)
+		{
+			ImGui::TextUnformatted("Recording: waiting for the flyover camera (F2). Samples are taken only while it is active.");
+		}
+		else
+		{
+			ImGui::Text("Recording: %zu keys, %.2f s. Press F1 (editor camera) to stop; the flyover camera captures the mouse.",
+				m_cameraPath.GetKeyCount(), m_cameraPath.GetDuration());
+		}
+	}
+	else if (playing)
+	{
+		ImGui::Text("Playing: frame %lld of %llu at %.6f s per frame. The mouse is released; F1 or F3 ends it.",
+			static_cast<long long>(m_cameraPath.GetAppliedFrame()), static_cast<unsigned long long>(m_cameraPath.GetFrameCount()),
+			m_cameraPath.GetStep());
+	}
+	else if (m_cameraPath.GetKeyCount() > 0)
+	{
+		const double step = 1.0 / static_cast<double>(m_pathStepsPerSecond);
+		ImGui::Text("Path: %zu keys, %.3f s, %llu frames at %d steps per second", m_cameraPath.GetKeyCount(),
+			m_cameraPath.GetDuration(),
+			static_cast<unsigned long long>(CameraPath::FrameCount(m_cameraPath.GetDuration(), step)), m_pathStepsPerSecond);
+		ImGui::TextDisabled("%s", m_cameraPath.GetFile().empty() ? "not saved" : Utf8(m_cameraPath.GetFile()).c_str());
+		ImGui::TextDisabled("sha256 %s", m_cameraPath.GetSha256().c_str());
+	}
+	else
+	{
+		ImGui::TextDisabled("No path. Record one while flying with F2, or load a file.");
+	}
+	if (!m_pathMessage.empty())
+	{
+		if (m_pathMessageIsError)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", m_pathMessage.c_str());
+		}
+		else
+		{
+			ImGui::TextUnformatted(m_pathMessage.c_str());
+		}
+	}
+
+	if (m_cameraPath.HasDumpResult() && idle)
+	{
+		const MatrixDumpResult& dump = m_cameraPath.GetLastDump();
+		if (dump.written)
+		{
+			ImGui::Text("Matrix dump: %llu frames, sha256 %s", static_cast<unsigned long long>(dump.frames), dump.sha256.c_str());
+			ImGui::TextWrapped("%s", Utf8(dump.file).c_str());
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Copy path##dump"))
+			{
+				ImGui::SetClipboardText(Utf8(dump.file).c_str());
+			}
+		}
+		else
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Matrix dump failed: %s", dump.error.c_str());
+		}
+	}
+	ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+	ImGui::TextWrapped("Only the flyover camera is recorded: one key per frame (time, position, yaw, pitch, roll). Playback is "
+		"indexed by frame (t = frame x step), not by wall time, and replaces the camera update. The matrix dump lists the view "
+		"and projection matrix of every path frame as hex floats; two playbacks at the same render size give identical dumps. "
+		"Switch the matrix dump off for measured runs (it keeps the rows in memory until the playback ends).");
+	ImGui::PopStyleColor();
 }

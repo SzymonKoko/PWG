@@ -37,6 +37,21 @@ namespace pwg
 		UpdateMatrices();
 	}
 
+	void FlyoverCamera::SetPose(const glm::vec3& position, float yawDegrees, float pitchDegrees, float rollRadians)
+	{
+		const float pitch = glm::clamp(pitchDegrees, -MaxPitchDegrees, MaxPitchDegrees);
+		m_transform.position = position;
+		m_flyoverProperties.yaw = yawDegrees;
+		m_flyoverProperties.pitch = pitch;
+		m_targetYaw = yawDegrees;
+		m_targetPitch = pitch;
+		m_flyoverProperties.velocity = glm::vec3(0.0f);
+		m_gimbalRoll = rollRadians;
+		m_mouseTurn = 0.0f;
+		CalculateCameraForward();
+		UpdateMatrices();
+	}
+
 		void FlyoverCamera::SetAspectRatio(float aspectRatio)
 	{
 		m_cameraProperties.aspectRatio = glm::max(aspectRatio, 0.01f);
@@ -110,7 +125,7 @@ namespace pwg
 		float yoffset = mouseInput.GetDeltaY() * m_flyoverProperties.sensitivity;
 
 		m_targetYaw += xoffset;
-		m_targetPitch = glm::clamp(m_targetPitch + yoffset, -89.0f, 89.0f);
+		m_targetPitch = glm::clamp(m_targetPitch + yoffset, -MaxPitchDegrees, MaxPitchDegrees);
 		float lookResponse = 1.0f - std::exp(-std::max(m_flyoverProperties.lookSmoothing, 0.1f) * dt);
 		m_flyoverProperties.yaw = glm::mix(m_flyoverProperties.yaw, m_targetYaw, lookResponse);
 		m_flyoverProperties.pitch = glm::mix(m_flyoverProperties.pitch, m_targetPitch, lookResponse);
