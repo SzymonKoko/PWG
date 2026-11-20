@@ -41,6 +41,7 @@ pwg::Texture::Texture(const std::string& imagePath, TextureType type)
 		{
 			glGenerateMipmap(GL_TEXTURE_2D);
 		}
+		PWG_MEM_DO(AccountStorage(m_hasMipmap));
 	}
 	else
 	{
@@ -80,6 +81,7 @@ pwg::Texture::Texture(const unsigned char* encodedData, std::size_t encodedSize,
 	{
 		glTexImage2D(GL_TEXTURE_2D, 0, m_format.internalFormat, m_width, m_height, 0, m_format.format, m_format.type, m_image);
 		glGenerateMipmap(GL_TEXTURE_2D);
+		PWG_MEM_DO(AccountStorage(true));
 	}
 	else
 	{
@@ -122,6 +124,8 @@ pwg::Texture::Texture(int width, int height, TextureType type)
 
 	glTexImage2D(GL_TEXTURE_2D, 0, m_format.internalFormat, width, height, 0, m_format.format, m_format.type, NULL);
 
+	PWG_MEM_DO(AccountStorage(false));
+
 	PWG_DEBUG("Texture created ({0}x{1})", width, height);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -129,6 +133,14 @@ pwg::Texture::Texture(int width, int height, TextureType type)
 
 pwg::Texture::~Texture()
 {
+	// The GL texture is not deleted below (glDeleteTextures is disabled), so its storage stays in the driver:
+	// the accounting moves these bytes from "live" to "orphaned" instead of reporting them as freed.
+	PWG_MEM_DO(
+		if (m_accountedBytes != 0)
+		{
+			PWG_MEM_RELEASE(TEXTURE, m_accountedBytes, false);
+			m_accountedBytes = 0;
+		});
 
 	if (m_textureID != 0)
 	{
@@ -251,6 +263,7 @@ void pwg::Texture::UpdateData(unsigned char* data, int width, int height, int nr
 	{
 		glGenerateMipmap(GL_TEXTURE_2D);
 	}
+	PWG_MEM_DO(AccountStorage(m_hasMipmap));
 
 	//Set the texture wrapping/filtering options
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, m_wrapS);
@@ -273,6 +286,7 @@ void pwg::Texture::UpdateFloatData(const std::vector<float>& data, int width, in
 		m_width = width;
 		m_height = height;
 		glTexImage2D(GL_TEXTURE_2D, 0, m_format.internalFormat, m_width, m_height, 0, m_format.format, GL_FLOAT, data.data());
+		PWG_MEM_DO(AccountStorage(m_accountedMipmapped));	// Level 0 was replaced; the mip state does not change.
 	}
 	else
 	{
@@ -298,3 +312,28 @@ int pwg::Texture::GetHeight()
 	return m_height;
 }
 
+
+#if PWG_DEBUG_VIEW_INSTRUMENTATION
+void pwg::Texture::AccountStorage(bool mipmapped)
+{
+	if (m_textureID == 0)
+	{
+		return;
+	}
+	const unsigned long long bytes = debug::Texture2DBytes(m_format.internalFormat, m_width, m_height, mipmapped);
+	if (bytes == 0)
+	{
+		return;
+	}
+	if (m_accountedBytes == 0)
+	{
+		PWG_MEM_ALLOC(TEXTURE, bytes);
+	}
+	else
+	{
+		PWG_MEM_RESIZE(TEXTURE, m_accountedBytes, bytes);
+	}
+	m_accountedBytes = bytes;
+	m_accountedMipmapped = mipmapped;
+}
+#endif

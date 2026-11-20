@@ -62,7 +62,11 @@ namespace pwg
 		ResetHeightCacheReadbacks();
 		for (auto& slot : m_heightReadbacks)
 		{
-			if (slot.buffer != 0) glDeleteBuffers(1, &slot.buffer);
+			if (slot.buffer != 0)
+			{
+				glDeleteBuffers(1, &slot.buffer);
+				PWG_MEM_DO(if (slot.byteSize != 0) PWG_MEM_RELEASE(HEIGHT_PBO, slot.byteSize, true));
+			}
 		}
 		if (m_sceneDepthCopy != 0) glDeleteTextures(1, &m_sceneDepthCopy);
 	}
@@ -876,6 +880,9 @@ namespace pwg
 		if (slot.byteSize != byteSize)
 		{
 			glBufferData(GL_PIXEL_PACK_BUFFER, byteSize, nullptr, GL_STREAM_READ);
+			PWG_MEM_DO(
+				if (slot.byteSize == 0) PWG_MEM_ALLOC(HEIGHT_PBO, byteSize);
+				else PWG_MEM_RESIZE(HEIGHT_PBO, slot.byteSize, byteSize));
 			slot.byteSize = byteSize;
 		}
 		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);

@@ -88,12 +88,12 @@ GPU columns are empty when the Debug View is off, the pass did not run, or the s
 | `event` | event name (table below) |
 | `seq` | event sequence number; all rows of one event share it, and it gives the order in which events started |
 | `group` | graph run or hydrology run the event belongs to, empty if none |
-| `index` | graph node: execution order in its run, from 0; hydrology stage: stage number (0 = resampling); erosion events: pipeline step index |
-| `detail` | `key=value` pairs separated by `;`: `node_id`, `node_type`, `node_enabled`, `resolution`, `solver_step`, `stage_name`, `success`, `refresh`, `talus`, `stable` |
-| `metric` | `cpu_ms`, `gpu_ms`, `active_particles`, `latency_frames`, `solver_step` (thermal_stable), `occurred` (event without another value) |
+| `index` | graph node: execution order in its run, from 0; hydrology stage: stage number (0 = resampling); erosion events: pipeline step index; `memory_snapshot`: number of the snapshot in the window, from 0 |
+| `detail` | `key=value` pairs separated by `;`: `node_id`, `node_type`, `node_enabled`, `resolution`, `solver_step`, `stage_name`, `success`, `refresh`, `talus`, `stable`; `memory_snapshot`: `point`, `item` |
+| `metric` | `cpu_ms`, `gpu_ms`, `active_particles`, `latency_frames`, `solver_step` (thermal_stable), `occurred` (event without another value), `bytes` (`memory_snapshot`) |
 | `value` | number; empty for `gpu_ms` whose result had not arrived when the file was written |
-| `unit` | `ms`, `1`, `frame` |
-| `source` | `steady_clock` for `cpu_ms`; `time_elapsed` or `timestamp_pair` for `gpu_ms` |
+| `unit` | `ms`, `1`, `frame`, `B` |
+| `source` | `steady_clock` for `cpu_ms`; `time_elapsed` or `timestamp_pair` for `gpu_ms`; `own_accounting`, `os_process`, `driver_nvx` or `unavailable` for `memory_snapshot` |
 
 Only events that started inside the window are written. Event names are those of D-03 (`GetSimEventName`). The design (7.3, section 9) used provisional names; they map as follows:
 
@@ -105,7 +105,7 @@ Only events that started inside the window are written. Event names are those of
 | `hydraulic_step`, `hydraulic_refresh`, `thermal_step`, `thermal_stable`, `hydrology_stage` | same; plus `graph_mask_pass`, `thermal_refresh`, `thermal_check` |
 | `hydrology_total` | `hydrology_worker`; `hydrology_end_to_end` is Start to result on the main thread |
 | `hydrology_main_read`, `hydrology_main_upload` | `hydrology_readback`, `hydrology_upload` |
-| `memory_snapshot` | D-04 (not yet produced) |
+| `memory_snapshot` | D-04, see "Memory snapshots (D-04)" below. Added to the window by the runner (`memory_snapshots: true`) or by the Memory tab's button; one value per row, all rows of a snapshot share `seq` and `index` |
 | `stepping_window` | produced by the runner (D-11) for fixed-step hydraulic and thermal stepping: `metric` `steps` (unit `1`, source `runner`) and `wall_ms` (unit `ms`, source `steady_clock`), `detail` = `kind=hydraulic\|thermal;per_frame=<n>;frames=<n>;glfinish=<bool>`. One pair of rows per `hydraulic` or `thermal` prepare entry, only when the window records the prepare phase (`record: prepare`) |
 
 ## summary.csv
@@ -143,7 +143,24 @@ A run folder written by the experiment runner (D-11) has one more top-level map,
 - Readers select columns by name and keys by name.
 - New frames.csv columns are appended at the end, new metadata keys are appended to the key list, and new event names, metrics, units and sources may appear in events.csv. None of these changes `format_version`.
 - Renaming or removing a column, key or event name, or changing a unit or the meaning of a value, increments `format_version`.
-- D-04 (memory) adds `memory_snapshot` rows to events.csv (`metric` = `bytes`, `unit` = `B`, `source` = `own_accounting`, `os_process`, `driver_nvx`), through `EventRow`, and may append memory columns to frames.csv. Both are additions under these rules.
+- D-04 (memory) added `memory_snapshot` rows to events.csv (`metric` = `bytes`, `unit` = `B`, `source` = `own_accounting`, `os_process`, `driver_nvx` or `unavailable`) through `EventRow`. No memory column was added to frames.csv. An addition under these rules; `format_version` stays 1.
+
+## Memory snapshots (D-04)
+
+Code: `src/debug/memoryStats.*`, Memory tab in `src/debug/debugViewPanel.cpp`, `DebugView::RecordMemorySnapshot`. Semantics, coverage and how it was checked: `debug_view_memory.md`.
+
+`memory_snapshot` rows of events.csv, one row per value, all rows of one snapshot with the same `seq` and `index`, `metric` = `bytes`, `unit` = `B`, integer values. `detail` = `point=<where>;item=<value>`:
+
+| `source` | `item` | Meaning |
+|---|---|---|
+| `own_accounting` | `texture_live`, `particle_ssbo_live`, `height_pbo_live`, `instance_vbo_live` | nominal bytes of the live objects of each class that the engine counts (and only those) |
+| `own_accounting` | `total_live` | sum of the four rows above |
+| `own_accounting` | `texture_orphaned` | bytes of destroyed `pwg::Texture` objects whose GL texture was never deleted (the engine's `~Texture` does not call `glDeleteTextures`); cumulative |
+| `os_process` | `private_usage`, `working_set` | `GetProcessMemoryInfo`: `PrivateUsage`, `WorkingSetSize` |
+| `driver_nvx` | `vram_dedicated`, `vram_available`, `vram_used` | `GL_NVX_gpu_memory_info`: dedicated, current available, used = dedicated - available. Whole GPU, other processes included |
+| `unavailable` | the three `vram_*` items | the extension is not present: `source` is `unavailable` and the value is empty |
+
+`point` is `prepare_start`, `after:<prepare entry name>`, `measure_start`, `measure_end` (runner) or `manual` (button). The values are never merged: `own_accounting` is not a part of `driver_nvx` and not a part of `os_process`. A reader selects by `source` and `item`. With `PWG_DEBUG_VIEW_INSTRUMENTATION=OFF` no row is written.
 
 ## Screenshot export (D-07)
 

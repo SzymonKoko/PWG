@@ -44,6 +44,7 @@ camera: { path: ..., dt: 0.0166666667, loop: false, matrix_dump: false }
 warmup: { frames: 300 }
 measure: { frames: 1800 }         # path frames; 0 or absent: no measurement window
 record: measure                   # measure | prepare | none, see "CSV window"
+memory_snapshots: false           # true: add memory_snapshot rows to the CSV window (D-04), see "Memory snapshots"
 repetitions: 5
 order: interleaved                # or sequential
 cooldown_s: 30
@@ -126,6 +127,17 @@ load project -> apply parameters -> benchmark mode on -> [CSV window of prepare]
 ```
 
 Each step waits three frames after a load, the parameters or benchmark mode so the scene has updated. Every unit reloads the project. `interleaved` runs repetition 1 of every variant, then repetition 2; `sequential` runs all repetitions of a variant together. If a step fails (project load, parameter, graph, hydrology, capture, dropped samples above the limit, `cpu_sleep_ms` above 0 in benchmark mode, a limiter or VSync that is still active at the start of the measurement) the unit is closed as failed with the reason in its `run.yaml`, and the remaining units continue. A failed renderer check stops the run before the first measurement.
+
+### Memory snapshots (D-04)
+
+`memory_snapshots: true` adds `memory_snapshot` rows (own accounting, process RAM, driver VRAM; `debug_view_memory.md`, `debug_view_export.md`) to the events.csv of the CSV window. Default `false`, so existing configs write what they wrote before; `true` with `record: none` is rejected. The points depend on what the window covers:
+
+| `record` | Points (`point=` in `detail`) |
+|---|---|
+| `prepare` | `prepare_start` (before the first entry), then `after:<entry name>` after every prepare entry, e.g. `after:run_graph` (E-05) |
+| `measure` | `measure_start` (first frame of the window) and `measure_end` (last frame) |
+
+A snapshot costs one `GetProcessMemoryInfo` call, two `glGetIntegerv` and seven atomic loads, and runs on the main thread between two frames. It does not wait for the GPU: after fixed erosion steps or an upload the driver's VRAM figure may not yet include work that is still queued. Without instrumentation (`PWG_DEBUG_VIEW_INSTRUMENTATION=OFF`) no row is written.
 
 ### CSV window
 

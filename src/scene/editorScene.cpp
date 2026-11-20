@@ -898,6 +898,11 @@ void pwg::EditorScene::Draw()
             debug::DebugView::Get().DrawSimulationTab();
             ImGui::EndTabItem();
         }
+        if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Memory"))
+        {
+            debug::DebugView::Get().DrawMemoryTab();
+            ImGui::EndTabItem();
+        }
         if (debug::DebugView::HasInstance() && ImGui::BeginTabItem("Experiment"))
         {
             debug::DebugView::Get().DrawExperimentTab();

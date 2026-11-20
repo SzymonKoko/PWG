@@ -29,6 +29,7 @@ namespace pwg
 
 	Mesh::~Mesh()
 	{
+		PWG_MEM_DO(if (m_instanceBufferCapacity != 0) PWG_MEM_RELEASE(INSTANCE_VBO, m_instanceBufferCapacity, true));
 		glDeleteVertexArrays(1, &m_vaoID);
 		glDeleteBuffers(1, &m_vboID);
 		glDeleteBuffers(1, &m_eboID);
@@ -73,8 +74,12 @@ namespace pwg
 		const std::size_t requiredBytes = transforms.size() * sizeof(glm::mat4);
 		if (requiredBytes > m_instanceBufferCapacity)
 		{
+			const std::size_t previousCapacity = m_instanceBufferCapacity;
 			m_instanceBufferCapacity = std::max(requiredBytes, m_instanceBufferCapacity + m_instanceBufferCapacity / 2u);
 			glBufferData(GL_ARRAY_BUFFER, m_instanceBufferCapacity, nullptr, GL_STREAM_DRAW);
+			PWG_MEM_DO(
+				if (previousCapacity == 0) PWG_MEM_ALLOC(INSTANCE_VBO, m_instanceBufferCapacity);
+				else PWG_MEM_RESIZE(INSTANCE_VBO, previousCapacity, m_instanceBufferCapacity));
 		}
 		glBufferSubData(GL_ARRAY_BUFFER, 0, requiredBytes, transforms.data());
 		for (unsigned int location = 4; location < 8; ++location)

@@ -30,6 +30,7 @@ namespace pwg
 		glGenBuffers(1, &m_particleBuffer);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffer);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, static_cast<GLsizeiptr>(m_particleCapacity) * 32, nullptr, GL_DYNAMIC_DRAW);
+		PWG_MEM_ALLOC(PARTICLE_SSBO, static_cast<uint64_t>(m_particleCapacity) * 32u);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 		glGenVertexArrays(1, &m_debugVao);
 		m_heightDelta = CreateAtomicTexture();
@@ -45,7 +46,11 @@ namespace pwg
 		if (m_heightDelta) glDeleteTextures(1, &m_heightDelta);
 		if (m_flowDelta) glDeleteTextures(1, &m_flowDelta);
 		if (m_waterDelta) glDeleteTextures(1, &m_waterDelta);
-		if (m_particleBuffer) glDeleteBuffers(1, &m_particleBuffer);
+		if (m_particleBuffer)
+		{
+			glDeleteBuffers(1, &m_particleBuffer);
+			PWG_MEM_RELEASE(PARTICLE_SSBO, static_cast<uint64_t>(m_particleCapacity) * 32u, true);
+		}
 		if (m_debugVao) glDeleteVertexArrays(1, &m_debugVao);
 	}
 

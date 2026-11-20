@@ -14,6 +14,7 @@
 #include "debug/exporters.h"
 #include "debug/frameStats.h"
 #include "debug/gpuProfiler.h"
+#include "debug/memoryStats.h"
 #include "debug/renderStats.h"
 #include "debug/runMetadata.h"
 #include "debug/simulationStats.h"
@@ -184,6 +185,20 @@ namespace pwg::debug
 		void DrawSimulationTab();
 
 		/**
+		* @brief "Memory" tab of the Debug window (D-04): own accounting, process RAM and driver VRAM, each with its
+		* source label (debugViewPanel.cpp). Instrumented builds only.
+		*/
+		void DrawMemoryTab();
+
+		/**
+		* @brief Takes a memory snapshot (own accounting, process RAM, driver VRAM; needs the GL context, main thread) and
+		* adds its rows (`memory_snapshot`, one shared sequence number) to the events.csv of the window being recorded.
+		* `point` says where it was taken (`point=` in the detail column). False if no window records, the frame is not
+		* inside it, or the instrumentation is compiled out; no query is made in that case.
+		*/
+		bool RecordMemorySnapshot(const std::string& point);
+
+		/**
 		* @brief Experiment runner (D-11, design 8). Application creates it and registers it here; the Experiment tab
 		* and the runner's metadata use it through this pointer. Null until registered.
 		*/
@@ -239,6 +254,9 @@ namespace pwg::debug
 		CameraPath m_cameraPath;
 		std::vector<GpuEventResult> m_gpuEventResults;	/**< Reused by BeginFrame. */
 		uint32_t m_manualExportCounter{ 0 };
+		int64_t m_memorySnapshotIndex{ 0 };		/**< `index` of the next memory_snapshot of the window; restarts with every window. */
+		MemorySnapshot m_memoryShown;			/**< Snapshot of the Memory tab, refreshed a few times per second. */
+		double m_memoryShownTime{ -1.0 };		/**< ImGui time of m_memoryShown; negative = none yet. */
 
 		uint64_t m_frameIndex{ 0 };
 		bool m_frameStarted{ false };

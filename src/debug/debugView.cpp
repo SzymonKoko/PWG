@@ -239,7 +239,39 @@ bool pwg::debug::DebugView::StartRecording(RunInfo run, const std::filesystem::p
 	}
 
 	Metadata metadata = CollectRunMetadata(run, start);
+	m_memorySnapshotIndex = 0;
 	return m_recorder.Start(run, std::move(metadata), outputRoot / run.runId, m_frameIndex, frameCount);
+}
+
+bool pwg::debug::DebugView::RecordMemorySnapshot(const std::string& point)
+{
+	if constexpr (!InstrumentationCompiled)
+	{
+		(void)point;
+		return false;
+	}
+	else
+	{
+		if (m_recorder.GetState() != CsvRecorder::State::RECORDING)
+		{
+			return false;
+		}
+		std::vector<EventRow> rows;
+		AppendMemorySnapshotRows(MemoryStats::TakeSnapshot(), point, m_memorySnapshotIndex, rows);
+		const uint64_t sequence = m_sim.ReserveSequence();
+		bool added = false;
+		for (EventRow& row : rows)
+		{
+			row.sequence = sequence;
+			row.engineFrame = m_frameIndex;
+			added = m_recorder.AddEventRow(std::move(row)) || added;
+		}
+		if (added)
+		{
+			++m_memorySnapshotIndex;
+		}
+		return added;
+	}
 }
 
 bool pwg::debug::DebugView::RequestScreenshot(ScreenshotRequest request)

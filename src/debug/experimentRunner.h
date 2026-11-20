@@ -128,6 +128,7 @@ namespace pwg::debug
 		double cameraStep{ 1.0 / 60.0 };
 		bool cameraLoop{ false };
 		bool matrixDump{ false };
+		bool memorySnapshots{ false };		/**< D-04: add `memory_snapshot` rows at the points of the CSV window (debug_view_runner.md). */
 
 		uint64_t warmupFrames{ 0 };
 		uint64_t measureFrames{ 0 };
@@ -338,6 +339,8 @@ namespace pwg::debug
 		std::vector<StepLog> m_stepLog;
 		std::vector<CaptureRecord> m_captureLog;
 		bool m_windowActive{ false };		/**< A CSV window was started in this unit. */
+		bool m_memoryStartTaken{ false };	/**< The first memory snapshot of the window (`prepare_start` or `measure_start`) was added. */
+		bool m_memoryEndTaken{ false };		/**< The `measure_end` snapshot was added. */
 		bool m_windowWritten{ false };
 		uint64_t m_windowGpuDropped{ 0 };
 		double m_windowMaxSleepMs{ 0.0 };

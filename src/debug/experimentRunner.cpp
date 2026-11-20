@@ -681,7 +681,7 @@ bool pwg::debug::LoadExperimentConfig(const std::filesystem::path& file, const s
 	{
 		if (!CheckKeys(root, { "format", "format_version", "experiment_id", "description", "project", "expect_renderer", "output",
 			"debug_view", "benchmark", "manual", "params", "prepare", "camera", "warmup", "measure", "record", "repetitions",
-			"order", "cooldown_s", "variants", "captures" }, "the config", error))
+			"order", "cooldown_s", "variants", "captures", "memory_snapshots" }, "the config", error))
 		{
 			return false;
 		}
@@ -721,6 +721,10 @@ bool pwg::debug::LoadExperimentConfig(const std::filesystem::path& file, const s
 		else
 		{
 			config.output = (base / "results" / config.experimentId).lexically_normal();
+		}
+		if (!ReadFlag(root, "memory_snapshots", config.memorySnapshots, "the config", error))
+		{
+			return false;
 		}
 		if (!ReadFlag(root, "debug_view", config.debugView, "the config", error))
 		{
@@ -898,6 +902,12 @@ bool pwg::debug::LoadExperimentConfig(const std::filesystem::path& file, const s
 		if (config.measureFrames > 0 && config.record == ExperimentConfig::Record::PREPARE)
 		{
 			error = "measure.frames with record: prepare: one CSV window per run, choose what it covers (record: measure or none)";
+			return false;
+		}
+
+		if (config.memorySnapshots && config.record == ExperimentConfig::Record::NONE)
+		{
+			error = "memory_snapshots: true with record: none writes nothing; use record: prepare or measure";
 			return false;
 		}
 
@@ -1377,6 +1387,8 @@ void pwg::debug::ExperimentRunner::Tick()
 		if (m_phaseFrame >= m_phaseFrames)
 		{
 			m_stepIndex = 0;
+			m_memoryStartTaken = false;
+			m_memoryEndTaken = false;
 			m_stepStarted = false;
 			m_stepFrames = 0;
 			if (m_config.record == ExperimentConfig::Record::PREPARE)
@@ -1941,6 +1953,18 @@ void pwg::debug::ExperimentRunner::TickMeasure()
 	{
 		RestartPlaybackIfEnded();
 		m_phaseFrame = view.GetFrameIndex() - m_stepStartFrame;
+		if (m_config.memorySnapshots)
+		{
+			// First and last frame of the window (the window covers frames start + 1 ... start + measure.frames).
+			if (!m_memoryStartTaken)
+			{
+				m_memoryStartTaken = view.RecordMemorySnapshot("measure_start");
+			}
+			else if (!m_memoryEndTaken && m_phaseFrame >= m_config.measureFrames)
+			{
+				m_memoryEndTaken = view.RecordMemorySnapshot("measure_end");
+			}
+		}
 		return;
 	}
 	// The window is over: it drains and writes at the start of the coming frames.
@@ -2171,6 +2195,12 @@ void pwg::debug::ExperimentRunner::TickPrepare()
 	}
 
 	const ExperimentStep& step = m_config.prepare[m_stepIndex];
+	const bool memoryWindow = m_config.memorySnapshots && m_config.record == ExperimentConfig::Record::PREPARE && m_windowActive;
+	if (memoryWindow && !m_memoryStartTaken)
+	{
+		// Before the first entry: the baseline of the window.
+		m_memoryStartTaken = view.RecordMemorySnapshot("prepare_start");
+	}
 	std::string error;
 	const StepResult result = TickStep(step, error);
 	if (result == StepResult::RUNNING)
@@ -2181,6 +2211,11 @@ void pwg::debug::ExperimentRunner::TickPrepare()
 	{
 		FailUnit("prepare '" + step.label + "': " + error);
 		return;
+	}
+	if (memoryWindow)
+	{
+		// The entry is done; fixed erosion steps and uploads may still be queued on the GPU, which the VRAM value does not wait for.
+		view.RecordMemorySnapshot("after:" + step.label);
 	}
 	++m_stepIndex;
 	m_stepStarted = false;
@@ -2519,6 +2554,10 @@ void pwg::debug::ExperimentRunner::EmitExperimentBlock(YAML::Emitter& out, const
 	}
 	out << YAML::EndMap;
 	KeyBool(out, "debug_view", m_config.debugView);
+	if (m_config.memorySnapshots)
+	{
+		KeyBool(out, "memory_snapshots", true);		// Only when set, so the inputs of runs of earlier configs are unchanged.
+	}
 	out << YAML::Key << "benchmark" << YAML::Value << YAML::BeginMap;
 	KeyBool(out, "enabled", m_config.benchmarkEnabled);
 	KeyNumber(out, "render_width", m_config.renderWidth);

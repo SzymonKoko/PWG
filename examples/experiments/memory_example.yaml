@@ -1,0 +1,32 @@
+# Example experiment config for the Debug View runner (D-04, D-11): memory snapshots around the prepare phase, with a
+# different world size per variant (the shape of E-05). events.csv holds the graph events and memory_snapshot rows
+# (own accounting, process RAM, driver VRAM; docs/debug_view_memory.md) at prepare_start and after every entry.
+# A functional example, not an experiment of the thesis; the world sizes are not the ones E-05 will use.
+#
+# Run it from build/bin/Release:
+#   PWG.exe --experiment ../../../examples/experiments/memory_example.yaml --exit-when-done
+format: pwg-experiment
+format_version: 1
+experiment_id: EX-memory
+description: "Example: memory snapshots after the graph run and a hydrology run, two world sizes"
+project: runner-test.pwg
+output: ../../build/experiment-runs/EX-memory
+
+benchmark:
+  enabled: true
+  render_size: [640, 360]
+
+variants:
+  - { name: world_5x65, params: { terrain.chunk_count: 5, terrain.chunk_size: 65 } }
+  - { name: world_9x65, params: { terrain.chunk_count: 9, terrain.chunk_size: 65 } }
+
+prepare:
+  - run_graph: true                          # needed after terrain.* parameters
+    name: graph
+  - hydrology: generate
+    name: hydrology
+
+record: prepare
+memory_snapshots: true
+repetitions: 1
+cooldown_s: 0

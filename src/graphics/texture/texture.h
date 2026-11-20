@@ -13,6 +13,7 @@
 #include <cstddef>
 
 #include "core/logger/logger.h"
+#include "debug/memoryStats.h"
 
 namespace pwg
 {
@@ -143,6 +144,15 @@ namespace pwg
 
 		TextureType m_textureType{ TextureType::ALBEDO };		/**< Type of texture (2D, cubemap, noise). */
 		GLTextureFormats m_format;									/**< OpenGL internal format, format, and type. */
+
+		/** @brief Own accounting (D-04): bytes counted for this texture, and whether they include the mip chain. Not present when instrumentation is compiled out. */
+		PWG_MEM_MEMBER(unsigned long long m_accountedBytes{ 0 };)
+		PWG_MEM_MEMBER(bool m_accountedMipmapped{ false };)
+
+#if PWG_DEBUG_VIEW_INSTRUMENTATION
+		/** @brief Sets the counted bytes from the current size and format; the first call counts the texture as a new object. */
+		void AccountStorage(bool mipmapped);
+#endif
 	};
 } // namespace pwg
 

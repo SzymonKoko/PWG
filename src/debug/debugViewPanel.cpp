@@ -1373,3 +1373,171 @@ void pwg::debug::DebugView::DrawCameraPathSection()
 		"Switch the matrix dump off for measured runs (it keeps the rows in memory until the playback ends).");
 	ImGui::PopStyleColor();
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Memory tab (D-04, design 5.7)
+// ---------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+	constexpr double MemoryRefreshSeconds = 0.25;
+
+	/** @brief One table row: name, size in MiB, exact bytes, source label, method. `bytes` null = not available. */
+	void MemoryRow(const char* name, const uint64_t* bytes, const char* source, const char* method)
+	{
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn(); ImGui::TextUnformatted(name);
+		ImGui::TableNextColumn();
+		if (bytes)
+		{
+			ImGui::Text("%.2f", static_cast<double>(*bytes) / (1024.0 * 1024.0));
+		}
+		else
+		{
+			ImGui::TextDisabled("-");
+		}
+		ImGui::TableNextColumn();
+		if (bytes)
+		{
+			ImGui::Text("%llu", static_cast<unsigned long long>(*bytes));
+		}
+		else
+		{
+			ImGui::TextDisabled("-");
+		}
+		ImGui::TableNextColumn(); ImGui::TextUnformatted(source);
+		ImGui::TableNextColumn(); ImGui::TextUnformatted(method);
+	}
+
+	bool BeginMemoryTable(const char* id)
+	{
+		const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+		if (!ImGui::BeginTable(id, 5, flags))
+		{
+			return false;
+		}
+		ImGui::TableSetupColumn("value");
+		ImGui::TableSetupColumn("MiB");
+		ImGui::TableSetupColumn("bytes");
+		ImGui::TableSetupColumn("source label");
+		ImGui::TableSetupColumn("method");
+		ImGui::TableHeadersRow();
+		return true;
+	}
+}
+
+void pwg::debug::DebugView::DrawMemoryTab()
+{
+	if constexpr (!InstrumentationCompiled)
+	{
+		ImGui::TextDisabled("Instrumentation compiled out (PWG_DEBUG_VIEW_INSTRUMENTATION=OFF). No memory statistics.");
+		return;
+	}
+
+	// Own accounting is a set of atomics and is read every frame. The process and VRAM queries (a system call and two
+	// glGetIntegerv) are repeated a few times per second, only while this tab is drawn.
+	const double now = ImGui::GetTime();
+	if (m_memoryShownTime < 0.0 || now - m_memoryShownTime >= MemoryRefreshSeconds || now < m_memoryShownTime)
+	{
+		m_memoryShown = MemoryStats::TakeSnapshot();
+		m_memoryShownTime = now;
+	}
+	else
+	{
+		for (size_t i = 0; i < MemoryCategoryCount; ++i)
+		{
+			m_memoryShown.own[i] = MemoryStats::GetTotals(static_cast<MemoryCategory>(i));
+		}
+	}
+	const MemorySnapshot& snapshot = m_memoryShown;
+
+	ImGui::TextWrapped("Three separate numbers from three methods. They are never added to or subtracted from each other: own accounting counts "
+		"only the allocations listed below, process memory is the CPU side, and driver VRAM is the whole GPU.");
+	ImGui::Spacing();
+
+	// --- Own accounting ---
+	ImGui::SeparatorText("Own accounting  [own_accounting]");
+	if (BeginMemoryTable("MemoryOwn"))
+	{
+		static const char* const Methods[MemoryCategoryCount] = {
+			"width x height x bytes per texel of the internal format, plus the mip chain if mipmaps were generated (pwg::Texture)",
+			"particle capacity x 32 B (GpuParticleErosion)",
+			"world size^2 x 4 B per slot (ChunkManager height readback)",
+			"capacity of the instance buffer (Mesh::DrawInstanced)",
+		};
+		static const char* const Names[MemoryCategoryCount] = {
+			"textures (pwg::Texture)", "particle SSBO", "height readback PBOs", "instance VBOs",
+		};
+		for (size_t i = 0; i < MemoryCategoryCount; ++i)
+		{
+			MemoryRow(Names[i], &snapshot.own[i].liveBytes, "own_accounting", Methods[i]);
+		}
+		const uint64_t total = snapshot.OwnLiveBytes();
+		MemoryRow("total of the four (live)", &total, "own_accounting", "sum of the rows above");
+		ImGui::EndTable();
+	}
+	const MemoryCategoryTotals& textures = snapshot.own[static_cast<size_t>(MemoryCategory::TEXTURE)];
+	ImGui::Text("Texture objects alive: %llu (peak %.2f MiB)  |  destroyed textures whose GL texture was not deleted: %llu, %.2f MiB",
+		static_cast<unsigned long long>(textures.liveObjects),
+		static_cast<double>(textures.peakBytes) / (1024.0 * 1024.0),
+		static_cast<unsigned long long>(textures.orphanedObjects),
+		static_cast<double>(textures.orphanedBytes) / (1024.0 * 1024.0));
+	ImGui::TextDisabled("The engine's ~Texture does not call glDeleteTextures, so a destroyed pwg::Texture leaves its storage in the driver. "
+		"The live rows drop when the object is destroyed; the line above counts the bytes that stayed.");
+	ImGui::TextWrapped("Own accounting covers ONLY these allocations: pwg::Texture objects, the particle erosion SSBO, the height readback PBOs and "
+		"the mesh instance buffers. It does NOT cover mesh vertex and index buffers (terrain chunks, vegetation), framebuffers and their depth "
+		"textures, shadow maps, cube maps and texture arrays, the erosion and water textures created outside pwg::Texture, or the driver's own "
+		"padding and bookkeeping. Sizes are nominal (as requested), not measured in the driver.");
+
+	// --- Process memory ---
+	ImGui::SeparatorText("Process memory  [os_process]");
+	if (BeginMemoryTable("MemoryProcess"))
+	{
+		const ProcessMemory& process = snapshot.process;
+		MemoryRow("private usage", process.available ? &process.privateBytes : nullptr, "os_process", "GetProcessMemoryInfo, PrivateUsage");
+		MemoryRow("working set", process.available ? &process.workingSetBytes : nullptr, "os_process", "GetProcessMemoryInfo, WorkingSetSize");
+		MemoryRow("peak working set", process.available ? &process.peakWorkingSetBytes : nullptr, "os_process", "GetProcessMemoryInfo, PeakWorkingSetSize");
+		ImGui::EndTable();
+	}
+	ImGui::TextDisabled("CPU-side memory of this process (heap, mapped files, driver user-mode allocations). Not GPU memory.");
+
+	// --- VRAM ---
+	const GpuMemory& gpu = snapshot.gpu;
+	ImGui::SeparatorText(gpu.available ? "Video memory  [driver_nvx]" : "Video memory  [unavailable]");
+	if (gpu.available)
+	{
+		if (BeginMemoryTable("MemoryGpu"))
+		{
+			MemoryRow("dedicated", &gpu.dedicatedBytes, "driver_nvx", "GL_NVX_gpu_memory_info, DEDICATED_VIDMEM_NVX");
+			MemoryRow("currently available", &gpu.availableBytes, "driver_nvx", "GL_NVX_gpu_memory_info, CURRENT_AVAILABLE_VIDMEM_NVX");
+			MemoryRow("used (dedicated - available)", &gpu.usedBytes, "driver_nvx", "dedicated - currently available");
+			ImGui::EndTable();
+		}
+		ImGui::TextDisabled("Used VRAM is reported by the driver for the whole GPU: this process, other processes (the desktop, the browser) and "
+			"the driver's own use. It is shown next to own accounting and never replaces it.");
+	}
+	else
+	{
+		ImGui::TextWrapped("GL_NVX_gpu_memory_info is not available on this GPU or driver, so no VRAM value is shown (the CSV rows carry source 'unavailable' "
+			"and an empty value). Own accounting and process memory are still valid.");
+	}
+
+	// --- CSV ---
+	ImGui::SeparatorText("CSV");
+	ImGui::BeginDisabled(m_recorder.GetState() != CsvRecorder::State::RECORDING);
+	if (ImGui::Button("Add snapshot to the CSV window"))
+	{
+		RecordMemorySnapshot("manual");
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	if (ImGui::Button("Reset peaks"))
+	{
+		MemoryStats::ResetPeaks();
+	}
+	ImGui::TextDisabled("memory_snapshot rows (events.csv): metric bytes, unit B, source = the label of the table. The runner adds them with memory_snapshots: true.");
+	if (!IsEnabled())
+	{
+		ImGui::TextDisabled("Own accounting counts whether the Debug View is enabled or not.");
+	}
+}
